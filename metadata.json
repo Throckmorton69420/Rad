@@ -1,0 +1,6 @@
+{
+  "name": "Reverted Radiology Core Exam Study Planner",
+  "description": "An interactive, day-by-day study planner for radiology residents preparing for their Core Exam. It organizes study resources into a personalized schedule and helps manage study time effectively.",
+  "requestFramePermissions": [],
+  "prompt": ""
+}

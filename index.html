@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#1C1C1E">
+  <title>Radiology Core Exam Study Planner</title>
+  
+  <!-- PWA Full-Screen Mode for iOS -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Radiology Planner">
+  <link rel="manifest" href="/manifest.json">
+  
+  <script src="https://cdn.tailwindcss.com/3.4.1"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+<script type="importmap">
+{
+  "imports": {
+    "react-dom/": "https://esm.sh/react-dom@^19.1.0/",
+    "react/": "https://esm.sh/react@^19.1.0/",
+    "react": "https://esm.sh/react@^19.1.0",
+    "path": "https://esm.sh/path@^0.12.7",
+    "vite": "https://esm.sh/vite@^6.3.5",
+    "url": "https://esm.sh/url@^0.11.4",
+    "focus-trap-react": "https://esm.sh/focus-trap-react@^10.2.3",
+    "react-dom": "https://esm.sh/react-dom@^19.1.0",
+    "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@^2.50.2"
+  }
+}
+</script>
+  <link rel="stylesheet" href="/reset.css">
+  <link rel="stylesheet" href="/index.css">
+</head>
+<body>
+  <div id="root"></div>
+  <div id="notifications" aria-live="polite" aria-atomic="true"></div>
+  <script type="module" src="/index.tsx"></script>
+</body>
+</html>
