@@ -30,14 +30,14 @@ export interface Database {
         Row: { // The data shape of a row
           id: number;
           created_at: string;
-          plan_data: PlanDataBlob;
+          plan_data: Json;
         };
         Insert: { // The data shape for inserting a new row
           id: number;
-          plan_data: PlanDataBlob;
+          plan_data: Json;
         };
         Update: { // The data shape for updating a row
-          plan_data?: PlanDataBlob;
+          plan_data?: Json;
         };
       };
     };

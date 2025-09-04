@@ -281,8 +281,8 @@ const App: React.FC = () => {
   }
 
   return (
-    <div className="flex flex-col h-screen bg-transparent text-[var(--text-primary)]">
-      <header className="bg-[var(--background-secondary)] text-white p-3 md:p-4 border-b border-[var(--separator-primary)] flex justify-between items-center sticky top-0 z-[var(--z-header)]">
+    <div className="flex flex-col h-screen bg-transparent text-[var(--text-primary)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]">
+      <header className="bg-[var(--background-secondary)] text-white px-3 md:px-4 pb-3 md:pb-4 border-b border-[var(--separator-primary)] flex justify-between items-center sticky top-0 z-[var(--z-header)] pt-[calc(0.75rem+env(safe-area-inset-top))] md:pt-[calc(1rem+env(safe-area-inset-top))]">
         <div className="flex items-center">
             <button className="lg:hidden p-2 -ml-2 mr-2 text-[var(--text-primary)] hover:bg-[var(--background-tertiary)] rounded-full" onClick={() => setIsSidebarOpen(p => !p)} aria-label="Toggle menu">
                 <i className="fas fa-bars fa-lg"></i>
@@ -318,7 +318,7 @@ const App: React.FC = () => {
         {/* Mobile Sidebar Overlay */}
         <div className={`lg:hidden fixed inset-0 bg-black/60 z-40 transition-opacity ${isSidebarOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`} onClick={() => setIsSidebarOpen(false)} aria-hidden="true"></div>
         
-        <aside className={`w-80 bg-[var(--background-secondary)] text-[var(--text-secondary)] px-5 pt-5 pb-24 lg:p-5 space-y-4 overflow-y-auto border-r border-[var(--separator-primary)] fixed lg:static h-full z-50 transform transition-transform duration-300 ease-in-out lg:translate-x-0 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+        <aside className={`w-80 bg-[var(--background-secondary)] text-[var(--text-secondary)] px-5 pt-5 space-y-4 overflow-y-auto border-r border-[var(--separator-primary)] fixed lg:static h-full z-50 transform transition-transform duration-300 ease-in-out lg:translate-x-0 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} pb-[calc(6rem+env(safe-area-inset-bottom))] lg:pb-[calc(1.25rem+env(safe-area-inset-bottom))]`}>
           <div className="flex justify-end -mr-2 -mt-2 lg:hidden">
               <button onClick={() => setIsSidebarOpen(false)} className="p-2 text-[var(--text-primary)] hover:text-white" aria-label="Close menu">
                   <i className="fas fa-times fa-lg"></i>
@@ -395,7 +395,7 @@ const App: React.FC = () => {
           </div>
         </aside>
 
-        <main className="flex-1 p-3 md:p-6 flex flex-col overflow-y-auto bg-transparent">
+        <main className="flex-1 p-3 md:p-6 flex flex-col overflow-y-auto bg-transparent pb-[env(safe-area-inset-bottom)]">
            <div className="mb-6 flex-shrink-0">
                 <div className="inline-flex bg-[var(--background-tertiary)] p-1 rounded-lg space-x-1">
                     <button onClick={() => setActiveTab('schedule')} className={`py-1.5 px-4 font-semibold text-sm rounded-md flex-1 transition-colors ${activeTab === 'schedule' ? 'bg-[var(--background-tertiary-hover)] shadow text-[var(--text-primary)]' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}>

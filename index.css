@@ -164,6 +164,9 @@ aside {
 }
 .ios-switch input:checked + .slider { background-color: var(--accent-purple); }
 .ios-switch.yellow input:checked + .slider { background-color: var(--accent-yellow); }
+.ios-switch input:checked + .slider:before {
+  transform: translateX(20px);
+}
 
 
 .topic-list-item { transition: transform 0.2s ease-out, box-shadow 0.2s ease-out, opacity 0.2s ease-out; }
