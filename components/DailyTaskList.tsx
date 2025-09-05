@@ -116,7 +116,7 @@ const DailyTaskList: React.FC<DailyTaskListProps> = ({
           </div>
         )}
         {/* Spacer for safe area and "dead space", allowing content to scroll above the sticky footer */}
-        <div className="flex-shrink-0 h-4 pb-[calc(1rem+env(safe-area-inset-bottom))]"></div>
+        <div className="flex-shrink-0 h-8 pb-[calc(1rem+env(safe-area-inset-bottom))]"></div>
       </div>
       
       <div className="flex-shrink-0 mt-auto pt-3 bg-[var(--glass-background-panel)] backdrop-blur-[24px] flex space-x-2">
