@@ -62,7 +62,7 @@
   }
 }
 
-html, body {
+html, body, #root {
   height: 100%;
   overflow-x: hidden;
 }
@@ -78,13 +78,6 @@ body {
   font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-}
-
-body.body-no-scroll {
-  position: fixed;
-  overflow: hidden;
-  width: 100%;
-  top: calc(var(--scroll-y, 0) * -1px);
 }
 
 h1, h2 {

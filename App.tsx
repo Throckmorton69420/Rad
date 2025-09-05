@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import ReactDOM from 'react-dom';
 import { DailySchedule, StudyPlan, ScheduledTask, PomodoroSettings, ViewMode, Domain, ResourceType, AddTaskModalProps, StudyResource, ResourceEditorModalProps, ExceptionDateRule } from './types';
 import { EXAM_DATE_START, STUDY_START_DATE, APP_TITLE, ALL_DOMAINS, POMODORO_DEFAULT_STUDY_MINS, POMODORO_DEFAULT_REST_MINS } from './constants';
@@ -28,20 +28,18 @@ import { formatDuration, getTodayInNewYork } from './utils/timeFormatter';
 const App: React.FC = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(true);
-  const [draggedItem, setDraggedItem] = useState<{ type: 'resource' | 'task', id: string } | null>(null);
-  const scrollPositionRef = useRef(0);
 
   const {
     studyPlan, setStudyPlan, previousStudyPlan,
     globalMasterResourcePool, setGlobalMasterResourcePool,
-    userExceptions, setUserExceptions,
+    userExceptions,
     isLoading, systemNotification, setSystemNotification,
     isNewUser,
     loadSchedule, handleRebalance, handleUpdateTopicOrderAndRebalance, handleUpdateCramTopicOrderAndRebalance, handleTogglePhysicsManagementAndRebalance,
     handleToggleCramPhysicsManagementAndRebalance,
     handleToggleCramMode,
     handleTaskToggle, handleSaveModifiedDayTasks, handleUndo,
-    scheduledResourceIds, unscheduledResources, updatePreviousStudyPlan,
+    updatePreviousStudyPlan,
     saveStatus,
     handleToggleRestDay,
     handleAddOrUpdateException,
@@ -70,23 +68,6 @@ const App: React.FC = () => {
     loadSchedule();
   }, []);
   
-  useEffect(() => {
-    const body = document.body;
-    if (isSidebarOpen) {
-      scrollPositionRef.current = window.scrollY;
-      body.style.position = 'fixed';
-      body.style.top = `-${scrollPositionRef.current}px`;
-      body.style.width = '100%';
-      body.style.overflow = 'hidden';
-    } else {
-      body.style.position = '';
-      body.style.top = '';
-      body.style.width = '';
-      body.style.overflow = '';
-      window.scrollTo(0, scrollPositionRef.current);
-    }
-  }, [isSidebarOpen]);
-
   const navigateDate = (direction: 'next' | 'prev') => {
     const currentDateObj = new Date(selectedDate + 'T00:00:00');
     currentDateObj.setDate(currentDateObj.getDate() + (direction === 'next' ? 1 : -1));
@@ -256,7 +237,7 @@ const App: React.FC = () => {
     e.preventDefault();
   };
 
-  const onTaskDragStart = (e: React.DragEvent<HTMLDivElement>, taskId: string) => {
+  const onTaskDragStart = (e: React.DragEvent<HTMLDivElement>) => {
      showConfirmation({
         title: "Modify Schedule?",
         message: "To move tasks, please use the 'Modify Schedule & Resources' button. This provides a dedicated interface for dragging tasks on or off the schedule.",
@@ -299,7 +280,7 @@ const App: React.FC = () => {
   }
 
   return (
-    <div className="flex flex-col h-dvh w-full overflow-x-hidden bg-transparent text-[var(--text-primary)]">
+    <div className="flex flex-col h-full w-full overflow-x-hidden bg-transparent text-[var(--text-primary)]">
       <header className="bg-[var(--background-secondary)] text-white px-3 md:px-4 pb-3 md:pb-4 border-b border-[var(--separator-primary)] flex justify-between items-center sticky top-0 z-[var(--z-header)] pt-[calc(0.75rem+env(safe-area-inset-top))] md:pt-[calc(1rem+env(safe-area-inset-top))] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]">
         <div className="flex items-center">
             <button className="lg:hidden p-2 -ml-2 mr-2 text-[var(--text-primary)] hover:bg-[var(--background-tertiary)] rounded-full" onClick={() => setIsSidebarOpen(p => !p)} aria-label="Toggle menu">
@@ -417,7 +398,7 @@ const App: React.FC = () => {
           </div>
         </aside>
 
-        <main className="flex-1 p-3 md:p-6 flex flex-col overflow-y-auto bg-transparent pr-[env(safe-area-inset-right)] isolated-scroll">
+        <main className={`flex-1 p-3 md:p-6 flex flex-col overflow-y-auto bg-transparent pr-[env(safe-area-inset-right)] isolated-scroll ${isSidebarOpen ? 'pointer-events-none' : ''}`}>
            <div className="mb-6 flex-shrink-0">
                 <div className="inline-flex bg-[var(--background-tertiary)] p-1 rounded-lg space-x-1">
                     <button onClick={() => setActiveTab('schedule')} className={`py-1.5 px-4 font-semibold text-sm rounded-md flex-1 transition-colors ${activeTab === 'schedule' ? 'bg-[var(--background-tertiary-hover)] shadow text-[var(--text-primary)]' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}>
