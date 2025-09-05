@@ -31,3 +31,31 @@ This is an interactive, day-by-day study planner for radiology residents prepari
 
 4.  **Open in Browser:**
     Your application will now be running. You can access it by opening your web browser and navigating to `http://localhost:5173` (or the address shown in your terminal).
+
+## Deploying to Vercel
+
+When you deploy this project to Vercel, you need to configure the same environment variables you used in your local `.env` file. This is why you are seeing a "Configuration Error" on your deployed site.
+
+Here's how to fix it:
+
+1.  **Go to your Project Settings in Vercel:**
+    Navigate to your project on the Vercel dashboard.
+
+2.  **Find Environment Variables:**
+    Click on the "Settings" tab, and then select "Environment Variables" from the side menu.
+
+3.  **Add the Variables:**
+    You need to add two environment variables using the credentials you provided:
+
+    *   **Variable 1:**
+        *   **Name:** `VITE_SUPABASE_URL`
+        *   **Value:** `https://wwjibyasyzrlycrvogzy.supabase.co`
+
+    *   **Variable 2:**
+        *   **Name:** `VITE_SUPABASE_ANON_KEY`
+        *   **Value:** `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind3amlieWFzeXpybHljcnZvZ3p5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTExMDkxNDYsImV4cCI6MjA2NjY4NTE0Nn0.J4JxgoYhyJzWz6XY28tShWvdgbtZu2wNfcdcGC2fAkQ`
+
+    *Important: Make sure the variables are available to all environments (Production, Preview, and Development) in the Vercel settings.*
+
+4.  **Redeploy:**
+    After adding and saving the variables, go to the "Deployments" tab for your project and trigger a new deployment for your latest commit. Vercel will use these new environment variables during the build process, and your application should connect to Supabase successfully.
