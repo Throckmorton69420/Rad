@@ -280,9 +280,9 @@ const App: React.FC = () => {
   }
 
   const SidebarContent = (
-      <aside className={`w-80 bg-[var(--background-secondary)] text-[var(--text-secondary)] border-r border-[var(--separator-primary)] flex flex-col h-full`}>
+      <aside className={`w-80 bg-[var(--background-secondary)] text-[var(--text-secondary)] border-r border-[var(--separator-primary)] flex flex-col h-full pb-[env(safe-area-inset-bottom)]`}>
         <div className="flex-grow flex flex-col min-h-0">
-          <div className="flex-grow overflow-y-auto isolated-scroll pr-5 pl-[calc(0.75rem+env(safe-area-inset-left))] pt-[calc(0.75rem+env(safe-area-inset-top))] pb-[calc(6rem+env(safe-area-inset-bottom))]">
+          <div className="flex-grow overflow-y-auto isolated-scroll pr-5 pl-[calc(0.75rem+env(safe-area-inset-left))] pt-[calc(0.75rem+env(safe-area-inset-top))] pb-24">
             <div className="space-y-4">
               <div className="flex justify-end -mr-2 -mt-2 lg:hidden">
                   <button onClick={() => setIsSidebarOpen(false)} className="p-2 text-[var(--text-primary)] hover:text-white" aria-label="Close menu">
