@@ -71,11 +71,14 @@ const App: React.FC = () => {
   useEffect(() => {
     if (isSidebarOpen) {
       document.documentElement.classList.add('scroll-lock');
+      document.body.classList.add('scroll-lock');
     } else {
       document.documentElement.classList.remove('scroll-lock');
+      document.body.classList.remove('scroll-lock');
     }
     return () => {
       document.documentElement.classList.remove('scroll-lock');
+      document.body.classList.remove('scroll-lock');
     };
   }, [isSidebarOpen]);
   
@@ -428,7 +431,7 @@ const App: React.FC = () => {
           notificationPortal
         )}
 
-        <main className={`flex-1 p-3 md:p-6 flex flex-col min-h-0 bg-transparent pl-[calc(0.75rem+env(safe-area-inset-left))] pr-[calc(0.75rem+env(safe-area-inset-right))]`}>
+        <main className={`flex-1 p-3 md:p-6 flex flex-col min-h-0 bg-transparent pl-[calc(0.75rem+env(safe-area-inset-left))] pr-[calc(0.75rem+env(safe-area-inset-right))] pb-[env(safe-area-inset-bottom)]`}>
           <div className="mb-6 flex-shrink-0">
                 <div className="inline-flex bg-[var(--background-tertiary)] p-1 rounded-lg space-x-1">
                     <button onClick={() => setActiveTab('schedule')} className={`py-1.5 px-4 font-semibold text-sm rounded-md flex-1 transition-colors ${activeTab === 'schedule' ? 'bg-[var(--background-tertiary-hover)] shadow text-[var(--text-primary)]' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}>

@@ -115,11 +115,9 @@ const DailyTaskList: React.FC<DailyTaskListProps> = ({
             <p className="text-[var(--text-secondary)] text-sm mt-1">Use the "Modify Schedule" button below to add tasks.</p>
           </div>
         )}
-        {/* Spacer for safe area and "dead space", allowing content to scroll above the sticky footer */}
-        <div className="flex-shrink-0 h-8 pb-[calc(1rem+env(safe-area-inset-bottom))]"></div>
       </div>
       
-      <div className="flex-shrink-0 mt-auto pt-3 bg-[var(--glass-background-panel)] backdrop-blur-[24px] flex space-x-2">
+      <div className="flex-shrink-0 mt-auto pt-3 bg-[var(--glass-background-panel)] backdrop-blur-[24px] flex space-x-2 pb-[env(safe-area-inset-bottom)]">
         <Button onClick={onOpenModifyDayModal} variant="primary" className="flex-grow" disabled={dailySchedule.isRestDay}>
           <i className="fas fa-edit mr-2"></i> Modify Schedule
         </Button>

@@ -146,90 +146,92 @@ const ProgressDisplay: React.FC<ProgressDisplayProps> = ({ studyPlan }) => {
 
 
   return (
-    <div className="view-container text-[var(--text-primary)] h-full overflow-y-auto">
-      <h2 className="text-2xl font-bold text-[var(--text-primary)] border-b border-[var(--separator-primary)] pb-3 text-center">Study Progress</h2>
+    <div className="view-container text-[var(--text-primary)] h-full flex flex-col">
+      <h2 className="text-2xl font-bold text-[var(--text-primary)] border-b border-[var(--separator-primary)] pb-3 text-center flex-shrink-0">Study Progress</h2>
       
-      <div className="mt-8">
-        <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-2">Overall Progress</h3>
-        <div className='mt-2 p-4 static-glow-border rounded-lg bg-[var(--background-tertiary)]'>
-            <div className="flex justify-between items-baseline mb-3">
-                <span className="text-sm font-medium text-[var(--text-secondary)]">Total Completion</span>
-                <span className="text-sm font-bold text-[var(--text-primary)]">{Math.round(overallProgressPercentage)}%</span>
-            </div>
-            <div className="w-full bg-black/40 rounded-full h-4 progress-bar-track static-glow-border mt-2">
-                <div className="progress-bar-fill" style={{ width: `${overallProgressPercentage}%` }}></div>
-            </div>
-            <p className="text-sm text-[var(--text-secondary)] mt-1 text-right">{formatDuration(totalCompletedMinutes)} / {formatDuration(totalScheduledMinutes)} completed</p>
+      <div className="flex-1 overflow-y-auto min-h-0 mt-8 pr-2 -mr-2">
+        <div>
+          <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-2">Overall Progress</h3>
+          <div className='mt-2 p-4 static-glow-border rounded-lg bg-[var(--background-tertiary)]'>
+              <div className="flex justify-between items-baseline mb-3">
+                  <span className="text-sm font-medium text-[var(--text-secondary)]">Total Completion</span>
+                  <span className="text-sm font-bold text-[var(--text-primary)]">{Math.round(overallProgressPercentage)}%</span>
+              </div>
+              <div className="w-full bg-black/40 rounded-full h-4 progress-bar-track static-glow-border mt-2">
+                  <div className="progress-bar-fill" style={{ width: `${overallProgressPercentage}%` }}></div>
+              </div>
+              <p className="text-sm text-[var(--text-secondary)] mt-1 text-right">{formatDuration(totalCompletedMinutes)} / {formatDuration(totalScheduledMinutes)} completed</p>
+          </div>
         </div>
-      </div>
 
-      {firstPassEndDate && (
-        <>
-            <h3 className="text-lg font-semibold text-[var(--text-primary)] mt-8">Key Dates</h3>
-            <div className="mt-4 flex justify-between items-center">
-                <span className="font-medium text-[var(--text-primary)]">First Pass Completion Date</span>
-                <span className="font-bold text-[var(--accent-purple)]">{new Date(firstPassEndDate + 'T00:00:00').toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
+        {firstPassEndDate && (
+          <>
+              <h3 className="text-lg font-semibold text-[var(--text-primary)] mt-8">Key Dates</h3>
+              <div className="mt-4 flex justify-between items-center">
+                  <span className="font-medium text-[var(--text-primary)]">First Pass Completion Date</span>
+                  <span className="font-bold text-[var(--accent-purple)]">{new Date(firstPassEndDate + 'T00:00:00').toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
+              </div>
+          </>
+        )}
+        
+        <h3 className="text-lg font-semibold text-[var(--text-primary)] mt-8">Detailed Progress</h3>
+        <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div>
+                <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">Filter by Topic</label>
+                <CustomSelect value={selectedDomain} onChange={val => setSelectedDomain(val as Domain | 'all')} options={domainOptions} />
             </div>
-        </>
-      )}
-      
-      <h3 className="text-lg font-semibold text-[var(--text-primary)] mt-8">Detailed Progress</h3>
-      <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-3">
-          <div>
-              <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">Filter by Topic</label>
-              <CustomSelect value={selectedDomain} onChange={val => setSelectedDomain(val as Domain | 'all')} options={domainOptions} />
-          </div>
-          <div>
-              <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">Filter by Type</label>
-              <CustomSelect value={selectedType} onChange={val => setSelectedType(val as ResourceType | 'all')} options={typeOptions} />
-          </div>
-          <div>
-              <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">Filter by Source</label>
-              <CustomSelect value={selectedSource} onChange={val => setSelectedSource(val)} options={sourceOptions} />
-          </div>
-      </div>
-
-
-      {filteredTasks.length === 0 ? (
-        <div className="text-center p-6 mt-8">
-          <p className="text-[var(--text-secondary)]">No tasks match the current filter criteria.</p>
+            <div>
+                <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">Filter by Type</label>
+                <CustomSelect value={selectedType} onChange={val => setSelectedType(val as ResourceType | 'all')} options={typeOptions} />
+            </div>
+            <div>
+                <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">Filter by Source</label>
+                <CustomSelect value={selectedSource} onChange={val => setSelectedSource(val)} options={sourceOptions} />
+            </div>
         </div>
-      ) : (
-        <>
-          {progressByTopic.length > 0 && (
-            <>
-                <h3 className="text-lg font-semibold text-[var(--text-primary)] mt-8">Progress by Topic</h3>
-                <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {progressByTopic.map(([domain, data]) => (
-                        <ProgressItem key={domain} label={domain} percentage={(data.completedMinutes / data.totalMinutes) * 100} completed={data.completedMinutes} total={data.totalMinutes} />
-                    ))}
-                </div>
-            </>
-          )}
 
-          {progressByResourceType.length > 0 && (
-            <>
-                <h3 className="text-lg font-semibold text-[var(--text-primary)] mt-8">Progress by Resource Type</h3>
-                <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {progressByResourceType.map(([type, data]) => (
-                         <ProgressItem key={type} label={type} percentage={(data.completedMinutes / data.totalMinutes) * 100} completed={data.completedMinutes} total={data.totalMinutes} />
-                    ))}
-                </div>
-            </>
-          )}
-          
-          {progressBySource.length > 0 && (
-            <>
-                <h3 className="text-lg font-semibold text-[var(--text-primary)] mt-8">Progress by Source</h3>
-                <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {progressBySource.map(([source, data], index) => (
-                        <ProgressItem key={`${source}-${index}`} label={source} percentage={(data.completedMinutes / data.totalMinutes) * 100} completed={data.completedMinutes} total={data.totalMinutes} />
-                    ))}
-                </div>
-            </>
-          )}
-        </>
-      )}
+
+        {filteredTasks.length === 0 ? (
+          <div className="text-center p-6 mt-8">
+            <p className="text-[var(--text-secondary)]">No tasks match the current filter criteria.</p>
+          </div>
+        ) : (
+          <>
+            {progressByTopic.length > 0 && (
+              <>
+                  <h3 className="text-lg font-semibold text-[var(--text-primary)] mt-8">Progress by Topic</h3>
+                  <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {progressByTopic.map(([domain, data]) => (
+                          <ProgressItem key={domain} label={domain} percentage={(data.completedMinutes / data.totalMinutes) * 100} completed={data.completedMinutes} total={data.totalMinutes} />
+                      ))}
+                  </div>
+              </>
+            )}
+
+            {progressByResourceType.length > 0 && (
+              <>
+                  <h3 className="text-lg font-semibold text-[var(--text-primary)] mt-8">Progress by Resource Type</h3>
+                  <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {progressByResourceType.map(([type, data]) => (
+                          <ProgressItem key={type} label={type} percentage={(data.completedMinutes / data.totalMinutes) * 100} completed={data.completedMinutes} total={data.totalMinutes} />
+                      ))}
+                  </div>
+              </>
+            )}
+            
+            {progressBySource.length > 0 && (
+              <>
+                  <h3 className="text-lg font-semibold text-[var(--text-primary)] mt-8">Progress by Source</h3>
+                  <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {progressBySource.map(([source, data], index) => (
+                          <ProgressItem key={`${source}-${index}`} label={source} percentage={(data.completedMinutes / data.totalMinutes) * 100} completed={data.completedMinutes} total={data.totalMinutes} />
+                      ))}
+                  </div>
+              </>
+            )}
+          </>
+        )}
+      </div>
     </div>
   );
 };
