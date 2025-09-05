@@ -85,7 +85,7 @@ const DailyTaskList: React.FC<DailyTaskListProps> = ({
         )}
       </div>
 
-      <div className="space-y-4 mt-4 pr-2 -mr-2 pb-24">
+      <div className="space-y-4 mt-4 pr-2 -mr-2 pb-[calc(6rem+env(safe-area-inset-bottom))]">
         {dailySchedule.isRestDay ? (
           <div className="text-center py-10 bg-[var(--background-tertiary)] rounded-lg">
             <p className="text-lg text-[var(--text-secondary)]">Enjoy your rest day! <i className="fas fa-coffee ml-1"></i></p>

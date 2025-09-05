@@ -146,7 +146,7 @@ const ProgressDisplay: React.FC<ProgressDisplayProps> = ({ studyPlan }) => {
 
 
   return (
-    <div className="view-container text-[var(--text-primary)] flex flex-col">
+    <div className="view-container text-[var(--text-primary)] flex flex-col pb-[env(safe-area-inset-bottom)]">
       <div className="flex-shrink-0">
         <h2 className="text-2xl font-bold text-[var(--text-primary)] border-b border-[var(--separator-primary)] pb-3 text-center">Study Progress</h2>
       </div>
