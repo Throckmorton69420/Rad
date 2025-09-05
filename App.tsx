@@ -282,8 +282,8 @@ const App: React.FC = () => {
   const SidebarContent = (
       <aside className={`w-80 bg-[var(--background-secondary)] text-[var(--text-secondary)] border-r border-[var(--separator-primary)] flex flex-col h-dvh`}>
         <div className="flex-grow flex flex-col min-h-0">
-          <div className="flex-grow overflow-y-auto isolated-scroll">
-            <div className="space-y-4 pr-5 pl-[calc(1.25rem+env(safe-area-inset-left))] pt-[calc(1.25rem+env(safe-area-inset-top))]">
+          <div className="flex-grow overflow-y-auto isolated-scroll pr-5 pl-[calc(0.75rem+env(safe-area-inset-left))] pt-[calc(0.75rem+env(safe-area-inset-top))] pb-[calc(2rem+env(safe-area-inset-bottom))]">
+            <div className="space-y-4">
               <div className="flex justify-end -mr-2 -mt-2 lg:hidden">
                   <button onClick={() => setIsSidebarOpen(false)} className="p-2 text-[var(--text-primary)] hover:text-white" aria-label="Close menu">
                       <i className="fas fa-times fa-lg"></i>
@@ -358,8 +358,6 @@ const App: React.FC = () => {
                   <Button onClick={() => showConfirmation({title: "Reset All Progress?", message: "Are you sure you want to mark all tasks as 'pending'?", confirmText: "Reset Progress", confirmVariant: 'danger', onConfirm: handleMasterResetTasks})} variant="danger" className="w-full" disabled={isLoading}>Reset Task Progress</Button>
                 </div>
               </div>
-              {/* Spacer for safe area padding and "dead space" at the bottom of the scrollable content */}
-              <div className="flex-shrink-0 h-8 pb-[calc(2rem+env(safe-area-inset-bottom))]"></div>
             </div>
           </div>
         </div>
