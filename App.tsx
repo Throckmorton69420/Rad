@@ -381,7 +381,7 @@ const App: React.FC = () => {
   );
 
   return (
-    <div className="h-full w-full bg-transparent text-[var(--text-primary)] flex flex-col">
+    <div className="h-[var(--app-height)] w-full bg-transparent text-[var(--text-primary)] flex flex-col">
       {/* --- Sidebar (Now a true overlay for both mobile and desktop) --- */}
       <div 
           className={`lg:hidden fixed inset-y-0 left-0 z-50 transform transition-transform duration-300 ease-in-out ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}
@@ -431,7 +431,7 @@ const App: React.FC = () => {
           notificationPortal
         )}
 
-        <main className={`flex-1 flex flex-col min-h-0 bg-transparent overflow-y-auto`}>
+        <main className={`flex-1 flex flex-col min-h-0 bg-transparent`}>
             <div className="p-3 md:p-6 pl-[calc(0.75rem+env(safe-area-inset-left))] pr-[calc(0.75rem+env(safe-area-inset-right))] pb-[env(safe-area-inset-bottom)] flex flex-col flex-grow">
               <div className="mb-6 flex-shrink-0">
                     <div className="inline-flex bg-[var(--background-tertiary)] p-1 rounded-lg space-x-1">
