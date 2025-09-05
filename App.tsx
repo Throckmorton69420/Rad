@@ -29,6 +29,7 @@ const App: React.FC = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(true);
   const [draggedItem, setDraggedItem] = useState<{ type: 'resource' | 'task', id: string } | null>(null);
+  const scrollPositionRef = useRef(0);
 
   const {
     studyPlan, setStudyPlan, previousStudyPlan,
@@ -72,19 +73,18 @@ const App: React.FC = () => {
   useEffect(() => {
     const body = document.body;
     if (isSidebarOpen) {
-      const scrollY = window.scrollY;
-      body.classList.add('body-no-scroll');
-      body.style.setProperty('--scroll-y', `${scrollY}`);
+      scrollPositionRef.current = window.scrollY;
+      body.style.position = 'fixed';
+      body.style.top = `-${scrollPositionRef.current}px`;
+      body.style.width = '100%';
+      body.style.overflow = 'hidden';
     } else {
-      const scrollY = body.style.getPropertyValue('--scroll-y');
-      body.classList.remove('body-no-scroll');
-      if (scrollY) {
-        window.scrollTo(0, parseInt(scrollY || '0'));
-      }
+      body.style.position = '';
+      body.style.top = '';
+      body.style.width = '';
+      body.style.overflow = '';
+      window.scrollTo(0, scrollPositionRef.current);
     }
-    return () => {
-      body.classList.remove('body-no-scroll');
-    };
   }, [isSidebarOpen]);
 
   const navigateDate = (direction: 'next' | 'prev') => {
@@ -336,9 +336,9 @@ const App: React.FC = () => {
         {/* Mobile Sidebar Overlay */}
         <div className={`lg:hidden fixed inset-0 bg-black/60 z-40 transition-opacity ${isSidebarOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`} onClick={() => setIsSidebarOpen(false)} aria-hidden="true"></div>
         
-        <aside className={`w-80 bg-[var(--background-secondary)] text-[var(--text-secondary)] border-r border-[var(--separator-primary)] fixed lg:static h-dvh z-50 transform transition-transform duration-300 ease-in-out lg:translate-x-0 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} flex flex-col`}>
+        <aside className={`w-80 bg-[var(--background-secondary)] text-[var(--text-secondary)] border-r border-[var(--separator-primary)] fixed lg:static inset-y-0 z-50 transform transition-transform duration-300 ease-in-out lg:translate-x-0 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} flex flex-col`}>
           <div className="flex-grow overflow-y-auto isolated-scroll">
-            <div className="pt-5 space-y-4 pr-5 pl-[calc(1.25rem+env(safe-area-inset-left))] pb-[env(safe-area-inset-bottom)]">
+            <div className="space-y-4 pr-5 pl-[calc(1.25rem+env(safe-area-inset-left))] pt-[calc(1.25rem+env(safe-area-inset-top))] pb-[calc(1.25rem+env(safe-area-inset-bottom))]">
               <div className="flex justify-end -mr-2 -mt-2 lg:hidden">
                   <button onClick={() => setIsSidebarOpen(false)} className="p-2 text-[var(--text-primary)] hover:text-white" aria-label="Close menu">
                       <i className="fas fa-times fa-lg"></i>
