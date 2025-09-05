@@ -56,6 +56,7 @@ const DailyTaskList: React.FC<DailyTaskListProps> = ({
       <div 
         onDrop={onTaskDrop}
         onDragOver={onDragOver}
+        className="pb-24"
       >
         <div className="flex justify-between items-center mb-2">
             <Button onClick={() => onNavigateDay('prev')} variant="ghost" size="sm" className="!px-2">
