@@ -53,7 +53,7 @@ const DailyTaskList: React.FC<DailyTaskListProps> = ({
 
   return (
     <div 
-      className="flex flex-col h-full view-container static-glow-border"
+      className="flex flex-col view-container static-glow-border"
       onDrop={onTaskDrop}
       onDragOver={onDragOver}
     >
@@ -85,7 +85,7 @@ const DailyTaskList: React.FC<DailyTaskListProps> = ({
         )}
       </div>
 
-      <div className="flex-grow space-y-4 mt-4 overflow-y-auto pr-2 -mr-2 min-h-0 pb-8">
+      <div className="space-y-4 mt-4 pr-2 -mr-2 pb-24">
         {dailySchedule.isRestDay ? (
           <div className="text-center py-10 bg-[var(--background-tertiary)] rounded-lg">
             <p className="text-lg text-[var(--text-secondary)]">Enjoy your rest day! <i className="fas fa-coffee ml-1"></i></p>
@@ -117,7 +117,7 @@ const DailyTaskList: React.FC<DailyTaskListProps> = ({
         )}
       </div>
       
-      <div className="flex-shrink-0 mt-auto pt-3 bg-[var(--glass-background-panel)] backdrop-blur-[24px] flex space-x-2 pb-[env(safe-area-inset-bottom)]">
+      <div className="flex-shrink-0 pt-3 bg-[var(--glass-background-panel)] backdrop-blur-[24px] flex space-x-2 pb-[env(safe-area-inset-bottom)] sticky bottom-0 -mx-4 -mb-4 px-4">
         <Button onClick={onOpenModifyDayModal} variant="primary" className="flex-grow" disabled={dailySchedule.isRestDay}>
           <i className="fas fa-edit mr-2"></i> Modify Schedule
         </Button>

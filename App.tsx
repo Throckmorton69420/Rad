@@ -74,33 +74,23 @@ const App: React.FC = () => {
     const bodyEl = document.body;
 
     if (isSidebarOpen) {
-        // 1. Save current scroll position
         scrollYRef.current = window.scrollY;
-
-        // 2. Apply locking styles
         htmlEl.style.overscrollBehavior = 'none';
         bodyEl.style.position = 'fixed';
         bodyEl.style.top = `-${scrollYRef.current}px`;
         bodyEl.style.width = '100%';
-        bodyEl.style.overflowY = 'scroll'; // Prevent layout shift from scrollbar disappearing
     } else {
-        // 3. Remove locking styles
         bodyEl.style.position = '';
         bodyEl.style.top = '';
         bodyEl.style.width = '';
-        bodyEl.style.overflowY = '';
         htmlEl.style.overscrollBehavior = '';
-
-        // 4. Restore scroll position
         window.scrollTo(0, scrollYRef.current);
     }
     
-    // Cleanup function
     return () => {
         bodyEl.style.position = '';
         bodyEl.style.top = '';
         bodyEl.style.width = '';
-        bodyEl.style.overflowY = '';
         htmlEl.style.overscrollBehavior = '';
     };
   }, [isSidebarOpen]);
@@ -404,7 +394,7 @@ const App: React.FC = () => {
   );
 
   return (
-    <div className="h-[var(--app-height)] w-full bg-transparent text-[var(--text-primary)] flex flex-col">
+    <div className="min-h-screen w-full bg-transparent text-[var(--text-primary)] flex flex-col">
       {/* --- Sidebar (Now a true overlay for both mobile and desktop) --- */}
       <div 
           className={`lg:hidden fixed inset-y-0 left-0 z-50 transform transition-transform duration-300 ease-in-out ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}
@@ -421,7 +411,7 @@ const App: React.FC = () => {
       </div>
 
       {/* --- Main Content Area (makes space for desktop sidebar) --- */}
-      <div className="h-full lg:pl-80 flex flex-col">
+      <div className="flex-grow lg:pl-80 flex flex-col">
         <header className="flex-shrink-0 bg-[var(--background-secondary)] text-white px-3 md:px-4 pb-3 md:pb-4 border-b border-[var(--separator-primary)] flex justify-between items-center sticky top-0 z-[var(--z-header)] pt-[calc(0.75rem+env(safe-area-inset-top))] md:pt-[calc(1rem+env(safe-area-inset-top))] pl-[calc(0.75rem+env(safe-area-inset-left))] pr-[calc(0.75rem+env(safe-area-inset-right))]">
           <div className="flex items-center">
               <button className="lg:hidden p-2 -ml-2 mr-2 text-[var(--text-primary)] hover:bg-[var(--background-tertiary)] rounded-full" onClick={() => setIsSidebarOpen(p => !p)} aria-label="Toggle menu">
@@ -454,7 +444,7 @@ const App: React.FC = () => {
           notificationPortal
         )}
 
-        <main className={`flex-1 flex flex-col min-h-0 bg-transparent`}>
+        <main className={`flex-1 flex flex-col bg-transparent`}>
             <div className="p-3 md:p-6 pl-[calc(0.75rem+env(safe-area-inset-left))] pr-[calc(0.75rem+env(safe-area-inset-right))] pb-[env(safe-area-inset-bottom)] flex flex-col flex-grow">
               <div className="mb-6 flex-shrink-0">
                     <div className="inline-flex bg-[var(--background-tertiary)] p-1 rounded-lg space-x-1">
@@ -471,7 +461,7 @@ const App: React.FC = () => {
                     {isLoading && studyPlan && <div className="flex flex-col items-center justify-center p-10"> <i className="fas fa-spinner fa-spin fa-2x text-[var(--accent-purple)] mb-3"></i> <span className="text-[var(--text-primary)]">Loading...</span> </div>}
                     
                     {!isLoading && activeTab === 'schedule' && (
-                      <div className="h-full">
+                      <div className="flex-grow">
                           {selectedDaySchedule ?
                             <DailyTaskList 
                                 dailySchedule={selectedDaySchedule} 
