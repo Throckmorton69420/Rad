@@ -146,7 +146,7 @@ const ProgressDisplay: React.FC<ProgressDisplayProps> = ({ studyPlan }) => {
 
 
   return (
-    <div className="view-container text-[var(--text-primary)]">
+    <div className="view-container text-[var(--text-primary)] h-full overflow-y-auto">
       <h2 className="text-2xl font-bold text-[var(--text-primary)] border-b border-[var(--separator-primary)] pb-3 text-center">Study Progress</h2>
       
       <div className="mt-8">

@@ -378,7 +378,7 @@ const App: React.FC = () => {
   );
 
   return (
-    <div className="h-full w-full bg-transparent text-[var(--text-primary)]">
+    <div className="h-dvh w-full bg-transparent text-[var(--text-primary)]">
       {/* --- Sidebar (Now a true overlay for both mobile and desktop) --- */}
       <div 
           className={`lg:hidden fixed inset-y-0 left-0 z-50 transform transition-transform duration-300 ease-in-out ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}
