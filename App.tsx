@@ -237,7 +237,8 @@ const App: React.FC = () => {
     e.preventDefault();
   };
 
-  const onTaskDragStart = (e: React.DragEvent<HTMLDivElement>) => {
+  // FIX: Add taskId parameter to match the expected prop type in DailyTaskListProps.
+  const onTaskDragStart = (e: React.DragEvent<HTMLDivElement>, taskId: string) => {
      showConfirmation({
         title: "Modify Schedule?",
         message: "To move tasks, please use the 'Modify Schedule & Resources' button. This provides a dedicated interface for dragging tasks on or off the schedule.",

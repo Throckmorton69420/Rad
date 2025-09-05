@@ -1,140 +1,113 @@
-import React from 'react';
-import { DailySchedule, ScheduledTask, Domain } from '../types';
-import TaskItem from './TaskItem';
+import React, { useState } from 'react';
+import { DailyTaskListProps, ScheduledTask } from '../types';
 import { Button } from './Button';
+import TaskItem from './TaskItem';
 import { formatDuration } from '../utils/timeFormatter';
 
-interface DailyTaskListProps {
-  dailySchedule: DailySchedule;
-  onTaskToggle: (taskId: string) => void;
-  onOpenAddTaskModal: () => void;
-  onOpenModifyDayModal: () => void;
-  currentPomodoroTaskId: string | null;
-  onPomodoroTaskSelect: (taskId: string | null) => void;
-  onNavigateDay: (direction: 'next' | 'prev') => void;
-  isPomodoroActive: boolean;
-  onTaskDrop: (e: React.DragEvent<HTMLDivElement>) => void;
-  onDragOver: (e: React.DragEvent<HTMLDivElement>) => void;
-  onTaskDragStart: (e: React.DragEvent<HTMLDivElement>, taskId: string) => void;
-  onToggleRestDay: (isCurrentlyRestDay: boolean) => void;
-}
-
-const DailyTaskList: React.FC<DailyTaskListProps> = ({ 
-    dailySchedule, 
-    onTaskToggle, 
-    onOpenAddTaskModal,
-    onOpenModifyDayModal,
-    currentPomodoroTaskId,
-    onPomodoroTaskSelect,
-    onNavigateDay,
-    isPomodoroActive,
-    onTaskDrop,
-    onDragOver,
-    onTaskDragStart,
-    onToggleRestDay,
+const DailyTaskList: React.FC<DailyTaskListProps> = ({
+  dailySchedule,
+  onTaskToggle,
+  onOpenAddTaskModal,
+  onOpenModifyDayModal,
+  currentPomodoroTaskId,
+  onPomodoroTaskSelect,
+  onNavigateDay,
+  isPomodoroActive,
+  onDragOver,
+  onTaskDrop,
+  onTaskDragStart,
+  onToggleRestDay
 }) => {
-  if (!dailySchedule) {
-    return <div className="text-center text-[var(--text-secondary)] py-10">No schedule for this day.</div>;
-  }
+  const [draggedOver, setDraggedOver] = useState(false);
+  const [pulsingTaskId, setPulsingTaskId] = useState<string | null>(null);
 
-  const tasksByTopic: Record<string, ScheduledTask[]> = dailySchedule.tasks.reduce((acc, task) => {
-    const topic = task.originalTopic || 'Uncategorized';
-    if (!acc[topic]) {
-      acc[topic] = [];
-    }
-    acc[topic].push(task);
-    return acc;
-  }, {} as Record<string, ScheduledTask[]>);
+  const { date, tasks, totalStudyTimeMinutes, isRestDay, dayName } = dailySchedule;
 
-  const totalAssignedMinutes = dailySchedule.tasks.reduce((acc, t) => acc + t.durationMinutes, 0);
-  const completedMinutes = dailySchedule.tasks.filter(t => t.status === 'completed').reduce((acc, t) => acc + t.durationMinutes, 0);
-  const progressPercentage = totalAssignedMinutes > 0 ? (completedMinutes / totalAssignedMinutes) * 100 : 0;
+  const totalCompletedMinutes = tasks.reduce((acc, task) => {
+    return task.status === 'completed' ? acc + task.durationMinutes : acc;
+  }, 0);
 
+  const handleSetPomodoro = (task: ScheduledTask) => {
+    onPomodoroTaskSelect(task.id);
+    setPulsingTaskId(task.id);
+    setTimeout(() => setPulsingTaskId(null), 1000);
+  };
+  
+  const handleDragEnter = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setDraggedOver(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setDraggedOver(false);
+  };
+  
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    onTaskDrop(e);
+    setDraggedOver(false);
+  };
+
+  const dropZoneClasses = `flex-grow min-h-[200px] transition-colors p-1 rounded-lg ${draggedOver ? 'bg-purple-900/40' : ''}`;
 
   return (
-    <div className="relative">
-      <div 
-        onDrop={onTaskDrop}
-        onDragOver={onDragOver}
-        className="pb-24"
-      >
-        <div className="flex justify-between items-center mb-2">
-            <Button onClick={() => onNavigateDay('prev')} variant="ghost" size="sm" className="!px-2">
-                <i className="fas fa-chevron-left"></i>
-            </Button>
-            <h2 className="text-xl md:text-2xl font-bold text-[var(--text-primary)] text-center">
-                {dailySchedule.dayName || new Date(dailySchedule.date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
-            </h2>
-            <Button onClick={() => onNavigateDay('next')} variant="ghost" size="sm" className="!px-2">
-                <i className="fas fa-chevron-right"></i>
-            </Button>
+    <div className="flex flex-col h-full text-[var(--text-primary)] pb-[calc(1.5rem+env(safe-area-inset-bottom))]">
+      <div className="flex-shrink-0">
+        <div className="flex justify-between items-center mb-1">
+          <Button onClick={() => onNavigateDay('prev')} variant="ghost" size="sm" className="!px-2.5" aria-label="Previous Day"><i className="fas fa-chevron-left"></i></Button>
+          <div className="text-center">
+            <h2 className="text-xl font-bold text-white">{dayName ? new Date(date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long' }) : '...'}</h2>
+            <p className="text-sm text-[var(--text-secondary)]">{new Date(date + 'T00:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</p>
+          </div>
+          <Button onClick={() => onNavigateDay('next')} variant="ghost" size="sm" className="!px-2.5" aria-label="Next Day"><i className="fas fa-chevron-right"></i></Button>
         </div>
-         <p className="text-sm text-[var(--text-secondary)] font-medium text-center mb-4">
-            {dailySchedule.isRestDay ? 'Rest Day' : `Assigned: ${formatDuration(totalAssignedMinutes)}`}
-        </p>
-        {!dailySchedule.isRestDay && dailySchedule.tasks.length > 0 && (
-            <div className="mb-2 mt-6 px-1">
-              <div className="flex justify-between text-sm text-[var(--text-secondary)] mb-2">
-                  <span>Daily Progress ({Math.round(progressPercentage)}%)</span>
-                  <span>{formatDuration(completedMinutes)} / {formatDuration(totalAssignedMinutes)}</span>
-              </div>
-              <div className="w-full bg-[var(--background-tertiary)] rounded-full h-2.5 progress-bar-track static-glow-border">
-                  <div className="progress-bar-fill" style={{ width: `${progressPercentage}%` }}></div>
-              </div>
-            </div>
-        )}
-
-        <div className="space-y-4 mt-4">
-          {dailySchedule.isRestDay ? (
-            <div className="text-center py-10 bg-[var(--background-tertiary)] rounded-lg">
-              <p className="text-lg text-[var(--text-secondary)]">Enjoy your rest day! <i className="fas fa-coffee ml-1"></i></p>
-            </div>
-          ) : Object.keys(tasksByTopic).length > 0 ? (
-            Object.entries(tasksByTopic).map(([topic, tasks]) => (
-              <div key={topic}>
-                <h3 className="text-md font-semibold text-[var(--text-primary)] mb-2 border-b border-[var(--separator-secondary)] pb-2">{topic}</h3>
-                <div className="space-y-2">
-                  {tasks.sort((a,b) => a.order - b.order).map(task => (
-                    <TaskItem 
-                      key={task.id} 
-                      task={task} 
-                      onToggle={onTaskToggle} 
-                      isCurrentPomodoroTask={task.id === currentPomodoroTaskId}
-                      isPulsing={isPomodoroActive && task.id === currentPomodoroTaskId}
-                      onSetPomodoro={() => onPomodoroTaskSelect(task.id === currentPomodoroTaskId ? null : task.id)}
-                      onDragStart={(e) => onTaskDragStart(e, task.id)}
-                    />
-                  ))}
-                </div>
-              </div>
-            ))
-          ) : (
-            <div className="text-center py-10 bg-[var(--background-tertiary)] rounded-lg border-2 border-dashed border-[var(--separator-secondary)]">
-              <p className="text-[var(--text-secondary)]">Your schedule for this day is empty.</p>
-              <p className="text-[var(--text-secondary)] text-sm mt-1">Use the "Modify Schedule" button below to add tasks.</p>
-            </div>
-          )}
+        <div className="text-center text-xs text-[var(--text-secondary)] mb-4">
+          <span>Total Planned: <strong className="text-[var(--text-primary)]">{formatDuration(totalStudyTimeMinutes)}</strong></span>
+          <span className="mx-2">|</span>
+          <span>Completed: <strong className="text-[var(--accent-green)]">{formatDuration(totalCompletedMinutes)}</strong></span>
+        </div>
+        <div className="flex justify-center space-x-2 mb-4">
+            <Button onClick={onOpenAddTaskModal} variant="secondary" size="sm"><i className="fas fa-plus mr-2"></i> Add Optional Task</Button>
+            <Button onClick={onOpenModifyDayModal} variant="secondary" size="sm"><i className="fas fa-edit mr-2"></i> Modify Schedule & Resources</Button>
         </div>
       </div>
       
-      <div className="sticky bottom-0 -mx-4 px-4 pt-3 bg-[var(--glass-background-panel)] backdrop-blur-[24px] border-t border-t-[var(--separator-primary)] pb-[calc(3rem+env(safe-area-inset-bottom))]">
-        <div className="flex space-x-2">
-            <Button onClick={onOpenModifyDayModal} variant="primary" className="flex-grow" disabled={dailySchedule.isRestDay}>
-              <i className="fas fa-edit mr-2"></i> Modify Schedule
-            </Button>
-            <Button onClick={onOpenAddTaskModal} variant="secondary" title="Add a quick custom task" disabled={dailySchedule.isRestDay}>
-              <i className="fas fa-plus"></i>
-            </Button>
-            {dailySchedule.isRestDay ? (
-              <Button onClick={() => onToggleRestDay(true)} variant="secondary" title="Convert to Study Day" className="!px-3">
-                  <i className="fas fa-book-open"></i>
-              </Button>
-            ) : (
-              <Button onClick={() => onToggleRestDay(false)} variant="secondary" title="Convert to Rest Day" className="!px-3">
-                  <i className="fas fa-coffee"></i>
-              </Button>
-            )}
-        </div>
+      <div 
+        className={dropZoneClasses}
+        onDragOver={onDragOver}
+        onDragEnter={handleDragEnter}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+      >
+        {isRestDay ? (
+          <div className="h-full flex flex-col justify-center items-center text-center p-6 bg-[var(--background-tertiary)] rounded-lg interactive-glow-border">
+            <i className="fas fa-coffee fa-2x text-[var(--text-secondary)] mb-3"></i>
+            <p className="text-lg font-semibold">Rest Day</p>
+            <p className="text-sm text-[var(--text-secondary)] mb-4">Take a well-deserved break!</p>
+            <Button onClick={() => onToggleRestDay(true)} variant="secondary" size="sm">Make it a Study Day</Button>
+          </div>
+        ) : tasks.length === 0 ? (
+          <div className="h-full flex flex-col justify-center items-center text-center p-6 bg-[var(--background-tertiary)] rounded-lg interactive-glow-border">
+            <i className="fas fa-calendar-check fa-2x text-[var(--text-secondary)] mb-3"></i>
+            <p className="text-lg font-semibold">No Tasks Scheduled</p>
+            <p className="text-sm text-[var(--text-secondary)] mb-4">You can add optional tasks or rebalance your schedule.</p>
+            <Button onClick={() => onToggleRestDay(false)} variant="secondary" size="sm">Make it a Rest Day</Button>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {tasks.sort((a, b) => a.order - b.order).map(task => (
+              <TaskItem
+                key={task.id}
+                task={task}
+                onToggle={onTaskToggle}
+                isCurrentPomodoroTask={currentPomodoroTaskId === task.id}
+                isPulsing={pulsingTaskId === task.id && !isPomodoroActive}
+                onSetPomodoro={() => handleSetPomodoro(task)}
+                onDragStart={(e) => onTaskDragStart(e, task.id)}
+              />
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
