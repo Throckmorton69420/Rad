@@ -415,7 +415,7 @@ const App: React.FC = () => {
           notificationPortal
         )}
 
-        <main className="flex-1 overflow-y-auto min-h-0">
+        <main className="flex-1 overflow-y-auto min-h-0 pb-[calc(6rem+env(safe-area-inset-bottom))]">
             <div className="pt-3 md:pt-6 pl-[calc(0.75rem+env(safe-area-inset-left))] pr-[calc(0.75rem+env(safe-area-inset-right))] flex flex-col">
               <div className="mb-6 flex-shrink-0 px-3 md:px-6">
                     <div className="inline-flex bg-[var(--background-tertiary)] p-1 rounded-lg space-x-1">
