@@ -66,6 +66,15 @@ html, body, #root {
   height: 100%;
 }
 
+html {
+  -webkit-tap-highlight-color: transparent;
+}
+
+html.scroll-lock {
+  overflow: hidden;
+}
+
+
 body {
   background-color: #000000;
   background-image:

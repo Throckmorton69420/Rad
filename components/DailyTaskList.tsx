@@ -115,8 +115,8 @@ const DailyTaskList: React.FC<DailyTaskListProps> = ({
             <p className="text-[var(--text-secondary)] text-sm mt-1">Use the "Modify Schedule" button below to add tasks.</p>
           </div>
         )}
-        {/* Spacer for safe area, allowing content to scroll above the sticky footer */}
-        <div className="flex-shrink-0 h-1 pb-[env(safe-area-inset-bottom)]"></div>
+        {/* Spacer for safe area and "dead space", allowing content to scroll above the sticky footer */}
+        <div className="flex-shrink-0 h-4 pb-[calc(1rem+env(safe-area-inset-bottom))]"></div>
       </div>
       
       <div className="flex-shrink-0 mt-auto pt-3 bg-[var(--glass-background-panel)] backdrop-blur-[24px] flex space-x-2">
