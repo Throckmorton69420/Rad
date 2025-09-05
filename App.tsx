@@ -71,12 +71,12 @@ const App: React.FC = () => {
   
   useEffect(() => {
     if (isSidebarOpen) {
-      document.body.style.overflow = 'hidden';
+      document.body.classList.add('body-no-scroll');
     } else {
-      document.body.style.overflow = '';
+      document.body.classList.remove('body-no-scroll');
     }
     return () => {
-      document.body.style.overflow = '';
+      document.body.classList.remove('body-no-scroll');
     };
   }, [isSidebarOpen]);
 
@@ -329,82 +329,85 @@ const App: React.FC = () => {
         {/* Mobile Sidebar Overlay */}
         <div className={`lg:hidden fixed inset-0 bg-black/60 z-40 transition-opacity ${isSidebarOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`} onClick={() => setIsSidebarOpen(false)} aria-hidden="true"></div>
         
-        <aside className={`w-80 bg-[var(--background-secondary)] text-[var(--text-secondary)] pt-5 space-y-4 overflow-y-auto border-r border-[var(--separator-primary)] fixed lg:static h-full z-50 transform transition-transform duration-300 ease-in-out lg:translate-x-0 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} pr-5 pl-[calc(1.25rem+env(safe-area-inset-left))] isolated-scroll`}>
-          <div className="flex justify-end -mr-2 -mt-2 lg:hidden">
-              <button onClick={() => setIsSidebarOpen(false)} className="p-2 text-[var(--text-primary)] hover:text-white" aria-label="Close menu">
-                  <i className="fas fa-times fa-lg"></i>
-              </button>
-          </div>
-           <div>
-            <button onClick={() => setIsPomodoroCollapsed(!isPomodoroCollapsed)} className="w-full text-lg font-semibold text-left text-[var(--text-primary)] flex justify-between items-center py-2">
-                <span>Pomodoro Timer</span>
-                <i className={`fas fa-chevron-down transition-transform ${isPomodoroCollapsed ? '' : 'rotate-180'}`}></i>
-            </button>
-            {!isPomodoroCollapsed && (
-                <div className="animate-fade-in">
-                    <PomodoroTimerComponent settings={pomodoroSettings} setSettings={setPomodoroSettings} onSessionComplete={handlePomodoroSessionComplete} linkedTaskTitle={currentPomodoroTask?.title}/>
-                </div>
-            )}
-          </div>
+        <aside className={`w-80 bg-[var(--background-secondary)] text-[var(--text-secondary)] border-r border-[var(--separator-primary)] fixed lg:static h-screen z-50 transform transition-transform duration-300 ease-in-out lg:translate-x-0 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} flex flex-col`}>
+          <div className="flex-grow overflow-y-auto isolated-scroll">
+            <div className="pt-5 space-y-4 pr-5 pl-[calc(1.25rem+env(safe-area-inset-left))] pb-[env(safe-area-inset-bottom)]">
+              <div className="flex justify-end -mr-2 -mt-2 lg:hidden">
+                  <button onClick={() => setIsSidebarOpen(false)} className="p-2 text-[var(--text-primary)] hover:text-white" aria-label="Close menu">
+                      <i className="fas fa-times fa-lg"></i>
+                  </button>
+              </div>
+              <div>
+                <button onClick={() => setIsPomodoroCollapsed(!isPomodoroCollapsed)} className="w-full text-lg font-semibold text-left text-[var(--text-primary)] flex justify-between items-center py-2">
+                    <span>Pomodoro Timer</span>
+                    <i className={`fas fa-chevron-down transition-transform ${isPomodoroCollapsed ? '' : 'rotate-180'}`}></i>
+                </button>
+                {!isPomodoroCollapsed && (
+                    <div className="animate-fade-in">
+                        <PomodoroTimerComponent settings={pomodoroSettings} setSettings={setPomodoroSettings} onSessionComplete={handlePomodoroSessionComplete} linkedTaskTitle={currentPomodoroTask?.title}/>
+                    </div>
+                )}
+              </div>
 
-          <div className="border-b border-[var(--separator-primary)] my-2"></div>
-          
-          <div>
-            <h2 className="text-lg font-semibold mb-3 border-b border-[var(--separator-primary)] pb-2 text-[var(--text-primary)]">Calendar</h2>
-            <CalendarView 
-                schedule={studyPlan.schedule} 
+              <div className="border-b border-[var(--separator-primary)] my-2"></div>
+              
+              <div>
+                <h2 className="text-lg font-semibold mb-3 border-b border-[var(--separator-primary)] pb-2 text-[var(--text-primary)]">Calendar</h2>
+                <CalendarView 
+                    schedule={studyPlan.schedule} 
+                    selectedDate={selectedDate} 
+                    onDateSelect={(d) => {setSelectedDate(d); setIsSidebarOpen(false);}} 
+                    viewMode={ViewMode.MONTHLY}
+                    currentDisplayDate={selectedDate} 
+                    onNavigatePeriod={(dir) => navigatePeriod(dir, 'Monthly')} 
+                    highlightedDates={highlightedDates} 
+                    today={todayInNewYork}
+                />
+              </div>
+              
+              <RebalanceControls 
+                onRebalance={(options) => { handleRebalance(options); if(options.type === 'topic-time') setSelectedDate(options.date); }} 
+                isLoading={isLoading} 
                 selectedDate={selectedDate} 
-                onDateSelect={(d) => {setSelectedDate(d); setIsSidebarOpen(false);}} 
-                viewMode={ViewMode.MONTHLY}
-                currentDisplayDate={selectedDate} 
-                onNavigatePeriod={(dir) => navigatePeriod(dir, 'Monthly')} 
-                highlightedDates={highlightedDates} 
-                today={todayInNewYork}
-            />
-          </div>
-          
-          <RebalanceControls 
-            onRebalance={(options) => { handleRebalance(options); if(options.type === 'topic-time') setSelectedDate(options.date); }} 
-            isLoading={isLoading} 
-            selectedDate={selectedDate} 
-            isCramModeActive={studyPlan.isCramModeActive ?? false}
-            onToggleCramMode={handleToggleCramMode}
-          />
+                isCramModeActive={studyPlan.isCramModeActive ?? false}
+                onToggleCramMode={handleToggleCramMode}
+              />
 
-          <div className="space-y-3">
-             <button onClick={() => setIsSettingsOpen(!isSettingsOpen)} className="w-full text-lg font-semibold text-left text-[var(--text-primary)] flex justify-between items-center">
-                <span>Schedule Settings</span>
-                <i className={`fas fa-chevron-down transition-transform ${isSettingsOpen ? 'rotate-180' : ''}`}></i>
-              </button>
-              {isSettingsOpen && (
-                <div className="animate-fade-in pl-1">
-                  <TopicOrderManager 
-                    topicOrder={studyPlan.topicOrder} 
-                    onSaveOrder={handleUpdateTopicOrderAndRebalance} 
-                    cramTopicOrder={studyPlan.cramTopicOrder}
-                    onSaveCramOrder={handleUpdateCramTopicOrderAndRebalance}
-                    isLoading={isLoading} 
-                    isPhysicsInTopicOrder={studyPlan.isPhysicsInTopicOrder}
-                    onTogglePhysicsManagement={handleTogglePhysicsManagementAndRebalance}
-                    isCramModeActive={studyPlan.isCramModeActive ?? false}
-                    isCramPhysicsInterleaved={studyPlan.isCramPhysicsInterleaved}
-                    onToggleCramPhysicsManagement={handleToggleCramPhysicsManagementAndRebalance}
-                    />
+              <div className="space-y-3">
+                <button onClick={() => setIsSettingsOpen(!isSettingsOpen)} className="w-full text-lg font-semibold text-left text-[var(--text-primary)] flex justify-between items-center">
+                    <span>Schedule Settings</span>
+                    <i className={`fas fa-chevron-down transition-transform ${isSettingsOpen ? 'rotate-180' : ''}`}></i>
+                  </button>
+                  {isSettingsOpen && (
+                    <div className="animate-fade-in pl-1">
+                      <TopicOrderManager 
+                        topicOrder={studyPlan.topicOrder} 
+                        onSaveOrder={handleUpdateTopicOrderAndRebalance} 
+                        cramTopicOrder={studyPlan.cramTopicOrder}
+                        onSaveCramOrder={handleUpdateCramTopicOrderAndRebalance}
+                        isLoading={isLoading} 
+                        isPhysicsInTopicOrder={studyPlan.isPhysicsInTopicOrder}
+                        onTogglePhysicsManagement={handleTogglePhysicsManagementAndRebalance}
+                        isCramModeActive={studyPlan.isCramModeActive ?? false}
+                        isCramPhysicsInterleaved={studyPlan.isCramPhysicsInterleaved}
+                        onToggleCramPhysicsManagement={handleToggleCramPhysicsManagementAndRebalance}
+                        />
+                    </div>
+                  )}
+              </div>
+
+              <AddExceptionDay onAddException={handleAddOrUpdateException} isLoading={isLoading} />
+              
+              <div>
+                <h2 className="text-lg font-semibold mb-3 border-b border-[var(--separator-primary)] pb-2 text-[var(--text-primary)]">Actions</h2>
+                <div className="space-y-2">
+                  <Button onClick={handleUndo} variant="secondary" className="w-full" disabled={!previousStudyPlan || isLoading}><i className="fas fa-undo mr-2"></i> Undo Last Plan Change</Button>
+                  <Button onClick={() => showConfirmation({title: "Regenerate Schedule?", message: "This will regenerate the entire schedule from scratch based on the current resource pool and save it to the cloud. Are you sure?", confirmText: "Regenerate", confirmVariant: 'danger', onConfirm: () => loadSchedule(true)})} variant="danger" className="w-full" disabled={isLoading}>Regenerate Schedule</Button>
+                  <Button onClick={() => showConfirmation({title: "Reset All Progress?", message: "Are you sure you want to mark all tasks as 'pending'?", confirmText: "Reset Progress", confirmVariant: 'danger', onConfirm: handleMasterResetTasks})} variant="danger" className="w-full" disabled={isLoading}>Reset Task Progress</Button>
                 </div>
-              )}
-          </div>
-
-          <AddExceptionDay onAddException={handleAddOrUpdateException} isLoading={isLoading} />
-          
-          <div>
-            <h2 className="text-lg font-semibold mb-3 border-b border-[var(--separator-primary)] pb-2 text-[var(--text-primary)]">Actions</h2>
-            <div className="space-y-2">
-              <Button onClick={handleUndo} variant="secondary" className="w-full" disabled={!previousStudyPlan || isLoading}><i className="fas fa-undo mr-2"></i> Undo Last Plan Change</Button>
-              <Button onClick={() => showConfirmation({title: "Regenerate Schedule?", message: "This will regenerate the entire schedule from scratch based on the current resource pool and save it to the cloud. Are you sure?", confirmText: "Regenerate", confirmVariant: 'danger', onConfirm: () => loadSchedule(true)})} variant="danger" className="w-full" disabled={isLoading}>Regenerate Schedule</Button>
-              <Button onClick={() => showConfirmation({title: "Reset All Progress?", message: "Are you sure you want to mark all tasks as 'pending'?", confirmText: "Reset Progress", confirmVariant: 'danger', onConfirm: handleMasterResetTasks})} variant="danger" className="w-full" disabled={isLoading}>Reset Task Progress</Button>
+              </div>
             </div>
           </div>
-          <div className="h-[env(safe-area-inset-bottom)] flex-shrink-0"></div>
         </aside>
 
         <main className="flex-1 p-3 md:p-6 flex flex-col overflow-y-auto bg-transparent pr-[env(safe-area-inset-right)] isolated-scroll">
