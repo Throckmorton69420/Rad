@@ -51,7 +51,7 @@ const DailyTaskList: React.FC<DailyTaskListProps> = ({
   const dropZoneClasses = `flex-grow min-h-[200px] transition-colors p-1 rounded-lg ${draggedOver ? 'bg-purple-900/40' : ''}`;
 
   return (
-    <div className="flex flex-col h-full text-[var(--text-primary)] pb-[calc(1.5rem+env(safe-area-inset-bottom))]">
+    <div className="relative flex flex-col h-full text-[var(--text-primary)]">
       <div className="flex-shrink-0">
         <div className="flex justify-between items-center mb-1">
           <Button onClick={() => onNavigateDay('prev')} variant="ghost" size="sm" className="!px-2.5" aria-label="Previous Day"><i className="fas fa-chevron-left"></i></Button>
@@ -66,48 +66,57 @@ const DailyTaskList: React.FC<DailyTaskListProps> = ({
           <span className="mx-2">|</span>
           <span>Completed: <strong className="text-[var(--accent-green)]">{formatDuration(totalCompletedMinutes)}</strong></span>
         </div>
-        <div className="flex justify-center space-x-2 mb-4">
-            <Button onClick={onOpenAddTaskModal} variant="secondary" size="sm"><i className="fas fa-plus mr-2"></i> Add Optional Task</Button>
-            <Button onClick={onOpenModifyDayModal} variant="secondary" size="sm"><i className="fas fa-edit mr-2"></i> Modify Schedule & Resources</Button>
-        </div>
       </div>
       
-      <div 
-        className={dropZoneClasses}
-        onDragOver={onDragOver}
-        onDragEnter={handleDragEnter}
-        onDragLeave={handleDragLeave}
-        onDrop={handleDrop}
-      >
-        {isRestDay ? (
-          <div className="h-full flex flex-col justify-center items-center text-center p-6 bg-[var(--background-tertiary)] rounded-lg interactive-glow-border">
-            <i className="fas fa-coffee fa-2x text-[var(--text-secondary)] mb-3"></i>
-            <p className="text-lg font-semibold">Rest Day</p>
-            <p className="text-sm text-[var(--text-secondary)] mb-4">Take a well-deserved break!</p>
-            <Button onClick={() => onToggleRestDay(true)} variant="secondary" size="sm">Make it a Study Day</Button>
-          </div>
-        ) : tasks.length === 0 ? (
-          <div className="h-full flex flex-col justify-center items-center text-center p-6 bg-[var(--background-tertiary)] rounded-lg interactive-glow-border">
-            <i className="fas fa-calendar-check fa-2x text-[var(--text-secondary)] mb-3"></i>
-            <p className="text-lg font-semibold">No Tasks Scheduled</p>
-            <p className="text-sm text-[var(--text-secondary)] mb-4">You can add optional tasks or rebalance your schedule.</p>
-            <Button onClick={() => onToggleRestDay(false)} variant="secondary" size="sm">Make it a Rest Day</Button>
-          </div>
-        ) : (
-          <div className="space-y-2">
-            {tasks.sort((a, b) => a.order - b.order).map(task => (
-              <TaskItem
-                key={task.id}
-                task={task}
-                onToggle={onTaskToggle}
-                isCurrentPomodoroTask={currentPomodoroTaskId === task.id}
-                isPulsing={pulsingTaskId === task.id && !isPomodoroActive}
-                onSetPomodoro={() => handleSetPomodoro(task)}
-                onDragStart={(e) => onTaskDragStart(e, task.id)}
-              />
-            ))}
-          </div>
-        )}
+      <div className="flex-grow">
+        <div 
+          className={`${dropZoneClasses} pb-24`}
+          onDragOver={onDragOver}
+          onDragEnter={handleDragEnter}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
+        >
+          {isRestDay ? (
+            <div className="h-full flex flex-col justify-center items-center text-center p-6 bg-[var(--background-tertiary)] rounded-lg interactive-glow-border">
+              <i className="fas fa-coffee fa-2x text-[var(--text-secondary)] mb-3"></i>
+              <p className="text-lg font-semibold">Rest Day</p>
+              <p className="text-sm text-[var(--text-secondary)] mb-4">Take a well-deserved break!</p>
+              <Button onClick={() => onToggleRestDay(true)} variant="secondary" size="sm">Make it a Study Day</Button>
+            </div>
+          ) : tasks.length === 0 ? (
+            <div className="h-full flex flex-col justify-center items-center text-center p-6 bg-[var(--background-tertiary)] rounded-lg interactive-glow-border">
+              <i className="fas fa-calendar-check fa-2x text-[var(--text-secondary)] mb-3"></i>
+              <p className="text-lg font-semibold">No Tasks Scheduled</p>
+              <p className="text-sm text-[var(--text-secondary)] mb-4">You can add optional tasks or rebalance your schedule.</p>
+               <Button onClick={onOpenAddTaskModal} variant="secondary" size="sm" className="mb-2"><i className="fas fa-plus mr-2"></i> Add Optional Task</Button>
+              <Button onClick={() => onToggleRestDay(false)} variant="secondary" size="sm">Make it a Rest Day</Button>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {tasks.sort((a, b) => a.order - b.order).map(task => (
+                <TaskItem
+                  key={task.id}
+                  task={task}
+                  onToggle={onTaskToggle}
+                  isCurrentPomodoroTask={currentPomodoroTaskId === task.id}
+                  isPulsing={pulsingTaskId === task.id && !isPomodoroActive}
+                  onSetPomodoro={() => handleSetPomodoro(task)}
+                  onDragStart={(e) => onTaskDragStart(e, task.id)}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="sticky bottom-0 -mx-4 px-4 pt-3 bg-[var(--glass-background-panel)] backdrop-blur-[24px] border-t border-[var(--separator-primary)] pb-[calc(6rem+env(safe-area-inset-bottom))]">
+        <div className="flex space-x-2">
+          <Button onClick={onOpenModifyDayModal} variant="primary" className="flex-grow">
+            <i className="fas fa-edit mr-2"></i> Modify Schedule
+          </Button>
+          <Button onClick={onOpenAddTaskModal} variant="secondary" title="Add a quick custom task"><i className="fas fa-plus"></i></Button>
+          <Button onClick={() => onToggleRestDay(false)} variant="secondary" title="Convert to Rest Day"><i className="fas fa-coffee"></i></Button>
+        </div>
       </div>
     </div>
   );
