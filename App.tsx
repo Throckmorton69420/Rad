@@ -307,7 +307,7 @@ const App: React.FC = () => {
   }
 
   const SidebarContent = (
-      <aside className={`w-80 bg-[var(--background-secondary)] text-[var(--text-secondary)] border-r border-[var(--separator-primary)] flex flex-col h-full`}>
+      <aside className={`w-80 bg-[var(--background-secondary)] text-[var(--text-secondary)] border-r border-[var(--separator-primary)] flex flex-col h-dvh`}>
         <div className="flex-grow flex flex-col min-h-0">
           <div className="flex-grow overflow-y-auto isolated-scroll">
             <div className="space-y-4 pr-5 pl-[calc(1.25rem+env(safe-area-inset-left))] pt-[calc(1.25rem+env(safe-area-inset-top))]">
