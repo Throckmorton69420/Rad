@@ -445,8 +445,8 @@ const App: React.FC = () => {
         )}
 
         <main className={`flex-1 flex flex-col bg-transparent`}>
-            <div className="p-3 md:p-6 pl-[calc(0.75rem+env(safe-area-inset-left))] pr-[calc(0.75rem+env(safe-area-inset-right))] flex flex-col flex-grow">
-              <div className="mb-6 flex-shrink-0">
+            <div className="pt-3 md:pt-6 pl-[calc(0.75rem+env(safe-area-inset-left))] pr-[calc(0.75rem+env(safe-area-inset-right))] pb-[calc(6rem+env(safe-area-inset-bottom))] flex flex-col flex-grow">
+              <div className="mb-6 flex-shrink-0 px-3 md:px-6">
                     <div className="inline-flex bg-[var(--background-tertiary)] p-1 rounded-lg space-x-1">
                         <button onClick={() => setActiveTab('schedule')} className={`py-1.5 px-4 font-semibold text-sm rounded-md flex-1 transition-colors ${activeTab === 'schedule' ? 'bg-[var(--background-tertiary-hover)] shadow text-[var(--text-primary)]' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}>
                             <i className="fa-regular fa-calendar-days mr-2"></i> Schedule
@@ -457,7 +457,7 @@ const App: React.FC = () => {
                     </div>
                 </div>
 
-                <div className="flex-1 min-h-0 flex flex-col">
+                <div className="flex-1 min-h-0 flex flex-col px-3 md:px-6">
                     {isLoading && studyPlan && <div className="flex flex-col items-center justify-center p-10"> <i className="fas fa-spinner fa-spin fa-2x text-[var(--accent-purple)] mb-3"></i> <span className="text-[var(--text-primary)]">Loading...</span> </div>}
                     
                     {!isLoading && activeTab === 'schedule' && (
