@@ -70,7 +70,7 @@ const DailyTaskList: React.FC<DailyTaskListProps> = ({
       
       <div className="flex-grow">
         <div 
-          className={`${dropZoneClasses} pb-[calc(6rem+env(safe-area-inset-bottom))]`}
+          className={`${dropZoneClasses} pb-24`}
           onDragOver={onDragOver}
           onDragEnter={handleDragEnter}
           onDragLeave={handleDragLeave}
@@ -109,7 +109,7 @@ const DailyTaskList: React.FC<DailyTaskListProps> = ({
         </div>
       </div>
 
-      <div className="sticky bottom-0 -mx-4 px-4 pt-3 bg-[var(--glass-background-panel)] backdrop-blur-[24px] border-t border-[var(--separator-primary)] pb-[calc(6rem+env(safe-area-inset-bottom))]">
+      <div className="sticky bottom-0 -mx-4 px-4 pt-3 bg-[var(--glass-background-panel)] backdrop-blur-[24px] border-t border-[var(--separator-primary)] pb-[calc(1.5rem+env(safe-area-inset-bottom))]">
         <div className="flex space-x-2">
           <Button onClick={onOpenModifyDayModal} variant="primary" className="flex-grow">
             <i className="fas fa-edit mr-2"></i> Modify Schedule
