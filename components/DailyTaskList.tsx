@@ -70,7 +70,7 @@ const DailyTaskList: React.FC<DailyTaskListProps> = ({
       
       <div className="flex-grow">
         <div 
-          className={`${dropZoneClasses} pb-24`}
+          className={`${dropZoneClasses} pb-[calc(6rem+env(safe-area-inset-bottom))]`}
           onDragOver={onDragOver}
           onDragEnter={handleDragEnter}
           onDragLeave={handleDragLeave}
