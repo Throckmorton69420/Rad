@@ -52,12 +52,12 @@ const DailyTaskList: React.FC<DailyTaskListProps> = ({
 
 
   return (
-    <div 
-      className="flex flex-col view-container static-glow-border"
-      onDrop={onTaskDrop}
-      onDragOver={onDragOver}
-    >
-      <div className="flex-shrink-0">
+    <div className="relative">
+      <div 
+        className="pb-24"
+        onDrop={onTaskDrop}
+        onDragOver={onDragOver}
+      >
         <div className="flex justify-between items-center mb-2">
             <Button onClick={() => onNavigateDay('prev')} variant="ghost" size="sm" className="!px-2">
                 <i className="fas fa-chevron-left"></i>
@@ -83,56 +83,58 @@ const DailyTaskList: React.FC<DailyTaskListProps> = ({
               </div>
             </div>
         )}
-      </div>
 
-      <div className="space-y-4 mt-4 pr-2 -mr-2">
-        {dailySchedule.isRestDay ? (
-          <div className="text-center py-10 bg-[var(--background-tertiary)] rounded-lg">
-            <p className="text-lg text-[var(--text-secondary)]">Enjoy your rest day! <i className="fas fa-coffee ml-1"></i></p>
-          </div>
-        ) : Object.keys(tasksByTopic).length > 0 ? (
-          Object.entries(tasksByTopic).map(([topic, tasks]) => (
-            <div key={topic}>
-              <h3 className="text-md font-semibold text-[var(--text-primary)] mb-2 border-b border-[var(--separator-secondary)] pb-2">{topic}</h3>
-              <div className="space-y-2">
-                {tasks.sort((a,b) => a.order - b.order).map(task => (
-                  <TaskItem 
-                    key={task.id} 
-                    task={task} 
-                    onToggle={onTaskToggle} 
-                    isCurrentPomodoroTask={task.id === currentPomodoroTaskId}
-                    isPulsing={isPomodoroActive && task.id === currentPomodoroTaskId}
-                    onSetPomodoro={() => onPomodoroTaskSelect(task.id === currentPomodoroTaskId ? null : task.id)}
-                    onDragStart={(e) => onTaskDragStart(e, task.id)}
-                  />
-                ))}
-              </div>
+        <div className="space-y-4 mt-4">
+          {dailySchedule.isRestDay ? (
+            <div className="text-center py-10 bg-[var(--background-tertiary)] rounded-lg">
+              <p className="text-lg text-[var(--text-secondary)]">Enjoy your rest day! <i className="fas fa-coffee ml-1"></i></p>
             </div>
-          ))
-        ) : (
-          <div className="text-center py-10 bg-[var(--background-tertiary)] rounded-lg border-2 border-dashed border-[var(--separator-secondary)]">
-            <p className="text-[var(--text-secondary)]">Your schedule for this day is empty.</p>
-            <p className="text-[var(--text-secondary)] text-sm mt-1">Use the "Modify Schedule" button below to add tasks.</p>
-          </div>
-        )}
+          ) : Object.keys(tasksByTopic).length > 0 ? (
+            Object.entries(tasksByTopic).map(([topic, tasks]) => (
+              <div key={topic}>
+                <h3 className="text-md font-semibold text-[var(--text-primary)] mb-2 border-b border-[var(--separator-secondary)] pb-2">{topic}</h3>
+                <div className="space-y-2">
+                  {tasks.sort((a,b) => a.order - b.order).map(task => (
+                    <TaskItem 
+                      key={task.id} 
+                      task={task} 
+                      onToggle={onTaskToggle} 
+                      isCurrentPomodoroTask={task.id === currentPomodoroTaskId}
+                      isPulsing={isPomodoroActive && task.id === currentPomodoroTaskId}
+                      onSetPomodoro={() => onPomodoroTaskSelect(task.id === currentPomodoroTaskId ? null : task.id)}
+                      onDragStart={(e) => onTaskDragStart(e, task.id)}
+                    />
+                  ))}
+                </div>
+              </div>
+            ))
+          ) : (
+            <div className="text-center py-10 bg-[var(--background-tertiary)] rounded-lg border-2 border-dashed border-[var(--separator-secondary)]">
+              <p className="text-[var(--text-secondary)]">Your schedule for this day is empty.</p>
+              <p className="text-[var(--text-secondary)] text-sm mt-1">Use the "Modify Schedule" button below to add tasks.</p>
+            </div>
+          )}
+        </div>
       </div>
       
-      <div className="flex-shrink-0 pt-3 bg-[var(--glass-background-panel)] backdrop-blur-[24px] flex space-x-2 pb-[env(safe-area-inset-bottom)] sticky bottom-0 -mx-4 -mb-4 px-4">
-        <Button onClick={onOpenModifyDayModal} variant="primary" className="flex-grow" disabled={dailySchedule.isRestDay}>
-          <i className="fas fa-edit mr-2"></i> Modify Schedule
-        </Button>
-        <Button onClick={onOpenAddTaskModal} variant="secondary" title="Add a quick custom task" disabled={dailySchedule.isRestDay}>
-          <i className="fas fa-plus"></i>
-        </Button>
-        {dailySchedule.isRestDay ? (
-          <Button onClick={() => onToggleRestDay(true)} variant="secondary" title="Convert to Study Day" className="!px-3">
-              <i className="fas fa-book-open"></i>
-          </Button>
-        ) : (
-          <Button onClick={() => onToggleRestDay(false)} variant="secondary" title="Convert to Rest Day" className="!px-3">
-              <i className="fas fa-coffee"></i>
-          </Button>
-        )}
+      <div className="sticky bottom-0 -mx-4 px-4 pt-3 bg-[var(--glass-background-panel)] backdrop-blur-[24px] border-t border-t-[var(--separator-primary)] pb-[calc(1rem+env(safe-area-inset-bottom))]">
+        <div className="flex space-x-2">
+            <Button onClick={onOpenModifyDayModal} variant="primary" className="flex-grow" disabled={dailySchedule.isRestDay}>
+              <i className="fas fa-edit mr-2"></i> Modify Schedule
+            </Button>
+            <Button onClick={onOpenAddTaskModal} variant="secondary" title="Add a quick custom task" disabled={dailySchedule.isRestDay}>
+              <i className="fas fa-plus"></i>
+            </Button>
+            {dailySchedule.isRestDay ? (
+              <Button onClick={() => onToggleRestDay(true)} variant="secondary" title="Convert to Study Day" className="!px-3">
+                  <i className="fas fa-book-open"></i>
+              </Button>
+            ) : (
+              <Button onClick={() => onToggleRestDay(false)} variant="secondary" title="Convert to Rest Day" className="!px-3">
+                  <i className="fas fa-coffee"></i>
+              </Button>
+            )}
+        </div>
       </div>
     </div>
   );

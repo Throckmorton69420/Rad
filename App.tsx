@@ -63,37 +63,10 @@ const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'schedule' | 'progress'>('schedule');
   const [highlightedDates, setHighlightedDates] = useState<string[]>([]);
   const [isPomodoroCollapsed, setIsPomodoroCollapsed] = usePersistentState('radiology_pomodoro_collapsed', true);
-  const scrollYRef = useRef(0);
 
   useEffect(() => {
     loadSchedule();
   }, []);
-
-  useEffect(() => {
-    const htmlEl = document.documentElement;
-    const bodyEl = document.body;
-
-    if (isSidebarOpen) {
-        scrollYRef.current = window.scrollY;
-        htmlEl.style.overscrollBehavior = 'none';
-        bodyEl.style.position = 'fixed';
-        bodyEl.style.top = `-${scrollYRef.current}px`;
-        bodyEl.style.width = '100%';
-    } else {
-        bodyEl.style.position = '';
-        bodyEl.style.top = '';
-        bodyEl.style.width = '';
-        htmlEl.style.overscrollBehavior = '';
-        window.scrollTo(0, scrollYRef.current);
-    }
-    
-    return () => {
-        bodyEl.style.position = '';
-        bodyEl.style.top = '';
-        bodyEl.style.width = '';
-        htmlEl.style.overscrollBehavior = '';
-    };
-  }, [isSidebarOpen]);
   
   const navigateDate = (direction: 'next' | 'prev') => {
     const currentDateObj = new Date(selectedDate + 'T00:00:00');
@@ -394,7 +367,7 @@ const App: React.FC = () => {
   );
 
   return (
-    <div className="min-h-screen w-full bg-transparent text-[var(--text-primary)] flex flex-col">
+    <div className="h-full w-full bg-transparent text-[var(--text-primary)] flex flex-col">
       {/* --- Sidebar (Now a true overlay for both mobile and desktop) --- */}
       <div 
           className={`lg:hidden fixed inset-y-0 left-0 z-50 transform transition-transform duration-300 ease-in-out ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}
@@ -411,7 +384,7 @@ const App: React.FC = () => {
       </div>
 
       {/* --- Main Content Area (makes space for desktop sidebar) --- */}
-      <div className="flex-grow lg:pl-80 flex flex-col">
+      <div className="flex-grow lg:pl-80 flex flex-col min-h-0">
         <header className="flex-shrink-0 bg-[var(--background-secondary)] text-white px-3 md:px-4 pb-3 md:pb-4 border-b border-[var(--separator-primary)] flex justify-between items-center sticky top-0 z-[var(--z-header)] pt-[calc(0.75rem+env(safe-area-inset-top))] md:pt-[calc(1rem+env(safe-area-inset-top))] pl-[calc(0.75rem+env(safe-area-inset-left))] pr-[calc(0.75rem+env(safe-area-inset-right))]">
           <div className="flex items-center">
               <button className="lg:hidden p-2 -ml-2 mr-2 text-[var(--text-primary)] hover:bg-[var(--background-tertiary)] rounded-full" onClick={() => setIsSidebarOpen(p => !p)} aria-label="Toggle menu">
@@ -444,8 +417,8 @@ const App: React.FC = () => {
           notificationPortal
         )}
 
-        <main className={`flex-1 flex flex-col bg-transparent`}>
-            <div className="pt-3 md:pt-6 pl-[calc(0.75rem+env(safe-area-inset-left))] pr-[calc(0.75rem+env(safe-area-inset-right))] pb-[calc(6rem+env(safe-area-inset-bottom))] flex flex-col flex-grow">
+        <main className="flex-1 overflow-y-auto min-h-0">
+            <div className="pt-3 md:pt-6 pl-[calc(0.75rem+env(safe-area-inset-left))] pr-[calc(0.75rem+env(safe-area-inset-right))] flex flex-col">
               <div className="mb-6 flex-shrink-0 px-3 md:px-6">
                     <div className="inline-flex bg-[var(--background-tertiary)] p-1 rounded-lg space-x-1">
                         <button onClick={() => setActiveTab('schedule')} className={`py-1.5 px-4 font-semibold text-sm rounded-md flex-1 transition-colors ${activeTab === 'schedule' ? 'bg-[var(--background-tertiary-hover)] shadow text-[var(--text-primary)]' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}>

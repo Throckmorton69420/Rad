@@ -62,8 +62,14 @@
   }
 }
 
-html, body, #root {
+html, body {
+  height: 100vh;
+  overflow: hidden;
   -webkit-tap-highlight-color: transparent;
+}
+
+#root {
+  height: 100dvh;
 }
 
 body {
