@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import ReactDOM from 'react-dom';
 import { DailySchedule, StudyPlan, ScheduledTask, PomodoroSettings, ViewMode, Domain, ResourceType, AddTaskModalProps, StudyResource, ResourceEditorModalProps, ExceptionDateRule } from './types';
 import { EXAM_DATE_START, STUDY_START_DATE, APP_TITLE, ALL_DOMAINS, POMODORO_DEFAULT_STUDY_MINS, POMODORO_DEFAULT_REST_MINS } from './constants';
@@ -28,6 +28,7 @@ import { formatDuration, getTodayInNewYork } from './utils/timeFormatter';
 const App: React.FC = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(true);
+  const scrollPositionRef = useRef(0);
 
   const {
     studyPlan, setStudyPlan, previousStudyPlan,
@@ -67,6 +68,20 @@ const App: React.FC = () => {
   useEffect(() => {
     loadSchedule();
   }, []);
+
+  useEffect(() => {
+    if (isSidebarOpen) {
+      scrollPositionRef.current = window.scrollY;
+      document.body.style.position = 'fixed';
+      document.body.style.top = `-${scrollPositionRef.current}px`;
+      document.body.style.width = '100%';
+    } else {
+      document.body.style.position = '';
+      document.body.style.top = '';
+      document.body.style.width = '';
+      window.scrollTo(0, scrollPositionRef.current);
+    }
+  }, [isSidebarOpen]);
   
   const navigateDate = (direction: 'next' | 'prev') => {
     const currentDateObj = new Date(selectedDate + 'T00:00:00');
@@ -280,8 +295,8 @@ const App: React.FC = () => {
   }
 
   return (
-    <div className="flex flex-col h-full w-full overflow-x-hidden bg-transparent text-[var(--text-primary)]">
-      <header className="bg-[var(--background-secondary)] text-white px-3 md:px-4 pb-3 md:pb-4 border-b border-[var(--separator-primary)] flex justify-between items-center sticky top-0 z-[var(--z-header)] pt-[calc(0.75rem+env(safe-area-inset-top))] md:pt-[calc(1rem+env(safe-area-inset-top))] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]">
+    <div className="flex flex-col h-full bg-transparent text-[var(--text-primary)]">
+      <header className="flex-shrink-0 bg-[var(--background-secondary)] text-white px-3 md:px-4 pb-3 md:pb-4 border-b border-[var(--separator-primary)] flex justify-between items-center sticky top-0 z-[var(--z-header)] pt-[calc(0.75rem+env(safe-area-inset-top))] md:pt-[calc(1rem+env(safe-area-inset-top))] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]">
         <div className="flex items-center">
             <button className="lg:hidden p-2 -ml-2 mr-2 text-[var(--text-primary)] hover:bg-[var(--background-tertiary)] rounded-full" onClick={() => setIsSidebarOpen(p => !p)} aria-label="Toggle menu">
                 <i className="fas fa-bars fa-lg"></i>
@@ -317,88 +332,90 @@ const App: React.FC = () => {
         {/* Mobile Sidebar Overlay */}
         <div className={`lg:hidden fixed inset-0 bg-black/60 z-40 transition-opacity ${isSidebarOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`} onClick={() => setIsSidebarOpen(false)} aria-hidden="true"></div>
         
-        <aside className={`w-80 bg-[var(--background-secondary)] text-[var(--text-secondary)] border-r border-[var(--separator-primary)] fixed lg:static inset-y-0 z-50 transform transition-transform duration-300 ease-in-out lg:translate-x-0 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} flex flex-col`}>
-          <div className="flex-grow overflow-y-auto isolated-scroll">
-            <div className="space-y-4 pr-5 pl-[calc(1.25rem+env(safe-area-inset-left))] pt-[calc(1.25rem+env(safe-area-inset-top))] pb-[calc(1.25rem+env(safe-area-inset-bottom))]">
-              <div className="flex justify-end -mr-2 -mt-2 lg:hidden">
-                  <button onClick={() => setIsSidebarOpen(false)} className="p-2 text-[var(--text-primary)] hover:text-white" aria-label="Close menu">
-                      <i className="fas fa-times fa-lg"></i>
+        <aside className={`w-80 bg-[var(--background-secondary)] text-[var(--text-secondary)] border-r border-[var(--separator-primary)] fixed lg:static inset-y-0 z-50 transform transition-transform duration-300 ease-in-out lg:translate-x-0 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} flex flex-col h-full lg:h-auto`}>
+          <div className="flex-grow flex flex-col min-h-0">
+            <div className="flex-grow overflow-y-auto isolated-scroll">
+              <div className="space-y-4 pr-5 pl-[calc(1.25rem+env(safe-area-inset-left))] pt-[1.25rem] pb-[calc(1.25rem+env(safe-area-inset-bottom))]">
+                <div className="flex justify-end -mr-2 -mt-2 lg:hidden">
+                    <button onClick={() => setIsSidebarOpen(false)} className="p-2 text-[var(--text-primary)] hover:text-white" aria-label="Close menu">
+                        <i className="fas fa-times fa-lg"></i>
+                    </button>
+                </div>
+                <div>
+                  <button onClick={() => setIsPomodoroCollapsed(!isPomodoroCollapsed)} className="w-full text-lg font-semibold text-left text-[var(--text-primary)] flex justify-between items-center py-2">
+                      <span>Pomodoro Timer</span>
+                      <i className={`fas fa-chevron-down transition-transform ${isPomodoroCollapsed ? '' : 'rotate-180'}`}></i>
                   </button>
-              </div>
-              <div>
-                <button onClick={() => setIsPomodoroCollapsed(!isPomodoroCollapsed)} className="w-full text-lg font-semibold text-left text-[var(--text-primary)] flex justify-between items-center py-2">
-                    <span>Pomodoro Timer</span>
-                    <i className={`fas fa-chevron-down transition-transform ${isPomodoroCollapsed ? '' : 'rotate-180'}`}></i>
-                </button>
-                {!isPomodoroCollapsed && (
-                    <div className="animate-fade-in">
-                        <PomodoroTimerComponent settings={pomodoroSettings} setSettings={setPomodoroSettings} onSessionComplete={handlePomodoroSessionComplete} linkedTaskTitle={currentPomodoroTask?.title}/>
-                    </div>
-                )}
-              </div>
-
-              <div className="border-b border-[var(--separator-primary)] my-2"></div>
-              
-              <div>
-                <h2 className="text-lg font-semibold mb-3 border-b border-[var(--separator-primary)] pb-2 text-[var(--text-primary)]">Calendar</h2>
-                <CalendarView 
-                    schedule={studyPlan.schedule} 
-                    selectedDate={selectedDate} 
-                    onDateSelect={(d) => {setSelectedDate(d); setIsSidebarOpen(false);}} 
-                    viewMode={ViewMode.MONTHLY}
-                    currentDisplayDate={selectedDate} 
-                    onNavigatePeriod={(dir) => navigatePeriod(dir, 'Monthly')} 
-                    highlightedDates={highlightedDates} 
-                    today={todayInNewYork}
-                />
-              </div>
-              
-              <RebalanceControls 
-                onRebalance={(options) => { handleRebalance(options); if(options.type === 'topic-time') setSelectedDate(options.date); }} 
-                isLoading={isLoading} 
-                selectedDate={selectedDate} 
-                isCramModeActive={studyPlan.isCramModeActive ?? false}
-                onToggleCramMode={handleToggleCramMode}
-              />
-
-              <div className="space-y-3">
-                <button onClick={() => setIsSettingsOpen(!isSettingsOpen)} className="w-full text-lg font-semibold text-left text-[var(--text-primary)] flex justify-between items-center">
-                    <span>Schedule Settings</span>
-                    <i className={`fas fa-chevron-down transition-transform ${isSettingsOpen ? 'rotate-180' : ''}`}></i>
-                  </button>
-                  {isSettingsOpen && (
-                    <div className="animate-fade-in pl-1">
-                      <TopicOrderManager 
-                        topicOrder={studyPlan.topicOrder} 
-                        onSaveOrder={handleUpdateTopicOrderAndRebalance} 
-                        cramTopicOrder={studyPlan.cramTopicOrder}
-                        onSaveCramOrder={handleUpdateCramTopicOrderAndRebalance}
-                        isLoading={isLoading} 
-                        isPhysicsInTopicOrder={studyPlan.isPhysicsInTopicOrder}
-                        onTogglePhysicsManagement={handleTogglePhysicsManagementAndRebalance}
-                        isCramModeActive={studyPlan.isCramModeActive ?? false}
-                        isCramPhysicsInterleaved={studyPlan.isCramPhysicsInterleaved}
-                        onToggleCramPhysicsManagement={handleToggleCramPhysicsManagementAndRebalance}
-                        />
-                    </div>
+                  {!isPomodoroCollapsed && (
+                      <div className="animate-fade-in">
+                          <PomodoroTimerComponent settings={pomodoroSettings} setSettings={setPomodoroSettings} onSessionComplete={handlePomodoroSessionComplete} linkedTaskTitle={currentPomodoroTask?.title}/>
+                      </div>
                   )}
-              </div>
+                </div>
 
-              <AddExceptionDay onAddException={handleAddOrUpdateException} isLoading={isLoading} />
-              
-              <div>
-                <h2 className="text-lg font-semibold mb-3 border-b border-[var(--separator-primary)] pb-2 text-[var(--text-primary)]">Actions</h2>
-                <div className="space-y-2">
-                  <Button onClick={handleUndo} variant="secondary" className="w-full" disabled={!previousStudyPlan || isLoading}><i className="fas fa-undo mr-2"></i> Undo Last Plan Change</Button>
-                  <Button onClick={() => showConfirmation({title: "Regenerate Schedule?", message: "This will regenerate the entire schedule from scratch based on the current resource pool and save it to the cloud. Are you sure?", confirmText: "Regenerate", confirmVariant: 'danger', onConfirm: () => loadSchedule(true)})} variant="danger" className="w-full" disabled={isLoading}>Regenerate Schedule</Button>
-                  <Button onClick={() => showConfirmation({title: "Reset All Progress?", message: "Are you sure you want to mark all tasks as 'pending'?", confirmText: "Reset Progress", confirmVariant: 'danger', onConfirm: handleMasterResetTasks})} variant="danger" className="w-full" disabled={isLoading}>Reset Task Progress</Button>
+                <div className="border-b border-[var(--separator-primary)] my-2"></div>
+                
+                <div>
+                  <h2 className="text-lg font-semibold mb-3 border-b border-[var(--separator-primary)] pb-2 text-[var(--text-primary)]">Calendar</h2>
+                  <CalendarView 
+                      schedule={studyPlan.schedule} 
+                      selectedDate={selectedDate} 
+                      onDateSelect={(d) => {setSelectedDate(d); setIsSidebarOpen(false);}} 
+                      viewMode={ViewMode.MONTHLY}
+                      currentDisplayDate={selectedDate} 
+                      onNavigatePeriod={(dir) => navigatePeriod(dir, 'Monthly')} 
+                      highlightedDates={highlightedDates} 
+                      today={todayInNewYork}
+                  />
+                </div>
+                
+                <RebalanceControls 
+                  onRebalance={(options) => { handleRebalance(options); if(options.type === 'topic-time') setSelectedDate(options.date); }} 
+                  isLoading={isLoading} 
+                  selectedDate={selectedDate} 
+                  isCramModeActive={studyPlan.isCramModeActive ?? false}
+                  onToggleCramMode={handleToggleCramMode}
+                />
+
+                <div className="space-y-3">
+                  <button onClick={() => setIsSettingsOpen(!isSettingsOpen)} className="w-full text-lg font-semibold text-left text-[var(--text-primary)] flex justify-between items-center">
+                      <span>Schedule Settings</span>
+                      <i className={`fas fa-chevron-down transition-transform ${isSettingsOpen ? 'rotate-180' : ''}`}></i>
+                    </button>
+                    {isSettingsOpen && (
+                      <div className="animate-fade-in pl-1">
+                        <TopicOrderManager 
+                          topicOrder={studyPlan.topicOrder} 
+                          onSaveOrder={handleUpdateTopicOrderAndRebalance} 
+                          cramTopicOrder={studyPlan.cramTopicOrder}
+                          onSaveCramOrder={handleUpdateCramTopicOrderAndRebalance}
+                          isLoading={isLoading} 
+                          isPhysicsInTopicOrder={studyPlan.isPhysicsInTopicOrder}
+                          onTogglePhysicsManagement={handleTogglePhysicsManagementAndRebalance}
+                          isCramModeActive={studyPlan.isCramModeActive ?? false}
+                          isCramPhysicsInterleaved={studyPlan.isCramPhysicsInterleaved}
+                          onToggleCramPhysicsManagement={handleToggleCramPhysicsManagementAndRebalance}
+                          />
+                      </div>
+                    )}
+                </div>
+
+                <AddExceptionDay onAddException={handleAddOrUpdateException} isLoading={isLoading} />
+                
+                <div>
+                  <h2 className="text-lg font-semibold mb-3 border-b border-[var(--separator-primary)] pb-2 text-[var(--text-primary)]">Actions</h2>
+                  <div className="space-y-2">
+                    <Button onClick={handleUndo} variant="secondary" className="w-full" disabled={!previousStudyPlan || isLoading}><i className="fas fa-undo mr-2"></i> Undo Last Plan Change</Button>
+                    <Button onClick={() => showConfirmation({title: "Regenerate Schedule?", message: "This will regenerate the entire schedule from scratch based on the current resource pool and save it to the cloud. Are you sure?", confirmText: "Regenerate", confirmVariant: 'danger', onConfirm: () => loadSchedule(true)})} variant="danger" className="w-full" disabled={isLoading}>Regenerate Schedule</Button>
+                    <Button onClick={() => showConfirmation({title: "Reset All Progress?", message: "Are you sure you want to mark all tasks as 'pending'?", confirmText: "Reset Progress", confirmVariant: 'danger', onConfirm: handleMasterResetTasks})} variant="danger" className="w-full" disabled={isLoading}>Reset Task Progress</Button>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
         </aside>
 
-        <main className={`flex-1 p-3 md:p-6 flex flex-col overflow-y-auto bg-transparent pr-[env(safe-area-inset-right)] isolated-scroll ${isSidebarOpen ? 'pointer-events-none' : ''}`}>
+        <main className={`flex-1 p-3 md:p-6 flex flex-col overflow-y-auto bg-transparent pr-[env(safe-area-inset-right)]`}>
            <div className="mb-6 flex-shrink-0">
                 <div className="inline-flex bg-[var(--background-tertiary)] p-1 rounded-lg space-x-1">
                     <button onClick={() => setActiveTab('schedule')} className={`py-1.5 px-4 font-semibold text-sm rounded-md flex-1 transition-colors ${activeTab === 'schedule' ? 'bg-[var(--background-tertiary-hover)] shadow text-[var(--text-primary)]' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}>
@@ -410,11 +427,11 @@ const App: React.FC = () => {
                 </div>
             </div>
 
-            <div className="flex-1">
+            <div className="flex-1 min-h-0">
                 {isLoading && studyPlan && <div className="flex flex-col items-center justify-center p-10"> <i className="fas fa-spinner fa-spin fa-2x text-[var(--accent-purple)] mb-3"></i> <span className="text-[var(--text-primary)]">Loading...</span> </div>}
                 
                 {!isLoading && activeTab === 'schedule' && (
-                  <div className="">
+                  <div className="h-full">
                       {selectedDaySchedule ?
                         <DailyTaskList 
                             dailySchedule={selectedDaySchedule} 
