@@ -68,6 +68,17 @@ const App: React.FC = () => {
   useEffect(() => {
     loadSchedule();
   }, []);
+  
+  useEffect(() => {
+    if (isSidebarOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [isSidebarOpen]);
 
   const navigateDate = (direction: 'next' | 'prev') => {
     const currentDateObj = new Date(selectedDate + 'T00:00:00');
@@ -318,7 +329,7 @@ const App: React.FC = () => {
         {/* Mobile Sidebar Overlay */}
         <div className={`lg:hidden fixed inset-0 bg-black/60 z-40 transition-opacity ${isSidebarOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`} onClick={() => setIsSidebarOpen(false)} aria-hidden="true"></div>
         
-        <aside className={`w-80 bg-[var(--background-secondary)] text-[var(--text-secondary)] pt-5 space-y-4 overflow-y-auto border-r border-[var(--separator-primary)] fixed lg:static h-full z-50 transform transition-transform duration-300 ease-in-out lg:translate-x-0 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} pb-[calc(1.25rem+env(safe-area-inset-bottom))] pr-5 pl-[calc(1.25rem+env(safe-area-inset-left))] isolated-scroll`}>
+        <aside className={`w-80 bg-[var(--background-secondary)] text-[var(--text-secondary)] pt-5 space-y-4 overflow-y-auto border-r border-[var(--separator-primary)] fixed lg:static h-full z-50 transform transition-transform duration-300 ease-in-out lg:translate-x-0 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} pr-5 pl-[calc(1.25rem+env(safe-area-inset-left))] isolated-scroll`}>
           <div className="flex justify-end -mr-2 -mt-2 lg:hidden">
               <button onClick={() => setIsSidebarOpen(false)} className="p-2 text-[var(--text-primary)] hover:text-white" aria-label="Close menu">
                   <i className="fas fa-times fa-lg"></i>
@@ -393,9 +404,10 @@ const App: React.FC = () => {
               <Button onClick={() => showConfirmation({title: "Reset All Progress?", message: "Are you sure you want to mark all tasks as 'pending'?", confirmText: "Reset Progress", confirmVariant: 'danger', onConfirm: handleMasterResetTasks})} variant="danger" className="w-full" disabled={isLoading}>Reset Task Progress</Button>
             </div>
           </div>
+          <div className="h-[env(safe-area-inset-bottom)] flex-shrink-0"></div>
         </aside>
 
-        <main className="flex-1 p-3 md:p-6 flex flex-col overflow-y-auto bg-transparent pb-[env(safe-area-inset-bottom)] pr-[env(safe-area-inset-right)] isolated-scroll">
+        <main className="flex-1 p-3 md:p-6 flex flex-col overflow-y-auto bg-transparent pr-[env(safe-area-inset-right)] isolated-scroll">
            <div className="mb-6 flex-shrink-0">
                 <div className="inline-flex bg-[var(--background-tertiary)] p-1 rounded-lg space-x-1">
                     <button onClick={() => setActiveTab('schedule')} className={`py-1.5 px-4 font-semibold text-sm rounded-md flex-1 transition-colors ${activeTab === 'schedule' ? 'bg-[var(--background-tertiary-hover)] shadow text-[var(--text-primary)]' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}>

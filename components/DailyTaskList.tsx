@@ -117,7 +117,7 @@ const DailyTaskList: React.FC<DailyTaskListProps> = ({
       )}
       </div>
       
-      <div className="sticky bottom-0 mt-auto pt-3 bg-[var(--glass-background-panel)] backdrop-blur-[24px] flex space-x-2 pb-2">
+      <div className="sticky bottom-0 mt-auto pt-3 bg-[var(--glass-background-panel)] backdrop-blur-[24px] flex space-x-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))]">
         <Button onClick={onOpenModifyDayModal} variant="primary" className="flex-grow" disabled={dailySchedule.isRestDay}>
           <i className="fas fa-edit mr-2"></i> Modify Schedule
         </Button>
