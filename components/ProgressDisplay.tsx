@@ -147,9 +147,11 @@ const ProgressDisplay: React.FC<ProgressDisplayProps> = ({ studyPlan }) => {
 
   return (
     <div className="view-container text-[var(--text-primary)] h-full flex flex-col">
-      <h2 className="text-2xl font-bold text-[var(--text-primary)] border-b border-[var(--separator-primary)] pb-3 text-center flex-shrink-0">Study Progress</h2>
+      <div className="flex-shrink-0">
+        <h2 className="text-2xl font-bold text-[var(--text-primary)] border-b border-[var(--separator-primary)] pb-3 text-center">Study Progress</h2>
+      </div>
       
-      <div className="flex-1 overflow-y-auto min-h-0 mt-8 pr-2 -mr-2">
+      <div className="flex-grow overflow-y-auto min-h-0 mt-8 pr-2 -mr-2">
         <div>
           <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-2">Overall Progress</h3>
           <div className='mt-2 p-4 static-glow-border rounded-lg bg-[var(--background-tertiary)]'>

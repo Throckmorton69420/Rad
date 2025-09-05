@@ -62,7 +62,9 @@
   }
 }
 
-html {
+html, body, #root {
+  height: 100%;
+  overflow: hidden;
   -webkit-tap-highlight-color: transparent;
 }
 
@@ -77,12 +79,10 @@ body {
   font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  overflow: hidden; /* Prevent body scroll by default. All scrolling is internal. */
 }
 
 /* Robust scroll-lock for when sidebar is open */
 html.scroll-lock {
-  overflow: hidden;
   overscroll-behavior: none; /* Crucial for preventing pull-to-refresh on iOS */
 }
 body.scroll-lock {
