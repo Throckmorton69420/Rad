@@ -54,7 +54,6 @@ const DailyTaskList: React.FC<DailyTaskListProps> = ({
   return (
     <div className="relative">
       <div 
-        className="pb-24"
         onDrop={onTaskDrop}
         onDragOver={onDragOver}
       >
@@ -117,7 +116,7 @@ const DailyTaskList: React.FC<DailyTaskListProps> = ({
         </div>
       </div>
       
-      <div className="sticky bottom-0 -mx-4 px-4 pt-3 bg-[var(--glass-background-panel)] backdrop-blur-[24px] border-t border-t-[var(--separator-primary)] pb-[calc(3rem+env(safe-area-inset-bottom))]">
+      <div className="sticky bottom-0 -mx-4 px-4 pt-3 bg-[var(--glass-background-panel)] backdrop-blur-[24px] border-t border-t-[var(--separator-primary)]">
         <div className="flex space-x-2">
             <Button onClick={onOpenModifyDayModal} variant="primary" className="flex-grow" disabled={dailySchedule.isRestDay}>
               <i className="fas fa-edit mr-2"></i> Modify Schedule

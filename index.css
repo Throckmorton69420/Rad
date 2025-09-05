@@ -63,7 +63,7 @@
 }
 
 html, body {
-  height: 100vh;
+  height: 100dvh;
   overflow: hidden;
   -webkit-tap-highlight-color: transparent;
 }
