@@ -79,17 +79,6 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Robust scroll-lock for when sidebar is open */
-html.scroll-lock {
-  overscroll-behavior: none; /* Crucial for preventing pull-to-refresh on iOS */
-}
-body.scroll-lock {
-  position: fixed; /* A key part of robust iOS scroll locking */
-  width: 100%;
-  overscroll-behavior: none;
-}
-
-
 h1, h2 {
   text-shadow: 0 0 8px var(--accent-purple-glow);
 }

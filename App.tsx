@@ -63,22 +63,45 @@ const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'schedule' | 'progress'>('schedule');
   const [highlightedDates, setHighlightedDates] = useState<string[]>([]);
   const [isPomodoroCollapsed, setIsPomodoroCollapsed] = usePersistentState('radiology_pomodoro_collapsed', true);
+  const scrollYRef = useRef(0);
 
   useEffect(() => {
     loadSchedule();
   }, []);
 
   useEffect(() => {
+    const htmlEl = document.documentElement;
+    const bodyEl = document.body;
+
     if (isSidebarOpen) {
-      document.documentElement.classList.add('scroll-lock');
-      document.body.classList.add('scroll-lock');
+        // 1. Save current scroll position
+        scrollYRef.current = window.scrollY;
+
+        // 2. Apply locking styles
+        htmlEl.style.overscrollBehavior = 'none';
+        bodyEl.style.position = 'fixed';
+        bodyEl.style.top = `-${scrollYRef.current}px`;
+        bodyEl.style.width = '100%';
+        bodyEl.style.overflowY = 'scroll'; // Prevent layout shift from scrollbar disappearing
     } else {
-      document.documentElement.classList.remove('scroll-lock');
-      document.body.classList.remove('scroll-lock');
+        // 3. Remove locking styles
+        bodyEl.style.position = '';
+        bodyEl.style.top = '';
+        bodyEl.style.width = '';
+        bodyEl.style.overflowY = '';
+        htmlEl.style.overscrollBehavior = '';
+
+        // 4. Restore scroll position
+        window.scrollTo(0, scrollYRef.current);
     }
+    
+    // Cleanup function
     return () => {
-      document.documentElement.classList.remove('scroll-lock');
-      document.body.classList.remove('scroll-lock');
+        bodyEl.style.position = '';
+        bodyEl.style.top = '';
+        bodyEl.style.width = '';
+        bodyEl.style.overflowY = '';
+        htmlEl.style.overscrollBehavior = '';
     };
   }, [isSidebarOpen]);
   

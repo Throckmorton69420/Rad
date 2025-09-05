@@ -16,14 +16,23 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
 
   <script>
-    // This script sets a CSS variable to the actual visible viewport height.
-    // This is the most reliable way to avoid layout issues on mobile browsers
-    // where the vh unit is inconsistent due to dynamic toolbars.
+    // This script sets a CSS variable to the actual visible viewport height using the
+    // modern visualViewport API, which is the most reliable way to handle dynamic
+    // toolbars on mobile browsers.
     const setAppHeight = () => {
-      const doc = document.documentElement;
-      doc.style.setProperty('--app-height', `${window.innerHeight}px`);
+      const setHeight = (height) => {
+        document.documentElement.style.setProperty('--app-height', `${height}px`);
+      };
+      
+      if (window.visualViewport) {
+        setHeight(window.visualViewport.height);
+        window.visualViewport.addEventListener('resize', () => setHeight(window.visualViewport.height));
+      } else {
+        // Fallback for older browsers
+        setHeight(window.innerHeight);
+        window.addEventListener('resize', () => setHeight(window.innerHeight));
+      }
     };
-    window.addEventListener('resize', setAppHeight);
     setAppHeight();
   </script>
 
