@@ -85,39 +85,41 @@ const DailyTaskList: React.FC<DailyTaskListProps> = ({
         )}
       </div>
 
-      <div className="flex-grow space-y-4 mt-4 overflow-y-auto pr-2 -mr-2">
-      {dailySchedule.isRestDay ? (
-        <div className="text-center py-10 bg-[var(--background-tertiary)] rounded-lg">
-          <p className="text-lg text-[var(--text-secondary)]">Enjoy your rest day! <i className="fas fa-coffee ml-1"></i></p>
-        </div>
-      ) : Object.keys(tasksByTopic).length > 0 ? (
-        Object.entries(tasksByTopic).map(([topic, tasks]) => (
-          <div key={topic}>
-            <h3 className="text-md font-semibold text-[var(--text-primary)] mb-2 border-b border-[var(--separator-secondary)] pb-2">{topic}</h3>
-            <div className="space-y-2">
-              {tasks.sort((a,b) => a.order - b.order).map(task => (
-                <TaskItem 
-                  key={task.id} 
-                  task={task} 
-                  onToggle={onTaskToggle} 
-                  isCurrentPomodoroTask={task.id === currentPomodoroTaskId}
-                  isPulsing={isPomodoroActive && task.id === currentPomodoroTaskId}
-                  onSetPomodoro={() => onPomodoroTaskSelect(task.id === currentPomodoroTaskId ? null : task.id)}
-                  onDragStart={(e) => onTaskDragStart(e, task.id)}
-                />
-              ))}
-            </div>
+      <div className="flex-grow space-y-4 mt-4 overflow-y-auto pr-2 -mr-2 min-h-0">
+        {dailySchedule.isRestDay ? (
+          <div className="text-center py-10 bg-[var(--background-tertiary)] rounded-lg">
+            <p className="text-lg text-[var(--text-secondary)]">Enjoy your rest day! <i className="fas fa-coffee ml-1"></i></p>
           </div>
-        ))
-      ) : (
-        <div className="text-center py-10 bg-[var(--background-tertiary)] rounded-lg border-2 border-dashed border-[var(--separator-secondary)]">
-          <p className="text-[var(--text-secondary)]">Your schedule for this day is empty.</p>
-          <p className="text-[var(--text-secondary)] text-sm mt-1">Use the "Modify Schedule" button below to add tasks.</p>
-        </div>
-      )}
+        ) : Object.keys(tasksByTopic).length > 0 ? (
+          Object.entries(tasksByTopic).map(([topic, tasks]) => (
+            <div key={topic}>
+              <h3 className="text-md font-semibold text-[var(--text-primary)] mb-2 border-b border-[var(--separator-secondary)] pb-2">{topic}</h3>
+              <div className="space-y-2">
+                {tasks.sort((a,b) => a.order - b.order).map(task => (
+                  <TaskItem 
+                    key={task.id} 
+                    task={task} 
+                    onToggle={onTaskToggle} 
+                    isCurrentPomodoroTask={task.id === currentPomodoroTaskId}
+                    isPulsing={isPomodoroActive && task.id === currentPomodoroTaskId}
+                    onSetPomodoro={() => onPomodoroTaskSelect(task.id === currentPomodoroTaskId ? null : task.id)}
+                    onDragStart={(e) => onTaskDragStart(e, task.id)}
+                  />
+                ))}
+              </div>
+            </div>
+          ))
+        ) : (
+          <div className="text-center py-10 bg-[var(--background-tertiary)] rounded-lg border-2 border-dashed border-[var(--separator-secondary)]">
+            <p className="text-[var(--text-secondary)]">Your schedule for this day is empty.</p>
+            <p className="text-[var(--text-secondary)] text-sm mt-1">Use the "Modify Schedule" button below to add tasks.</p>
+          </div>
+        )}
+        {/* Spacer for safe area, allowing content to scroll above the sticky footer */}
+        <div className="flex-shrink-0 h-1 pb-[env(safe-area-inset-bottom)]"></div>
       </div>
       
-      <div className="flex-shrink-0 mt-auto pt-3 bg-[var(--glass-background-panel)] backdrop-blur-[24px] flex space-x-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))]">
+      <div className="flex-shrink-0 mt-auto pt-3 bg-[var(--glass-background-panel)] backdrop-blur-[24px] flex space-x-2">
         <Button onClick={onOpenModifyDayModal} variant="primary" className="flex-grow" disabled={dailySchedule.isRestDay}>
           <i className="fas fa-edit mr-2"></i> Modify Schedule
         </Button>
