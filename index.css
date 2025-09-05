@@ -315,3 +315,7 @@ aside {
 .scroller-highlight-glow {
   box-shadow: 0 0 16px 2px var(--accent-purple-glow), inset 0 0 10px rgba(255, 255, 255, 0.15);
 }
+
+.isolated-scroll {
+  overscroll-behavior: contain;
+}
