@@ -3,7 +3,7 @@ import { Domain, ResourceType, AddTaskModalProps } from '../types';
 import { Button } from './Button';
 import TimeInputScroller from './TimeInputScroller';
 import FocusTrap from 'focus-trap-react';
-import CustomSelect from './CustomSelect'; // Import new component
+import CustomSelect from '../CustomSelect';
 
 const AddTaskModal: React.FC<AddTaskModalProps> = ({ isOpen, onClose, onSave, availableDomains, selectedDate }) => {
   const [title, setTitle] = useState('');

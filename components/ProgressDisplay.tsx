@@ -2,7 +2,7 @@ import React, { useMemo, useState, useEffect } from 'react';
 import { StudyPlan, Domain, ResourceType } from '../types';
 import { ALL_DOMAINS } from '../constants'; 
 import { formatDuration } from '../utils/timeFormatter';
-import CustomSelect from './CustomSelect'; // Import new component
+import CustomSelect from '../CustomSelect';
 
 interface ProgressDisplayProps {
   studyPlan: StudyPlan;

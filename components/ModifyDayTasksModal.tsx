@@ -5,7 +5,7 @@ import { formatDuration } from '../utils/timeFormatter';
 import FocusTrap from 'focus-trap-react';
 import { useDragSelect } from '../hooks/useDragSelect';
 import { ALL_DOMAINS } from '../constants';
-import CustomSelect from './CustomSelect'; // Import new component
+import CustomSelect from '../CustomSelect';
 
 const ResourceCard = React.memo(({
     resource,

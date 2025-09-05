@@ -3,7 +3,7 @@ import { Domain, ResourceType, ResourceEditorModalProps, StudyResource } from '.
 import { Button } from './Button';
 import TimeInputScroller from './TimeInputScroller';
 import FocusTrap from 'focus-trap-react';
-import CustomSelect from './CustomSelect'; // Import new component
+import CustomSelect from '../CustomSelect';
 
 const ResourceEditorModal: React.FC<ResourceEditorModalProps> = ({ 
     isOpen, onClose, onSave, onRequestArchive, initialResource, availableDomains, availableResourceTypes 

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { ExceptionDateRule } from '../types';
 import { Button } from './Button';
-import CustomSelect from './CustomSelect'; // Import new component
+import CustomSelect from '../CustomSelect';
 import { MOONLIGHTING_WEEKDAY_TARGET_MINS, MOONLIGHTING_WEEKEND_TARGET_MINS } from '../constants';
 
 interface AddExceptionDayProps {
