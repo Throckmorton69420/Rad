@@ -45,7 +45,7 @@ const CountdownTimer: React.FC<CountdownTimerProps> = ({ examDate }) => {
   const formatPlural = (value: number, unit: string) => `${value} ${unit}${value !== 1 ? 's' : ''}`;
 
   return (
-    <div className="text-right p-2 rounded-lg interactive-glow-border">
+    <div className="text-right">
       <div className="text-xs text-slate-400">Time Until Exam (Nov 12-14, 2025)</div>
       {timeLeft.months > 0 || timeLeft.weeks > 0 || timeLeft.days > 0 || timeLeft.hours > 0 || timeLeft.minutes > 0 || timeLeft.seconds > 0 ? (
         <div className="text-sm font-medium">
