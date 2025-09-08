@@ -39,9 +39,11 @@
   --border-radius-md: 16px;
   --border-radius-lg: 20px;
 
-  --z-notification: 150;
-  --z-modal: 100;
   --z-header: 50;
+  --z-sidebar-mobile-backdrop: 90;
+  --z-sidebar-mobile: 100;
+  --z-modal: 110;
+  --z-notification: 120;
   --z-table-header: 10;
 }
 

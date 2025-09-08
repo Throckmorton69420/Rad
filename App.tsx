@@ -378,12 +378,12 @@ const App: React.FC = () => {
     <div className="h-full w-full bg-transparent text-[var(--text-primary)] flex flex-col">
       {/* --- Sidebar (Now a true overlay for both mobile and desktop) --- */}
       <div 
-          className={`lg:hidden fixed inset-y-0 left-0 z-50 transform transition-transform duration-300 ease-in-out ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}
+          className={`lg:hidden fixed inset-y-0 left-0 z-[var(--z-sidebar-mobile)] transform transition-transform duration-300 ease-in-out ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}
       >
         {SidebarContent}
       </div>
       <div 
-          className={`lg:hidden fixed inset-0 bg-black/60 z-40 transition-opacity ${isSidebarOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`} 
+          className={`lg:hidden fixed inset-0 bg-black/60 z-[var(--z-sidebar-mobile-backdrop)] transition-opacity ${isSidebarOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`} 
           onClick={() => setIsSidebarOpen(false)} 
           aria-hidden="true"
       ></div>
