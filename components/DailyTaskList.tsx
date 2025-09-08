@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { DailyTaskListProps, ScheduledTask } from '../types';
 import { Button } from './Button';
 import TaskItem from './TaskItem';
 import { formatDuration } from '../utils/timeFormatter';
+import TimeInputScroller from './TimeInputScroller';
 
 const DailyTaskList: React.FC<DailyTaskListProps> = ({
   dailySchedule,
@@ -16,16 +17,22 @@ const DailyTaskList: React.FC<DailyTaskListProps> = ({
   onDragOver,
   onTaskDrop,
   onTaskDragStart,
-  onToggleRestDay
+  onToggleRestDay,
+  onUpdateTimeForDay,
+  isLoading
 }) => {
   const [draggedOver, setDraggedOver] = useState(false);
   const [pulsingTaskId, setPulsingTaskId] = useState<string | null>(null);
+  const [isTimeEditorOpen, setIsTimeEditorOpen] = useState(false);
+  const [editedTime, setEditedTime] = useState(dailySchedule.totalStudyTimeMinutes);
 
   const { date, tasks, totalStudyTimeMinutes, isRestDay, dayName } = dailySchedule;
+  const actualTimeSpent = tasks.reduce((acc, task) => acc + (task.actualStudyTimeMinutes || 0), 0);
 
-  const totalCompletedMinutes = tasks.reduce((acc, task) => {
-    return task.status === 'completed' ? acc + task.durationMinutes : acc;
-  }, 0);
+  useEffect(() => {
+    setEditedTime(totalStudyTimeMinutes);
+    setIsTimeEditorOpen(false);
+  }, [date, totalStudyTimeMinutes]);
 
   const handleSetPomodoro = (task: ScheduledTask) => {
     onPomodoroTaskSelect(task.id);
@@ -48,6 +55,11 @@ const DailyTaskList: React.FC<DailyTaskListProps> = ({
     setDraggedOver(false);
   };
 
+  const handleSaveTime = () => {
+    onUpdateTimeForDay(editedTime);
+    setIsTimeEditorOpen(false);
+  };
+  
   const dropZoneClasses = `flex-grow min-h-[200px] transition-colors p-1 rounded-lg ${draggedOver ? 'bg-purple-900/40' : ''}`;
 
   return (
@@ -61,10 +73,28 @@ const DailyTaskList: React.FC<DailyTaskListProps> = ({
           </div>
           <Button onClick={() => onNavigateDay('next')} variant="ghost" size="sm" className="!px-2.5" aria-label="Next Day"><i className="fas fa-chevron-right"></i></Button>
         </div>
-        <div className="text-center text-xs text-[var(--text-secondary)] mb-4">
-          <span>Total Planned: <strong className="text-[var(--text-primary)]">{formatDuration(totalStudyTimeMinutes)}</strong></span>
-          <span className="mx-2">|</span>
-          <span>Completed: <strong className="text-[var(--accent-green)]">{formatDuration(totalCompletedMinutes)}</strong></span>
+        
+        <div className="mt-4 mb-4 p-3 bg-[var(--background-tertiary)] rounded-lg interactive-glow-border">
+          <div className="flex justify-between items-center">
+            <div>
+              <p className="text-xs text-[var(--text-secondary)]">Total Planned Time</p>
+              <p className="text-lg font-bold text-white">{formatDuration(totalStudyTimeMinutes)}</p>
+            </div>
+            <Button variant="secondary" size="sm" onClick={() => setIsTimeEditorOpen(!isTimeEditorOpen)}>
+              <i className="fas fa-clock mr-2"></i> Adjust
+            </Button>
+          </div>
+          {isTimeEditorOpen && (
+            <div className="mt-3 pt-3 border-t border-[var(--separator-secondary)] space-y-3">
+              <TimeInputScroller valueInMinutes={editedTime} onChange={setEditedTime} maxHours={12} disabled={isLoading} />
+              <div className="flex justify-end space-x-2">
+                <Button variant="secondary" size="sm" onClick={() => { setIsTimeEditorOpen(false); setEditedTime(totalStudyTimeMinutes); }}>Cancel</Button>
+                <Button variant="primary" size="sm" onClick={handleSaveTime} disabled={isLoading || editedTime === totalStudyTimeMinutes}>
+                  Save & Rebalance
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
       

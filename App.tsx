@@ -100,6 +100,16 @@ const App: React.FC = () => {
     setHighlightedDates([]);
   };
 
+  const handleUpdateTimeForDay = (newTotalMinutes: number) => {
+    const newRule: ExceptionDateRule = {
+      date: selectedDate,
+      dayType: 'exception', // A generic type for manual overrides
+      isRestDayOverride: newTotalMinutes === 0,
+      targetMinutes: newTotalMinutes,
+    };
+    handleAddOrUpdateException(newRule);
+  };
+
   const handlePomodoroTaskSelect = (taskId: string | null) => {
     setCurrentPomodoroTaskId(taskId);
     if (taskId) {
@@ -465,6 +475,8 @@ const App: React.FC = () => {
                                 onDragOver={onDragOver}
                                 onTaskDragStart={onTaskDragStart}
                                 onToggleRestDay={(isRest) => handleToggleRestDay(selectedDate, isRest)}
+                                onUpdateTimeForDay={handleUpdateTimeForDay}
+                                isLoading={isLoading}
                             /> : <div className="text-center text-[var(--text-secondary)] py-10">No schedule for this day.</div>
                           }
                       </div>

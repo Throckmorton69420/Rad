@@ -456,70 +456,7 @@ const createScheduleShell = (
     const endDate = new Date(endDateStr + 'T00:00:00');
     let currentDateIter = new Date(startDate);
     
-    const getScheduleWeekIndex = (currentDate: Date, start: Date): number => {
-        const startDayOfWeek = start.getDay();
-        const diffTime = currentDate.getTime() - start.getTime();
-        const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-        return Math.floor((diffDays + startDayOfWeek) / 7);
-    };
-
-    const daysByWeek: Record<number, { date: string, dayOfWeek: number }[]> = {};
-    while (currentDateIter <= endDate) {
-        const weekIndex = getScheduleWeekIndex(currentDateIter, startDate);
-        if (!daysByWeek[weekIndex]) {
-            daysByWeek[weekIndex] = [];
-        }
-        daysByWeek[weekIndex].push({
-            date: currentDateIter.toISOString().split('T')[0],
-            dayOfWeek: currentDateIter.getDay()
-        });
-        currentDateIter.setDate(currentDateIter.getDate() + 1);
-    }
-
-    const sortedWeekIndexes = Object.keys(daysByWeek).map(Number).sort((a,b)=>a-b);
-    let useSaturdayForNextWeekendRest = false;
-
-    sortedWeekIndexes.forEach((weekIndex) => {
-        const weekDays = daysByWeek[weekIndex];
-        const hasExistingRestDay = weekDays.some(day => finalExceptionMap.get(day.date)?.isRestDayOverride);
-
-        if (hasExistingRestDay) {
-            if (weekIndex % 2 === 0) {
-                 useSaturdayForNextWeekendRest = !useSaturdayForNextWeekendRest;
-            }
-            return;
-        }
-
-        const isWeekendRestWeek = weekIndex % 2 === 0;
-
-        if (isWeekendRestWeek) {
-            const dayToMakeRest = useSaturdayForNextWeekendRest
-                ? weekDays.find(d => d.dayOfWeek === 6)
-                : weekDays.find(d => d.dayOfWeek === 0);
-
-            if (dayToMakeRest && !finalExceptionMap.has(dayToMakeRest.date)) {
-                 finalExceptionMap.set(dayToMakeRest.date, {
-                    date: dayToMakeRest.date,
-                    dayType: 'rest-exception',
-                    isRestDayOverride: true,
-                    targetMinutes: 0
-                 });
-                 useSaturdayForNextWeekendRest = !useSaturdayForNextWeekendRest;
-            }
-        } else {
-            const wednesday = weekDays.find(d => d.dayOfWeek === 3);
-            if (wednesday && !finalExceptionMap.has(wednesday.date)) {
-                finalExceptionMap.set(wednesday.date, {
-                    date: wednesday.date,
-                    dayType: 'rest-exception',
-                    isRestDayOverride: true,
-                    targetMinutes: 0
-                });
-            }
-        }
-    });
-
-    currentDateIter = new Date(startDate);
+    // Simplified logic: No automatic rest days.
     while (currentDateIter <= endDate) {
         const dateStr = currentDateIter.toISOString().split('T')[0];
         const dayOfWeek = currentDateIter.getDay();

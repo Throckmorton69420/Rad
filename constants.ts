@@ -15,11 +15,11 @@ const effectiveStartDate = ACTUAL_TODAY_FOR_PLANNING > CONFIGURED_STUDY_START_DA
 export const STUDY_START_DATE = effectiveStartDate;
 export const STUDY_END_DATE = "2025-11-11"; 
 
-// Aligned with "Strict Daily Time Budgets" from Project Vision PDF (page 3)
-export const WORKDAY_TARGET_MINS_MIN = 180; // 3 hours
-export const WORKDAY_TARGET_MINS_MAX = 240; // 4 hours
-export const HIGH_CAPACITY_TARGET_MINS_MIN = 360; // 6 hours
-export const HIGH_CAPACITY_TARGET_MINS_MAX = 420; // 7 hours
+// Aligned with user request for 5h weekdays, 6.5h weekends
+export const WORKDAY_TARGET_MINS_MIN = 300;
+export const WORKDAY_TARGET_MINS_MAX = 300;
+export const HIGH_CAPACITY_TARGET_MINS_MIN = 390;
+export const HIGH_CAPACITY_TARGET_MINS_MAX = 390;
 export const WEEKDAY_QUESTION_BLOCK_OVERFLOW_MINUTES = 45; // Allow Q&R block to exceed daily budget on weekdays
 export const WEEKEND_QUESTION_BLOCK_OVERFLOW_MINUTES = 90; // Allow Q&R block to exceed daily budget on weekends
 
@@ -56,30 +56,11 @@ export const DEFAULT_TOPIC_ORDER: Domain[] = [
 ];
 
 
-// From Project Vision PDF (page 3) and user feedback
+// Per user request, all default exception/rest days are removed.
 const rawExceptionRules: ExceptionDateRule[] = [
-  // Corrected and added rest days per user request
-  { date: "2025-06-28", dayType: 'specific-rest', isRestDayOverride: true, targetMinutes: 0 },
-  { date: "2025-08-06", dayType: 'specific-rest', isRestDayOverride: true, targetMinutes: 0 },
-  { date: "2025-08-09", dayType: 'specific-rest', isRestDayOverride: true, targetMinutes: 0 },
-  { date: "2025-08-14", dayType: 'specific-rest', isRestDayOverride: true, targetMinutes: 0 },
-  { date: "2025-09-15", dayType: 'specific-rest', isRestDayOverride: true, targetMinutes: 0 },
-  
-  // Workday Exceptions (target 3-4 hours, use max for budget)
-  ...["2025-06-10", "2025-06-11", "2025-06-12", "2025-06-13"].map((date): ExceptionDateRule => ({ date, dayType: 'workday-exception', targetMinutes: WORKDAY_TARGET_MINS_MAX })),
-  ...["2025-06-15", "2025-06-16", "2025-06-17", "2025-06-18", "2025-06-19", "2025-06-20", "2025-06-21", "2025-06-22"].map((date): ExceptionDateRule => ({ date, dayType: 'workday-exception', targetMinutes: WORKDAY_TARGET_MINS_MAX })), // Extended from Python script
-  ...["2025-10-11", "2025-10-12", "2025-10-13", "2025-10-14", "2025-10-15", "2025-10-16", "2025-10-17", "2025-10-18", "2025-10-19"].map((date): ExceptionDateRule => ({ date, dayType: 'workday-exception', targetMinutes: WORKDAY_TARGET_MINS_MAX })),
-  
-  // High-Capacity Exceptions (target 6-7 hours, use max for budget)
-  { date: "2025-06-14", dayType: 'high-capacity-exception', targetMinutes: HIGH_CAPACITY_TARGET_MINS_MAX },
-
-  // FINAL REVIEW WEEK (User request)
-  // Rest Days Nov 2-8
-  ...["2025-11-02", "2025-11-03", "2025-11-04", "2025-11-05", "2025-11-06", "2025-11-07", "2025-11-08"].map((date): ExceptionDateRule => ({ date, dayType: 'specific-rest', isRestDayOverride: true, targetMinutes: 0 })),
+    // FINAL REVIEW WEEK (User request)
   // High-Yield Review Days Nov 9-11 (10 hours)
   ...["2025-11-09", "2025-11-10", "2025-11-11"].map((date): ExceptionDateRule => ({ date, dayType: 'final-review', targetMinutes: 600 })),
-  
-  // Default rest days (Sundays) will be handled by day of week logic, unless overridden by an exception.
 ];
 
 export const EXCEPTION_DATES_CONFIG: ExceptionDateRule[] = rawExceptionRules.filter((value, index, self) =>

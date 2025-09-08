@@ -118,6 +118,8 @@ export interface DailyTaskListProps {
   onDragOver: (e: React.DragEvent<HTMLDivElement>) => void;
   onTaskDragStart: (e: React.DragEvent<HTMLDivElement>, taskId: string) => void;
   onToggleRestDay: (isCurrentlyRestDay: boolean) => void;
+  onUpdateTimeForDay: (newTotalMinutes: number) => void;
+  isLoading: boolean;
 }
 
 export interface TaskItemProps {
@@ -145,7 +147,7 @@ export interface StudyPlan {
 export interface ExceptionDateRule {
   date: string;
   targetMinutes?: number;
-  dayType: 'workday-exception' | 'high-capacity-exception' | 'rest-exception' | 'specific-rest' | 'weekday-moonlighting' | 'weekend-moonlighting' | 'final-review';
+  dayType: 'workday-exception' | 'high-capacity-exception' | 'rest-exception' | 'specific-rest' | 'weekday-moonlighting' | 'weekend-moonlighting' | 'final-review' | 'exception';
   isRestDayOverride?: boolean;
 }
 
