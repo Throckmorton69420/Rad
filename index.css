@@ -62,14 +62,19 @@
   }
 }
 
-html, body {
-  height: 100dvh;
-  overflow: hidden;
+html {
+  height: 100%;
+}
+
+body {
+  min-height: 100vh; /* Fallback for older browsers */
+  min-height: 100dvh; /* Modern, dynamic viewport height */
+  overflow: hidden; /* Prevent body scroll */
   -webkit-tap-highlight-color: transparent;
 }
 
 #root {
-  height: 100dvh;
+  height: 100%;
 }
 
 body {

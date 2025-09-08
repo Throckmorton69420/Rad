@@ -28,6 +28,8 @@ import { formatDuration, getTodayInNewYork } from './utils/timeFormatter';
 const App: React.FC = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(true);
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 1024);
+
 
   const {
     studyPlan, setStudyPlan, previousStudyPlan,
@@ -68,6 +70,13 @@ const App: React.FC = () => {
     loadSchedule();
   }, []);
   
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 1024);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+
   const navigateDate = (direction: 'next' | 'prev') => {
     const currentDateObj = new Date(selectedDate + 'T00:00:00');
     currentDateObj.setDate(currentDateObj.getDate() + (direction === 'next' ? 1 : -1));
@@ -416,7 +425,7 @@ const App: React.FC = () => {
           notificationPortal
         )}
 
-        <main className="flex-1 overflow-y-auto min-h-0">
+        <main className={`flex-1 overflow-y-auto min-h-0 ${isMobile && isSidebarOpen ? 'overflow-hidden' : ''}`}>
             <div className="pt-3 md:pt-6 pl-[calc(0.75rem+env(safe-area-inset-left))] pr-[calc(0.75rem+env(safe-area-inset-right))] flex flex-col">
               <div className="mb-6 flex-shrink-0 px-3 md:px-6">
                     <div className="inline-flex bg-[var(--background-tertiary)] p-1 rounded-lg space-x-1">
