@@ -1,4 +1,6 @@
 // utils/timeFormatter.ts
+import { Domain } from '../types';
+
 export const formatDuration = (totalMinutes: number | undefined | null): string => {
   if (totalMinutes == null || isNaN(totalMinutes) || totalMinutes < 0) {
     return '0 min';
@@ -67,4 +69,33 @@ export const getTodayInNewYork = (): string => {
   const m = String(localDate.getMonth() + 1).padStart(2, '0');
   const d = String(localDate.getDate()).padStart(2, '0');
   return `${y}-${m}-${d}`;
+};
+
+const domainColorMap: Record<Domain, {bg: string, text: string}> = {
+    [Domain.PHYSICS]: { bg: 'hsl(210, 60%, 55%)', text: '#FFFFFF' }, // Blue
+    [Domain.BREAST_IMAGING]: { bg: 'hsl(350, 80%, 70%)', text: '#000000' }, // Pink
+    [Domain.GASTROINTESTINAL_IMAGING]: { bg: 'hsl(35, 100%, 60%)', text: '#000000' }, // Orange
+    [Domain.NUCLEAR_MEDICINE]: { bg: 'hsl(100, 50%, 55%)', text: '#000000' }, // Green
+    [Domain.GENITOURINARY_IMAGING]: { bg: 'hsl(25, 80%, 50%)', text: '#FFFFFF' }, // Brown-Orange
+    [Domain.NEURORADIOLOGY]: { bg: 'hsl(265, 60%, 65%)', text: '#FFFFFF' }, // Purple
+    [Domain.PEDIATRIC_RADIOLOGY]: { bg: 'hsl(330, 90%, 70%)', text: '#000000' }, // Bright Pink
+    [Domain.THORACIC_IMAGING]: { bg: 'hsl(200, 70%, 60%)', text: '#000000' }, // Cyan-Blue
+    [Domain.CARDIOVASCULAR_IMAGING]: { bg: 'hsl(10, 85%, 60%)', text: '#FFFFFF' }, // Red-Orange
+    [Domain.MUSCULOSKELETAL_IMAGING]: { bg: 'hsl(160, 60%, 45%)', text: '#FFFFFF' }, // Teal
+    [Domain.INTERVENTIONAL_RADIOLOGY]: { bg: 'hsl(45, 90%, 55%)', text: '#000000' }, // Gold
+    [Domain.ULTRASOUND_IMAGING]: { bg: 'hsl(55, 100%, 65%)', text: '#000000' }, // Yellow
+    [Domain.NIS]: { bg: 'hsl(220, 15%, 65%)', text: '#000000' }, // Slate Gray
+    [Domain.RISC]: { bg: 'hsl(210, 15%, 50%)', text: '#FFFFFF' }, // Darker Slate
+    [Domain.HIGH_YIELD]: { bg: 'hsl(50, 100%, 50%)', text: '#000000' }, // Bright Yellow
+    [Domain.MIXED_REVIEW]: { bg: 'hsl(0, 0%, 55%)', text: '#FFFFFF' }, // Gray
+    [Domain.WEAK_AREA_REVIEW]: { bg: 'hsl(340, 70%, 55%)', text: '#FFFFFF' }, // Magenta
+    [Domain.QUESTION_BANK_CATCHUP]: { bg: 'hsl(180, 30%, 50%)', text: '#FFFFFF' }, // Muted Teal
+    [Domain.FINAL_REVIEW]: { bg: 'hsl(0, 0%, 90%)', text: '#000000' }, // Light Gray
+    [Domain.LIGHT_REVIEW]: { bg: 'hsl(205, 50%, 75%)', text: '#000000' }, // Light Blue
+};
+
+// Function to get background color and appropriate text color
+export const getDomainColorStyle = (domain: Domain): { backgroundColor: string; color: string } => {
+  const colors = domainColorMap[domain] || domainColorMap[Domain.MIXED_REVIEW];
+  return { backgroundColor: colors.bg, color: colors.text };
 };

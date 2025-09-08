@@ -3,19 +3,20 @@ import { StudyPlan, Domain, ResourceType } from '../types';
 import { ALL_DOMAINS } from '../constants'; 
 import { formatDuration } from '../utils/timeFormatter';
 import CustomSelect from '../CustomSelect';
+import { getDomainColorStyle } from '../utils/timeFormatter';
 
 interface ProgressDisplayProps {
   studyPlan: StudyPlan;
 }
 
-const ProgressItem: React.FC<{label: string; percentage: number; completed: number; total: number}> = ({ label, percentage, completed, total }) => (
+const ProgressItem: React.FC<{label: string; percentage: number; completed: number; total: number; color?: string;}> = ({ label, percentage, completed, total, color }) => (
   <div className="p-3 rounded-lg static-glow-border bg-[var(--background-tertiary)]">
     <div className="flex justify-between items-baseline mb-3">
       <p className="text-sm font-medium text-[var(--text-primary)]">{label}</p>
       <p className="text-xs font-semibold text-[var(--text-secondary)]">{Math.round(percentage)}%</p>
     </div>
     <div className="w-full bg-black/30 rounded-full h-2.5 progress-bar-track static-glow-border">
-      <div className="progress-bar-fill" style={{ width: `${percentage}%` }}></div>
+      <div className="progress-bar-fill" style={{ width: `${percentage}%`, backgroundImage: color ? 'none' : undefined, backgroundColor: color }}></div>
     </div>
     <p className="text-xs text-[var(--text-secondary)] mt-1 text-right">
       {formatDuration(completed)} / {formatDuration(total)}
@@ -204,7 +205,14 @@ const ProgressDisplay: React.FC<ProgressDisplayProps> = ({ studyPlan }) => {
                   <h3 className="text-lg font-semibold text-[var(--text-primary)] mt-8">Progress by Topic</h3>
                   <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-4">
                       {progressByTopic.map(([domain, data]) => (
-                          <ProgressItem key={domain} label={domain} percentage={(data.completedMinutes / data.totalMinutes) * 100} completed={data.completedMinutes} total={data.totalMinutes} />
+                          <ProgressItem 
+                              key={domain} 
+                              label={domain} 
+                              percentage={(data.completedMinutes / data.totalMinutes) * 100} 
+                              completed={data.completedMinutes} 
+                              total={data.totalMinutes}
+                              color={getDomainColorStyle(domain).backgroundColor}
+                          />
                       ))}
                   </div>
               </>

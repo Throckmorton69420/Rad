@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react';
-import { DailySchedule, ViewMode } from '../types';
+import { DailySchedule, ViewMode, Domain } from '../types';
 import { Button } from './Button';
+import { getDomainColorStyle } from '../utils/timeFormatter';
 
 interface CalendarViewProps {
   schedule: DailySchedule[];
@@ -17,6 +18,25 @@ const CalendarView: React.FC<CalendarViewProps> = ({ schedule, selectedDate, onD
   const displayDateObj = new Date(currentDisplayDate + 'T00:00:00');
   const scheduleMap = new Map(schedule.map(day => [day.date, day]));
   const gridRef = useRef<HTMLDivElement>(null);
+
+  const getMajorDomainForDay = (day: DailySchedule): Domain | null => {
+    if (!day || day.isRestDay || day.tasks.length === 0) return null;
+
+    const timeByDomain: Partial<Record<Domain, number>> = {};
+    day.tasks.forEach(task => {
+        timeByDomain[task.originalTopic] = (timeByDomain[task.originalTopic] || 0) + task.durationMinutes;
+    });
+
+    let majorDomain: Domain | null = null;
+    let maxTime = 0;
+    for (const domain in timeByDomain) {
+        if (timeByDomain[domain as Domain]! > maxTime) {
+            maxTime = timeByDomain[domain as Domain]!;
+            majorDomain = domain as Domain;
+        }
+    }
+    return majorDomain;
+  };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     const currentDate = new Date(selectedDate + 'T00:00:00');
@@ -60,6 +80,9 @@ const CalendarView: React.FC<CalendarViewProps> = ({ schedule, selectedDate, onD
                 const isSelected = dateStr === selectedDate;
                 const isToday = dateStr === today;
                 const isHighlighted = highlightedDates.includes(dateStr);
+                const majorDomain = daySchedule ? getMajorDomainForDay(daySchedule) : null;
+                const domainColor = majorDomain ? getDomainColorStyle(majorDomain).backgroundColor : null;
+
 
                 const buttonClasses = [
                     'p-1.5', 'rounded-md', 'text-xs', 'text-center', 'focus:outline-none', 'focus-visible:ring-2', 'focus-visible:ring-[var(--accent-purple)]',
@@ -82,6 +105,9 @@ const CalendarView: React.FC<CalendarViewProps> = ({ schedule, selectedDate, onD
                         aria-label={`${new Date(dateStr + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}. ${daySchedule ? (daySchedule.isRestDay ? 'Rest Day' : `${Math.round(daySchedule.totalStudyTimeMinutes / 60)} hours assigned.`) : 'No tasks.'}`}
                     >
                         <span className={`${isSelected ? 'font-bold' : ''}`}>{dayOfMonth}</span>
+                        {domainColor && !isSelected && !daySchedule?.isRestDay && (
+                           <div className="absolute bottom-1.5 left-1/2 -translate-x-1/2 w-1.5 h-1.5 rounded-full" style={{ backgroundColor: domainColor }}></div>
+                        )}
                         {daySchedule?.isManuallyModified && !isSelected && <i className="fas fa-hand-paper text-xxs text-[var(--accent-yellow)] absolute top-1 right-1" title="Manually Modified"></i>}
                         {daySchedule && !daySchedule.isRestDay && daySchedule.totalStudyTimeMinutes > 0 && (
                             <span className={`mt-auto text-xxs px-1 py-0.5 rounded ${isSelected ? 'bg-black/30' : 'bg-[var(--background-secondary)]'}`}>

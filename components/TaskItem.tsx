@@ -2,12 +2,7 @@ import React from 'react';
 import { ScheduledTask, Domain, ResourceType, TaskItemProps } from '../types';
 import { Button } from './Button';
 import { formatDuration } from '../utils/timeFormatter';
-
-const getDomainColorDark = (domain: Domain): string => {
-  let hash = 0;
-  for (let i = 0; i < domain.length; i++) hash = domain.charCodeAt(i) + ((hash << 5) - hash);
-  return `hsl(${hash % 360}, 65%, 45%)`; 
-};
+import { getDomainColorStyle } from '../utils/timeFormatter';
 
 const getTypeColorDark = (type: ResourceType): string => {
     let hash = 0;
@@ -102,16 +97,16 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, onToggle, isCurrentPomodoroTa
         </div>
       </div>
       
-      <div className="pl-9 mt-1.5 flex items-center flex-wrap gap-x-2 gap-y-1 text-xs text-white">
+      <div className="pl-9 mt-1.5 flex items-center flex-wrap gap-x-2 gap-y-1 text-xs">
           <span 
               className="text-xxs px-2 py-0.5 rounded-full font-semibold"
-              style={{ backgroundColor: getDomainColorDark(task.originalTopic) }}
+              style={getDomainColorStyle(task.originalTopic)}
           >
               {task.originalTopic}
           </span>
           <span 
               className="text-xxs px-2 py-0.5 rounded-full font-semibold"
-              style={{ backgroundColor: getTypeColorDark(task.type) }}
+              style={{ backgroundColor: getTypeColorDark(task.type), color: '#fff' }}
           >
               {task.type}
           </span>
