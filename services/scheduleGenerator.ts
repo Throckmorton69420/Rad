@@ -233,7 +233,13 @@ const runSchedulingEngine = (
     let blocksToSchedule = createDomainBlocks(resourcePool, topicOrder, isPhysicsInTopicOrder);
     
     const secondaryResources = sortResources(resourcePool.filter(r => !r.isPrimaryMaterial && r.domain !== Domain.FINAL_REVIEW));
-    const questionTasks = secondaryResources.filter(r => r.type === ResourceType.QUESTIONS);
+    
+    // Split question banks into prioritized pools
+    const allQuestionTasks = secondaryResources.filter(r => r.type === ResourceType.QUESTIONS);
+    const qevlarQuestionTasks = allQuestionTasks.filter(r => r.bookSource === 'QEVLAR');
+    const boardVitalsQuestionTasks = allQuestionTasks.filter(r => r.bookSource === 'Board Vitals');
+    const otherQuestionTasks = allQuestionTasks.filter(r => r.bookSource !== 'QEVLAR' && r.bookSource !== 'Board Vitals');
+
     const reviewTasks = secondaryResources.filter(r => r.type === ResourceType.QUESTION_REVIEW);
     const otherSecondaryResources = secondaryResources.filter(r => r.type !== ResourceType.QUESTIONS && r.type !== ResourceType.QUESTION_REVIEW);
     const reviewTaskMap = new Map(reviewTasks.map(t => [t.pairedResourceIds?.[0], t]).filter((pair): pair is [string, StudyResource] => pair[0] !== undefined));
@@ -252,6 +258,7 @@ const runSchedulingEngine = (
     let workdayCounter = 0;
     const physicsFrequency = 2;
     const physicsTimeSlot = 60;
+    let qBankCycleCounter = 0; // Counter for QBank split
 
     // --- 2. PASS 1: PRIMARY & MANDATORY CONTENT ---
     for (const day of scheduleShell) {
@@ -264,24 +271,41 @@ const runSchedulingEngine = (
         }
 
         // --- "RESERVE-FIRST" LOGIC FOR Q&R ---
-        let reservedQandR: { qTask: StudyResource, reviewTask: StudyResource, duration: number, index: number } | null = null;
-        if (questionTasks.length > 0) {
+        let qBankPoolToUse: StudyResource[];
+        // Use a 5-cycle counter for a 60/40 QEVLAR/Board Vitals split.
+        // On the 4th and 5th cycles (indices 3, 4), try to use Board Vitals.
+        if (qBankCycleCounter % 5 >= 3) {
+            // This is for Board Vitals (40% share)
+            qBankPoolToUse = boardVitalsQuestionTasks.length > 0 ? boardVitalsQuestionTasks : qevlarQuestionTasks;
+        } else {
+            // This is for QEVLAR (60% share)
+            qBankPoolToUse = qevlarQuestionTasks.length > 0 ? qevlarQuestionTasks : boardVitalsQuestionTasks;
+        }
+        // If both prioritized pools are empty, fall back to other question banks.
+        if (qBankPoolToUse.length === 0) {
+            qBankPoolToUse = otherQuestionTasks;
+        }
+
+        let reservedQandR: { qTask: StudyResource, reviewTask: StudyResource, duration: number, pool: StudyResource[], index: number } | null = null;
+        
+        if (qBankPoolToUse.length > 0) {
             const nextTopic = blocksToSchedule.length > 0 && blocksToSchedule[0].tasks.length > 0 ? blocksToSchedule[0].domain : null;
             let foundIndex = -1;
             if (nextTopic) {
-                foundIndex = questionTasks.findIndex(q => q.domain === nextTopic);
+                foundIndex = qBankPoolToUse.findIndex(q => q.domain === nextTopic);
             }
-            if (foundIndex === -1 && questionTasks.length > 0) {
-                foundIndex = 0; // Fallback
+            if (foundIndex === -1 && qBankPoolToUse.length > 0) {
+                foundIndex = 0; // Fallback to the first available in the chosen pool
             }
             
             if (foundIndex !== -1) {
-                const qTask = questionTasks[foundIndex];
+                const qTask = qBankPoolToUse[foundIndex];
                 const reviewTask = reviewTaskMap.get(qTask.id);
                 if (qTask && reviewTask) {
                     reservedQandR = {
                         qTask, reviewTask,
                         duration: qTask.durationMinutes + reviewTask.durationMinutes,
+                        pool: qBankPoolToUse, // Keep track of the source pool
                         index: foundIndex,
                     };
                 }
@@ -352,8 +376,14 @@ const runSchedulingEngine = (
         if (reservedQandR) {
             day.tasks.push(mapResourceToTask(reservedQandR.qTask, day.tasks.length));
             day.tasks.push(mapResourceToTask(reservedQandR.reviewTask, day.tasks.length));
-            questionTasks.splice(reservedQandR.index, 1);
+            // Remove from the correct source pool
+            reservedQandR.pool.splice(reservedQandR.index, 1);
             reviewTaskMap.delete(reservedQandR.qTask.id);
+
+            // Only increment the counter for the prioritized banks
+            if (reservedQandR.qTask.bookSource === 'QEVLAR' || reservedQandR.qTask.bookSource === 'Board Vitals') {
+                qBankCycleCounter++;
+            }
         }
     }
 

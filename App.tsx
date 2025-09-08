@@ -413,6 +413,14 @@ const App: React.FC = () => {
               <div className="hidden sm:block">
                   <SaveStatusIndicator />
               </div>
+              {studyPlan.firstPassEndDate && (
+                <div className="hidden md:block text-right p-2 rounded-lg interactive-glow-border">
+                  <div className="text-xs text-slate-400">First Pass Ends</div>
+                  <div className="text-sm font-medium text-[var(--accent-purple)]">
+                    {new Date(studyPlan.firstPassEndDate + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                  </div>
+                </div>
+              )}
               <CountdownTimer examDate={EXAM_DATE_START} />
           </div>
         </header>
