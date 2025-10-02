@@ -10,11 +10,11 @@
   --link-color: hsl(210, 100%, 75%);
 
   /* --- Glass Materials --- */
-  --glass-bg-panel: rgba(36, 36, 38, 0.65);
-  --glass-bg-chrome: rgba(28, 28, 30, 0.70);
-  --glass-bg-modal: rgba(44, 44, 46, 0.75);
-  --glass-bg-hover: rgba(68, 68, 70, 0.8);
-  --glass-bg-active: rgba(90, 70, 110, 0.85);
+  --glass-bg-panel: rgba(36, 36, 38, 0.5);
+  --glass-bg-chrome: rgba(28, 28, 30, 0.55);
+  --glass-bg-modal: rgba(44, 44, 46, 0.6);
+  --glass-bg-hover: rgba(68, 68, 70, 0.65);
+  --glass-bg-active: rgba(90, 70, 110, 0.7);
 
   /* --- Core Liquid Glass Effect --- */
   /* Applies a base blur and saturation, then a URL-referenced SVG filter for refraction. */
@@ -31,10 +31,10 @@
   --separator-primary: rgba(255, 255, 255, 0.12);
   --separator-secondary: rgba(255, 255, 255, 0.08);
   --button-primary-bg: var(--accent-purple);
-  --button-secondary-bg: rgba(80, 80, 80, 0.5);
-  --button-secondary-hover-bg: rgba(100, 100, 100, 0.6);
+  --button-secondary-bg: rgba(80, 80, 80, 0.4);
+  --button-secondary-hover-bg: rgba(100, 100, 100, 0.5);
   --button-danger-bg: var(--accent-red);
-  --input-bg: rgba(30, 30, 30, 0.6);
+  --input-bg: rgba(30, 30, 30, 0.5);
   --input-border: rgba(255, 255, 255, 0.1);
 
   /* --- Z-Indexes --- */
@@ -142,11 +142,11 @@ body {
 .button-base { border: none; cursor: pointer; -webkit-tap-highlight-color: transparent; user-select: none; }
 .button-primary { background-color: var(--button-primary-bg); }
 .button-primary:hover:not(:disabled) { background-color: color-mix(in srgb, var(--button-primary-bg), #fff 15%); }
-.button-secondary { background-color: var(--button-secondary-bg); border: 1px solid var(--glass-border-color); }
+.button-secondary { background-color: var(--button-secondary-bg); border: 1px solid var(--glass-border-color); -webkit-backdrop-filter: var(--glass-backdrop-filter); backdrop-filter: var(--glass-backdrop-filter); }
 .button-secondary:hover:not(:disabled) { background-color: var(--button-secondary-hover-bg); }
 .button-danger { background-color: var(--button-danger-bg); }
 .button-danger:hover:not(:disabled) { background-color: color-mix(in srgb, var(--button-danger-bg), #fff 15%); }
-.button-ghost { background-color: transparent; box-shadow: none; border: none; }
+.button-ghost { background-color: transparent; box-shadow: none; border: none; -webkit-backdrop-filter: var(--glass-backdrop-filter); backdrop-filter: var(--glass-backdrop-filter); }
 .button-ghost:hover:not(:disabled) { background-color: rgba(191, 90, 242, 0.15); }
 
 /* --- Inputs & Selections --- */
@@ -154,6 +154,8 @@ body {
   width: 100%; padding: 0.5rem 0.75rem; background-color: var(--input-bg);
   border: 1px solid var(--input-border); border-radius: 0.5rem; color: var(--text-primary);
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  -webkit-backdrop-filter: var(--glass-backdrop-filter);
+  backdrop-filter: var(--glass-backdrop-filter);
 }
 .input-base:focus {
   outline: none; border-color: var(--accent-purple);
@@ -166,7 +168,11 @@ body {
 .resource-card.is-highlighted { background-color: color-mix(in srgb, var(--accent-yellow), transparent 85%); }
 
 /* --- Progress Bar --- */
-.progress-bar-track { background-color: rgba(0,0,0,0.3); }
+.progress-bar-track {
+  background-color: rgba(0,0,0,0.2);
+  -webkit-backdrop-filter: var(--glass-backdrop-filter);
+  backdrop-filter: var(--glass-backdrop-filter);
+}
 .progress-bar-fill {
   background-image: linear-gradient(45deg, var(--accent-purple), color-mix(in srgb, var(--accent-purple), #fff 30%));
 }

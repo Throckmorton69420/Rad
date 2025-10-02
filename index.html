@@ -42,12 +42,12 @@
   <svg style="position: absolute; width: 0; height: 0; overflow: hidden;" aria-hidden="true">
     <defs>
       <filter id="liquid-glass-filter" color-interpolation-filters="sRGB">
-        <!-- Add a slight blur to the background source -->
-        <feGaussianBlur in="SourceGraphic" stdDeviation="4" result="blur" />
+        <!-- Add a noticeable blur to the background source -->
+        <feGaussianBlur in="SourceGraphic" stdDeviation="8" result="blur" />
         <!-- Create a watery, turbulent noise pattern -->
-        <feTurbulence type="fractalNoise" baseFrequency="0.015 0.025" numOctaves="3" seed="7" result="turbulence"/>
+        <feTurbulence type="fractalNoise" baseFrequency="0.02 0.03" numOctaves="3" seed="7" result="turbulence"/>
         <!-- Use the noise to displace the blurred background, creating a refraction effect. Scale controls the intensity. -->
-        <feDisplacementMap in="blur" in2="turbulence" scale="25" xChannelSelector="R" yChannelSelector="G" />
+        <feDisplacementMap in="blur" in2="turbulence" scale="40" xChannelSelector="R" yChannelSelector="G" />
       </filter>
     </defs>
   </svg>
