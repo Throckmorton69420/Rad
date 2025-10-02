@@ -54,9 +54,14 @@
 }
 
 /* --- 1. Base Setup & THE DEFINITIVE Wallpaper Fix --- */
-html, body {
+html {
   height: 100%;
-  background-color: #000; /* Fallback background */
+  background-color: #000; /* Fallback background is now on the root element */
+}
+
+body {
+  height: 100%;
+  /* The body's background is now transparent by default, allowing the wallpaper behind it to show. */
   color: var(--text-primary);
   font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
@@ -69,7 +74,7 @@ html, body {
   height: 100%;
   background-color: transparent; /* VERY IMPORTANT: React root must be see-through */
   
-  /* CRITICAL: Create a new stacking context. This ensures the content inside #root appears above the wallpaper. */
+  /* CRITICAL: Create a new stacking context. This ensures the content inside #root appears above the wallpaper's parent (body). */
   position: relative;
   isolation: isolate;
   z-index: 0;
@@ -78,7 +83,7 @@ html, body {
 .background-wallpaper {
   position: fixed;
   inset: -20px; /* Overscan to prevent blurry edges on some screens */
-  z-index: -1; /* Place behind all content. Works with #root's stacking context. */
+  z-index: -1; /* Place behind all content. This puts it behind its stacking context parent, which is body. */
   background: url('/light-stream-blue-big-sur-kf.jpg') no-repeat center center;
   background-size: cover;
   filter: blur(24px) brightness(0.6);
