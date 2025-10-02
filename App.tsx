@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import ReactDOM from 'react-dom';
-import { DailySchedule, StudyPlan, ScheduledTask, PomodoroSettings, ViewMode, Domain, ResourceType, AddTaskModalProps, StudyResource, ResourceEditorModalProps, ExceptionDateRule } from './types';
+import { DailySchedule, StudyPlan, ScheduledTask, PomodoroSettings, ViewMode, Domain, ResourceType, AddTaskModalProps, StudyResource, ResourceEditorModalProps, ExceptionDateRule, DeadlineSettings } from './types';
 import { EXAM_DATE_START, STUDY_START_DATE, APP_TITLE, ALL_DOMAINS, POMODORO_DEFAULT_STUDY_MINS, POMODORO_DEFAULT_REST_MINS } from './constants';
 import { addResourceToGlobalPool } from './services/studyResources';
 
@@ -16,7 +16,7 @@ import ProgressDisplay from './components/ProgressDisplay';
 import { Button } from './components/Button';
 import AddTaskModal from './components/AddTaskModal';
 import ResourceEditorModal from './components/AddGlobalResourceModal';
-import RebalanceControls from './components/RebalanceControls';
+import AdvancedControls from './components/RebalanceControls';
 import AddExceptionDay from './components/AddExceptionDay';
 import ConfirmationModal from './components/ConfirmationModal';
 import WelcomeModal from './components/WelcomeModal';
@@ -252,6 +252,15 @@ const App: React.FC = () => {
       }
   };
 
+  const handleUpdateDeadlines = (newDeadlines: DeadlineSettings) => {
+      if (!studyPlan) return;
+      updatePreviousStudyPlan(studyPlan);
+      const updatedPlan = { ...studyPlan, deadlines: newDeadlines };
+      setStudyPlan(updatedPlan);
+      // This is a special rebalance trigger that uses the new deadlines
+      handleRebalance({ type: 'standard' });
+  };
+
   const onDragOver = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
   };
@@ -337,12 +346,14 @@ const App: React.FC = () => {
                 />
               </div>
               
-              <RebalanceControls 
+              <AdvancedControls
                 onRebalance={(options) => { handleRebalance(options); if(options.type === 'topic-time') setSelectedDate(options.date); }} 
                 isLoading={isLoading} 
                 selectedDate={selectedDate} 
                 isCramModeActive={studyPlan.isCramModeActive ?? false}
                 onToggleCramMode={handleToggleCramMode}
+                deadlines={studyPlan.deadlines}
+                onUpdateDeadlines={handleUpdateDeadlines}
               />
 
               <div className="space-y-3">

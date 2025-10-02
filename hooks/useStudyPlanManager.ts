@@ -43,6 +43,7 @@ export const useStudyPlanManager = () => {
                     if (!loadedPlan.cramTopicOrder) loadedPlan.cramTopicOrder = DEFAULT_TOPIC_ORDER;
                     if (typeof loadedPlan.isPhysicsInTopicOrder !== 'boolean') loadedPlan.isPhysicsInTopicOrder = false;
                     if (typeof loadedPlan.isCramPhysicsInterleaved !== 'boolean') loadedPlan.isCramPhysicsInterleaved = true;
+                    if (!loadedPlan.deadlines) loadedPlan.deadlines = {};
 
                     setStudyPlan(loadedPlan);
                     setGlobalMasterResourcePool(loadedData.resources);
@@ -70,9 +71,7 @@ export const useStudyPlanManager = () => {
                 setGlobalMasterResourcePool(updatedPool);
             }
             
-            setSystemNotification({ type: 'info', message: regenerate ? 'The study plan has been regenerated!' : 'A new study plan has been generated for you!' });
-            
-            const outcome: GeneratedStudyPlanOutcome = generateInitialSchedule(poolForGeneration, userExceptions, studyPlan?.topicOrder, studyPlan?.isPhysicsInTopicOrder);
+            const outcome: GeneratedStudyPlanOutcome = generateInitialSchedule(poolForGeneration, userExceptions, studyPlan?.topicOrder, studyPlan?.isPhysicsInTopicOrder, studyPlan?.deadlines);
             
             setStudyPlan(outcome.plan);
             if (!regenerate) {
@@ -82,6 +81,12 @@ export const useStudyPlanManager = () => {
             setIsNewUser(!regenerate);
             setPreviousStudyPlan(null);
             
+            if(outcome.notifications && outcome.notifications.length > 0) {
+                setSystemNotification(outcome.notifications[0]);
+            } else {
+                 setSystemNotification({ type: 'info', message: regenerate ? 'The study plan has been regenerated!' : 'A new study plan has been generated for you!' });
+            }
+            
         } catch (err: any) {
             console.error("Error loading data:", err);
             setSystemNotification({ type: 'error', message: err.message || "Failed to load data from the cloud." });
@@ -90,7 +95,7 @@ export const useStudyPlanManager = () => {
             setIsLoading(false);
             isInitialLoadRef.current = false;
         }
-    }, [studyPlan?.topicOrder, studyPlan?.isPhysicsInTopicOrder]);
+    }, [studyPlan?.topicOrder, studyPlan?.isPhysicsInTopicOrder, studyPlan?.deadlines]);
 
     useEffect(() => {
         if (isInitialLoadRef.current || isLoading) return;
@@ -134,8 +139,13 @@ export const useStudyPlanManager = () => {
             try {
                 const outcome = rebalanceSchedule(plan, options, userExceptions, globalMasterResourcePool);
                 setStudyPlan(outcome.plan);
-                setSystemNotification({ type: 'info', message: 'Rebalance complete!' });
-                setTimeout(() => setSystemNotification(null), 3000);
+
+                if (outcome.notifications && outcome.notifications.length > 0) {
+                     setSystemNotification(outcome.notifications[0]);
+                } else {
+                    setSystemNotification({ type: 'info', message: 'Rebalance complete!' });
+                    setTimeout(() => setSystemNotification(null), 3000);
+                }
             } catch (err) {
                 const error = err as any;
                 console.error("Error during rebalance:", error);

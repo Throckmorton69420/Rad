@@ -131,6 +131,13 @@ export interface TaskItemProps {
   isPulsing: boolean;
 }
 
+export interface DeadlineSettings {
+  allContent?: string; // YYYY-MM-DD
+  physicsContent?: string;
+  nucMedContent?: string;
+  otherContent?: string;
+}
+
 export interface StudyPlan {
   startDate: string;
   endDate: string;
@@ -142,6 +149,7 @@ export interface StudyPlan {
   isPhysicsInTopicOrder: boolean;
   isCramModeActive?: boolean;
   isCramPhysicsInterleaved: boolean;
+  deadlines: DeadlineSettings;
 }
 
 export interface ExceptionDateRule {
@@ -152,8 +160,7 @@ export interface ExceptionDateRule {
 }
 
 export interface Constraints {
-  dailyTimeBudgetRangeWorkday: [number, number]; 
-  dailyTimeBudgetRangeWeekend: [number, number];
+  dailyTimeBudget: [number, number]; 
   physicsFrequencyDays: number; 
   exceptionDates?: ExceptionDateRule[];
 }
@@ -232,7 +239,9 @@ export interface DailyStats {
 
 export interface GeneratedStudyPlanOutcome {
   plan: StudyPlan;
+  notifications?: { type: 'warning' | 'info', message: string }[];
 }
+
 
 export interface StudyBlock {
   id: string;
@@ -277,12 +286,14 @@ export interface TopicOrderManagerProps {
   onToggleCramPhysicsManagement: (isInterleaved: boolean) => void;
 }
 
-export interface RebalanceControlsProps {
+export interface AdvancedControlsProps {
   onRebalance: (options: RebalanceOptions) => void;
   isLoading: boolean;
   selectedDate: string;
   isCramModeActive: boolean;
   onToggleCramMode: (isActive: boolean) => void;
+  deadlines: DeadlineSettings;
+  onUpdateDeadlines: (newDeadlines: DeadlineSettings) => void;
 }
 
 

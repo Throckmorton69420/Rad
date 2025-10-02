@@ -15,11 +15,8 @@ const effectiveStartDate = ACTUAL_TODAY_FOR_PLANNING > CONFIGURED_STUDY_START_DA
 export const STUDY_START_DATE = effectiveStartDate;
 export const STUDY_END_DATE = "2025-11-11"; 
 
-// Aligned with user request for 5h weekdays, 6.5h weekends
-export const WORKDAY_TARGET_MINS_MIN = 300;
-export const WORKDAY_TARGET_MINS_MAX = 300;
-export const HIGH_CAPACITY_TARGET_MINS_MIN = 390;
-export const HIGH_CAPACITY_TARGET_MINS_MAX = 390;
+export const DEFAULT_DAILY_STUDY_MINS = 330; // 5.5 hours baseline
+
 export const WEEKDAY_QUESTION_BLOCK_OVERFLOW_MINUTES = 45; // Allow Q&R block to exceed daily budget on weekdays
 export const WEEKEND_QUESTION_BLOCK_OVERFLOW_MINUTES = 90; // Allow Q&R block to exceed daily budget on weekends
 
@@ -71,12 +68,11 @@ export const EXCEPTION_DATES_CONFIG: ExceptionDateRule[] = rawExceptionRules.fil
 
 
 export const DEFAULT_CONSTRAINTS: Constraints = {
-  dailyTimeBudgetRangeWorkday: [WORKDAY_TARGET_MINS_MIN, WORKDAY_TARGET_MINS_MAX],
-  dailyTimeBudgetRangeWeekend: [HIGH_CAPACITY_TARGET_MINS_MIN, HIGH_CAPACITY_TARGET_MINS_MAX],
+  dailyTimeBudget: [DEFAULT_DAILY_STUDY_MINS, DEFAULT_DAILY_STUDY_MINS],
   physicsFrequencyDays: 2, // "every two days or in small amounts every single day" - using 2 for simple heuristic
   exceptionDates: EXCEPTION_DATES_CONFIG, 
 };
 
 // For proactive splitting, split if task exceeds a normal workday's max budget.
-export const MAX_TASK_DURATION_BEFORE_SPLIT_CONSIDERATION = WORKDAY_TARGET_MINS_MAX; 
+export const MAX_TASK_DURATION_BEFORE_SPLIT_CONSIDERATION = DEFAULT_DAILY_STUDY_MINS; 
 export const MIN_DURATION_for_SPLIT_PART = 30;

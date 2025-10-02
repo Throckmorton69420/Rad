@@ -24,13 +24,23 @@ const ProgressItem: React.FC<{label: string; percentage: number; completed: numb
   </div>
 );
 
+const DeadlineItem: React.FC<{ label: string; deadline?: string; projected: string; onTrack: boolean }> = ({ label, deadline, projected, onTrack }) => (
+    <div className="flex justify-between items-center text-sm py-1.5 border-b border-[var(--separator-secondary)]">
+        <span className="text-[var(--text-primary)]">{label}</span>
+        <div className="text-right">
+            <span className={`font-bold ${onTrack ? 'text-[var(--accent-green)]' : 'text-[var(--accent-red)]'}`} title="Projected Completion Date">{projected}</span>
+            {deadline && <span className="text-xs text-[var(--text-secondary)] ml-2" title="Your Target Deadline">(Target: {deadline})</span>}
+        </div>
+    </div>
+);
+
 
 const ProgressDisplay: React.FC<ProgressDisplayProps> = ({ studyPlan }) => {
   const [selectedDomain, setSelectedDomain] = useState<Domain | 'all'>('all');
   const [selectedType, setSelectedType] = useState<ResourceType | 'all'>('all');
   const [selectedSource, setSelectedSource] = useState<string | 'all'>('all');
 
-  const { firstPassEndDate } = studyPlan;
+  const { deadlines } = studyPlan;
   
   const allTasks = useMemo(() => studyPlan.schedule.flatMap(day => day.tasks), [studyPlan.schedule]);
 
@@ -46,6 +56,29 @@ const ProgressDisplay: React.FC<ProgressDisplayProps> = ({ studyPlan }) => {
     return { totalScheduledMinutes: scheduled, totalCompletedMinutes: completed };
   }, [allTasks]);
   const overallProgressPercentage = totalScheduledMinutes > 0 ? (totalCompletedMinutes / totalScheduledMinutes) * 100 : 0;
+
+  const projectedDates = useMemo(() => {
+    const findLastDate = (filterFn: (task: any) => boolean) => {
+        for (let i = studyPlan.schedule.length - 1; i >= 0; i--) {
+            if (studyPlan.schedule[i].tasks.some(filterFn)) {
+                return new Date(studyPlan.schedule[i].date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+            }
+        }
+        return 'N/A';
+    };
+
+    return {
+      allContent: findLastDate(t => t.isPrimaryMaterial),
+      physics: findLastDate(t => t.isPrimaryMaterial && t.originalTopic === Domain.PHYSICS),
+      nucMed: findLastDate(t => t.isPrimaryMaterial && t.originalTopic === Domain.NUCLEAR_MEDICINE),
+      other: findLastDate(t => t.isPrimaryMaterial && t.originalTopic !== Domain.PHYSICS && t.originalTopic !== Domain.NUCLEAR_MEDICINE),
+    };
+  }, [studyPlan.schedule]);
+
+  const isOnTrack = (deadline?: string, projected?: string) => {
+    if (!deadline || !projected || projected === 'N/A') return true;
+    return new Date(projected) <= new Date(deadline);
+  };
   
   // --- Intelligent Hierarchical Filtering ---
   
@@ -167,15 +200,13 @@ const ProgressDisplay: React.FC<ProgressDisplayProps> = ({ studyPlan }) => {
           </div>
         </div>
 
-        {firstPassEndDate && (
-          <>
-              <h3 className="text-lg font-semibold text-[var(--text-primary)] mt-8">Key Dates</h3>
-              <div className="mt-4 flex justify-between items-center">
-                  <span className="font-medium text-[var(--text-primary)]">First Pass Completion Date</span>
-                  <span className="font-bold text-[var(--accent-purple)]">{new Date(firstPassEndDate + 'T00:00:00').toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
-              </div>
-          </>
-        )}
+        <h3 className="text-lg font-semibold text-[var(--text-primary)] mt-8">Deadlines & Projections</h3>
+        <div className="mt-2 p-4 static-glow-border rounded-lg bg-[var(--background-tertiary)]">
+            <DeadlineItem label="All Content" deadline={deadlines.allContent} projected={projectedDates.allContent} onTrack={isOnTrack(deadlines.allContent, projectedDates.allContent)} />
+            <DeadlineItem label="Physics" deadline={deadlines.physicsContent} projected={projectedDates.physics} onTrack={isOnTrack(deadlines.physicsContent, projectedDates.physics)} />
+            <DeadlineItem label="Nuclear Medicine" deadline={deadlines.nucMedContent} projected={projectedDates.nucMed} onTrack={isOnTrack(deadlines.nucMedContent, projectedDates.nucMed)} />
+            <DeadlineItem label="Other Topics" deadline={deadlines.otherContent} projected={projectedDates.other} onTrack={isOnTrack(deadlines.otherContent, projectedDates.other)} />
+        </div>
         
         <h3 className="text-lg font-semibold text-[var(--text-primary)] mt-8">Detailed Progress</h3>
         <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-3">
