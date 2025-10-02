@@ -56,7 +56,7 @@
 /* --- 1. Base Setup & THE DEFINITIVE Wallpaper Fix --- */
 html {
   height: 100%;
-  background-color: #000; /* Fallback color */
+  background-color: transparent; /* CRITICAL: Must be transparent to see the pseudo-element behind it. */
 }
 
 /* Create the background on the highest-level element's pseudo-element */
@@ -64,8 +64,9 @@ html::before {
   content: '';
   position: fixed;
   inset: -20px; /* Overscan to prevent blurry edges */
-  z-index: -1; /* CRITICAL: Send it behind everything */
-  background: url('/light-stream-blue-big-sur-kf.jpg') no-repeat center center;
+  z-index: -1; /* CRITICAL: Send it behind the html element */
+  /* CRITICAL: Set fallback color AND image in the same property */
+  background: #000 url('/light-stream-blue-big-sur-kf.jpg') no-repeat center center;
   background-size: cover;
   filter: blur(24px) brightness(0.6);
   transform: scale(1.1); /* Zoom in to fill overscan area */
