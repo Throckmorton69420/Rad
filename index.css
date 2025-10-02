@@ -68,8 +68,11 @@ body {
   -webkit-tap-highlight-color: transparent;
   overflow: hidden; /* Prevent body scrolling */
   
-  /* Apply the background image directly to the body */
-  background: url('/light-stream-blue-big-sur-kf.jpg') no-repeat center center fixed;
+  /* Apply the background image using the CSS variable set from React */
+  background-image: var(--wallpaper-url);
+  background-repeat: no-repeat;
+  background-position: center center;
+  background-attachment: fixed;
   background-size: cover;
 }
 

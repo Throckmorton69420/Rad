@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import ReactDOM from 'react-dom';
+import wallpaperUrl from '/light-stream-blue-big-sur-kf.jpg';
 // Fix: Added RebalanceOptions and ShowConfirmationOptions to import for prop typing
 import { DailySchedule, StudyPlan, ScheduledTask, PomodoroSettings, ViewMode, Domain, ResourceType, AddTaskModalProps, StudyResource, ResourceEditorModalProps, ExceptionDateRule, DeadlineSettings, RebalanceOptions, ShowConfirmationOptions } from './types';
 import { EXAM_DATE_START, STUDY_START_DATE, APP_TITLE, ALL_DOMAINS, POMODORO_DEFAULT_STUDY_MINS, POMODORO_DEFAULT_REST_MINS } from './constants';
@@ -161,6 +162,11 @@ const App: React.FC = () => {
   const [isSettingsOpen, setIsSettingsOpen] = useState(true);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 1024);
 
+  // Definitive fix for wallpaper loading:
+  // Import the image to get a reliable URL from Vite and set it as a CSS variable.
+  useEffect(() => {
+    document.documentElement.style.setProperty('--wallpaper-url', `url(${wallpaperUrl})`);
+  }, []);
 
   const {
     studyPlan, setStudyPlan, previousStudyPlan,
