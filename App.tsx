@@ -16,7 +16,7 @@ import ProgressDisplay from './components/ProgressDisplay';
 import { Button } from './components/Button';
 import AddTaskModal from './components/AddTaskModal';
 import ResourceEditorModal from './components/AddGlobalResourceModal';
-import AdvancedControls from './components/RebalanceControls';
+import AdvancedControls from './components/AdvancedControls';
 import AddExceptionDay from './components/AddExceptionDay';
 import ConfirmationModal from './components/ConfirmationModal';
 import WelcomeModal from './components/WelcomeModal';
