@@ -1,11 +1,8 @@
 import React from 'react';
-import { ScheduledTask, Domain, ResourceType, Omit } from '../types';
+import { ScheduledTask, Domain, ResourceType, TaskItemProps } from '../types';
 import { Button } from './Button';
 import { formatDuration } from '../utils/timeFormatter';
 import { getDomainColorStyle, getSourceColorStyle } from '../utils/timeFormatter';
-
-// Remove onDragStart from the base TaskItemProps
-type PatchedTaskItemProps = Omit<import('../types').TaskItemProps, 'onDragStart'>;
 
 const getTypeColorDark = (type: ResourceType): string => {
     let hash = 0;
@@ -13,7 +10,7 @@ const getTypeColorDark = (type: ResourceType): string => {
     return `hsl(${(hash % 360 + 60) % 360}, 50%, 40%)`; 
 };
 
-const TaskItem: React.FC<PatchedTaskItemProps> = ({ task, onToggle, isCurrentPomodoroTask, isPulsing, onSetPomodoro }) => {
+const TaskItem: React.FC<TaskItemProps> = ({ task, onToggle, isCurrentPomodoroTask, isPulsing, onSetPomodoro }) => {
   const isCompleted = task.status === 'completed';
   const baseBg = isCurrentPomodoroTask ? 'bg-[var(--glass-background-active)]' : 'bg-[var(--background-tertiary)]';
   const taskBgColor = isCompleted ? baseBg : `${baseBg} hover:bg-[var(--background-tertiary-hover)]`;

@@ -130,7 +130,6 @@ export interface TaskItemProps {
   onToggle: (taskId: string) => void;
   isCurrentPomodoroTask: boolean;
   onSetPomodoro: () => void;
-  onDragStart: (e: React.DragEvent<HTMLDivElement>) => void;
   isPulsing: boolean;
 }
 

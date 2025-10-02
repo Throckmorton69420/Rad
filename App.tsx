@@ -1,9 +1,7 @@
-import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import ReactDOM from 'react-dom';
-import wallpaperUrl from '/light-stream-blue-big-sur-kf.jpg';
-// Fix: Added RebalanceOptions and ShowConfirmationOptions to import for prop typing
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import wallpaperUrl from './light-stream-blue-big-sur-kf.jpg';
 import { DailySchedule, StudyPlan, ScheduledTask, PomodoroSettings, ViewMode, Domain, ResourceType, AddTaskModalProps, StudyResource, ResourceEditorModalProps, ExceptionDateRule, DeadlineSettings, RebalanceOptions, ShowConfirmationOptions } from './types';
-import { EXAM_DATE_START, STUDY_START_DATE, APP_TITLE, ALL_DOMAINS, POMODORO_DEFAULT_STUDY_MINS, POMODORO_DEFAULT_REST_MINS } from './constants';
+import { EXAM_DATE_START, APP_TITLE, ALL_DOMAINS, POMODORO_DEFAULT_STUDY_MINS, POMODORO_DEFAULT_REST_MINS } from './constants';
 import { addResourceToGlobalPool } from './services/studyResources';
 
 import { usePersistentState } from './hooks/usePersistentState';
@@ -28,7 +26,6 @@ import MasterResourcePoolViewer from './components/MasterResourcePoolViewer';
 import ScheduleReport from './components/ScheduleReport';
 import { formatDuration, getTodayInNewYork, parseDateString } from './utils/timeFormatter';
 
-// Fix: Defined a props interface for the SidebarContent component to resolve TypeScript errors.
 interface SidebarContentProps {
     isSidebarOpen: boolean;
     setIsSidebarOpen: React.Dispatch<React.SetStateAction<boolean>>;
@@ -64,7 +61,7 @@ interface SidebarContentProps {
 
 // Memoized Sidebar to prevent re-renders from the Pomodoro timer
 const SidebarContent = React.memo(({ 
-    isSidebarOpen, setIsSidebarOpen, isPomodoroCollapsed, setIsPomodoroCollapsed, 
+    setIsSidebarOpen, isPomodoroCollapsed, setIsPomodoroCollapsed, 
     pomodoroSettings, setPomodoroSettings, handlePomodoroSessionComplete, currentPomodoroTask,
     studyPlan, selectedDate, setSelectedDate, isMobile, navigatePeriod, highlightedDates, 
     todayInNewYork, handleRebalance, isLoading, handleToggleCramMode, handleUpdateDeadlines,
@@ -74,7 +71,7 @@ const SidebarContent = React.memo(({
 }: SidebarContentProps) => (
     <aside className={`w-80 bg-[var(--background-secondary)] text-[var(--text-secondary)] border-r border-[var(--separator-primary)] flex flex-col h-dvh isolated-scroll`}>
         <div className="flex-grow flex flex-col min-h-0">
-            <div className="flex-grow overflow-y-auto isolated-scroll sidebar-content-area pr-5">
+            <div className="flex-grow overflow-y-auto isolated-scroll sidebar-content-area">
                 <div className="space-y-4">
                     <div className="flex justify-end -mr-2 -mt-2 lg:hidden">
                         <button onClick={() => setIsSidebarOpen(false)} className="p-2 text-[var(--text-primary)] hover:text-white" aria-label="Close menu">
@@ -162,8 +159,6 @@ const App: React.FC = () => {
   const [isSettingsOpen, setIsSettingsOpen] = useState(true);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 1024);
 
-  // Definitive fix for wallpaper loading:
-  // Import the image to get a reliable URL from Vite and set it as a CSS variable.
   useEffect(() => {
     document.documentElement.style.setProperty('--wallpaper-url', `url(${wallpaperUrl})`);
   }, []);
@@ -171,7 +166,6 @@ const App: React.FC = () => {
   const {
     studyPlan, setStudyPlan, previousStudyPlan,
     globalMasterResourcePool, setGlobalMasterResourcePool,
-    userExceptions,
     isLoading, systemNotification, setSystemNotification,
     isNewUser,
     loadSchedule, handleRebalance, handleUpdateTopicOrderAndRebalance, handleUpdateCramTopicOrderAndRebalance,
@@ -207,14 +201,10 @@ const App: React.FC = () => {
     loadSchedule();
   }, [loadSchedule]);
   
-  // Ensures the selectedDate is always valid after the studyPlan loads or changes.
   useEffect(() => {
     if (studyPlan) {
       const { startDate, endDate } = studyPlan;
-      // If the currently selected date is not within the plan's range, adjust it.
       if (selectedDate < startDate || selectedDate > endDate) {
-        // Prioritize jumping to "today" if it's within the new plan's range.
-        // Otherwise, jump to the start date of the plan.
         if (todayInNewYork >= startDate && todayInNewYork <= endDate) {
           setSelectedDate(todayInNewYork);
         } else {
@@ -222,7 +212,7 @@ const App: React.FC = () => {
         }
       }
     }
-  }, [studyPlan?.startDate, studyPlan?.endDate, todayInNewYork]);
+  }, [studyPlan?.startDate, studyPlan?.endDate, selectedDate, todayInNewYork]);
   
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 1024);
@@ -230,34 +220,36 @@ const App: React.FC = () => {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-
   const navigateDate = useCallback((direction: 'next' | 'prev') => {
     const currentDateObj = parseDateString(selectedDate);
-    currentDateObj.setDate(currentDateObj.getDate() + (direction === 'next' ? 1 : -1));
+    currentDateObj.setUTCDate(currentDateObj.getUTCDate() + (direction === 'next' ? 1 : -1));
     const newDateStr = currentDateObj.toISOString().split('T')[0];
     if (!studyPlan) return;
-    const planStartDate = parseDateString(studyPlan.startDate);
-    const planEndDate = parseDateString(studyPlan.endDate);
-    if (currentDateObj >= planStartDate && currentDateObj <= planEndDate) setSelectedDate(newDateStr);
+    if (newDateStr >= studyPlan.startDate && newDateStr <= studyPlan.endDate) {
+      setSelectedDate(newDateStr);
+    }
     setHighlightedDates([]);
   }, [selectedDate, studyPlan]);
   
   const navigatePeriod = useCallback((direction: 'next' | 'prev', viewMode: 'Weekly' | 'Monthly') => {
     const currentDateObj = parseDateString(selectedDate);
-    if (viewMode === 'Weekly') currentDateObj.setDate(currentDateObj.getDate() + (direction === 'next' ? 7 : -7));
-    else if (viewMode === 'Monthly') currentDateObj.setMonth(currentDateObj.getMonth() + (direction === 'next' ? 1 : -1));
+    if (viewMode === 'Weekly') {
+      currentDateObj.setUTCDate(currentDateObj.getUTCDate() + (direction === 'next' ? 7 : -7));
+    } else if (viewMode === 'Monthly') {
+      currentDateObj.setUTCMonth(currentDateObj.getUTCMonth() + (direction === 'next' ? 1 : -1));
+    }
     const newDateStr = currentDateObj.toISOString().split('T')[0];
     if (!studyPlan) return;
-    const planStartDate = parseDateString(studyPlan.startDate);
-    const planEndDate = parseDateString(studyPlan.endDate);
-    if (currentDateObj >= planStartDate && currentDateObj <= planEndDate) setSelectedDate(newDateStr);
+    if (newDateStr >= studyPlan.startDate && newDateStr <= studyPlan.endDate) {
+      setSelectedDate(newDateStr);
+    }
     setHighlightedDates([]);
   }, [selectedDate, studyPlan]);
 
   const handleUpdateTimeForDay = useCallback((newTotalMinutes: number) => {
     const newRule: ExceptionDateRule = {
       date: selectedDate,
-      dayType: 'exception', // A generic type for manual overrides
+      dayType: 'exception',
       isRestDayOverride: newTotalMinutes === 0,
       targetMinutes: newTotalMinutes,
     };
@@ -268,7 +260,7 @@ const App: React.FC = () => {
     setCurrentPomodoroTaskId(taskId);
     if (taskId) {
       setPomodoroSettings(prev => ({ ...prev, isActive: false, isStudySession: true, timeLeft: prev.studyDuration * 60 }));
-      setIsPomodoroCollapsed(false); // Open the timer when a task is selected
+      setIsPomodoroCollapsed(false);
     }
   }, [setPomodoroSettings, setIsPomodoroCollapsed]);
 
@@ -359,14 +351,12 @@ const App: React.FC = () => {
   const onDayTasksSave = useCallback((updatedTasks: ScheduledTask[]) => {
     handleSaveModifiedDayTasks(updatedTasks, selectedDate);
     closeModal('isModifyDayTasksModalOpen');
-    // After modifying a day, it's a good idea to run a standard rebalance to clean up the future schedule.
     setTimeout(() => handleRebalance({ type: 'standard' }), 100);
   }, [handleSaveModifiedDayTasks, selectedDate, closeModal, handleRebalance]);
   
   const handlePomodoroSessionComplete = useCallback((sessionType: 'study' | 'rest', durationMinutes: number) => {
       if (sessionType === 'study' && currentPomodoroTaskId) {
           const task = studyPlan?.schedule.flatMap(d => d.tasks).find(t => t.id === currentPomodoroTaskId);
-          
           setStudyPlan(prevPlan => {
               if (!prevPlan) return null;
               updatePreviousStudyPlan(prevPlan);
@@ -395,7 +385,7 @@ const App: React.FC = () => {
                   onConfirm: () => {
                       if (currentPomodoroTaskId) {
                           handleTaskToggle(currentPomodoroTaskId, selectedDate);
-                          setCurrentPomodoroTaskId(null); // Clear the linked task
+                          setCurrentPomodoroTaskId(null);
                       }
                   }
               });
@@ -411,7 +401,6 @@ const App: React.FC = () => {
       updatePreviousStudyPlan(studyPlan);
       const updatedPlan = { ...studyPlan, deadlines: newDeadlines };
       setStudyPlan(updatedPlan);
-      // This is a special rebalance trigger that uses the new deadlines
       handleRebalance({ type: 'standard' });
   }, [studyPlan, updatePreviousStudyPlan, setStudyPlan, handleRebalance]);
 
@@ -446,15 +435,10 @@ const App: React.FC = () => {
 
   const SaveStatusIndicator: React.FC = () => {
     switch (saveStatus) {
-      case 'saving':
-        return <div className="text-xs text-[var(--accent-yellow)] flex items-center"><i className="fas fa-sync fa-spin mr-1.5"></i> Saving...</div>;
-      case 'saved':
-        return <div className="text-xs text-[var(--accent-green)] flex items-center"><i className="fas fa-check-circle mr-1.5"></i> Saved</div>;
-      case 'error':
-        return <div className="text-xs text-[var(--accent-red)] flex items-center"><i className="fas fa-exclamation-triangle mr-1.5"></i> Error</div>;
-      case 'idle':
-      default:
-        return <div className="text-xs text-[var(--text-secondary)] flex items-center"><i className="fas fa-cloud mr-1.5"></i> Synced</div>;
+      case 'saving': return <div className="text-xs text-[var(--accent-yellow)] flex items-center"><i className="fas fa-sync fa-spin mr-1.5"></i> Saving...</div>;
+      case 'saved': return <div className="text-xs text-[var(--accent-green)] flex items-center"><i className="fas fa-check-circle mr-1.5"></i> Saved</div>;
+      case 'error': return <div className="text-xs text-[var(--accent-red)] flex items-center"><i className="fas fa-exclamation-triangle mr-1.5"></i> Error</div>;
+      default: return <div className="text-xs text-[var(--text-secondary)] flex items-center"><i className="fas fa-cloud mr-1.5"></i> Synced</div>;
     }
   };
 
@@ -470,50 +454,29 @@ const App: React.FC = () => {
   const currentPomodoroTask = currentPomodoroTaskId ? studyPlan.schedule.flatMap(d => d.tasks).find(t => t.id === currentPomodoroTaskId) : null;
   
   const MainAppContent = (
-    <>
       <div className="h-full w-full bg-transparent text-[var(--text-primary)] flex flex-col print:hidden">
-        <div 
-            className={`lg:hidden fixed inset-y-0 left-0 z-[var(--z-sidebar-mobile)] transform transition-transform duration-300 ease-in-out ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}
-        >
+        <div className={`lg:hidden fixed inset-y-0 left-0 z-[var(--z-sidebar-mobile)] transform transition-transform duration-300 ease-in-out ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
             <SidebarContent 
-                isSidebarOpen={isSidebarOpen} setIsSidebarOpen={setIsSidebarOpen} 
-                isPomodoroCollapsed={isPomodoroCollapsed} setIsPomodoroCollapsed={setIsPomodoroCollapsed}
-                pomodoroSettings={pomodoroSettings} setPomodoroSettings={setPomodoroSettings} 
-                handlePomodoroSessionComplete={handlePomodoroSessionComplete} currentPomodoroTask={currentPomodoroTask}
-                studyPlan={studyPlan} selectedDate={selectedDate} setSelectedDate={setSelectedDate} 
-                isMobile={isMobile} navigatePeriod={navigatePeriod} highlightedDates={highlightedDates}
-                todayInNewYork={todayInNewYork} handleRebalance={handleRebalance} isLoading={isLoading}
-                handleToggleCramMode={handleToggleCramMode} handleUpdateDeadlines={handleUpdateDeadlines}
-                isSettingsOpen={isSettingsOpen} setIsSettingsOpen={setIsSettingsOpen}
-                handleUpdateTopicOrderAndRebalance={handleUpdateTopicOrderAndRebalance}
-                handleUpdateCramTopicOrderAndRebalance={handleUpdateCramTopicOrderAndRebalance}
-                handleToggleSpecialTopicsInterleaving={handleToggleSpecialTopicsInterleaving}
-                handleAddOrUpdateException={handleAddOrUpdateException} handleUndo={handleUndo}
-                previousStudyPlan={previousStudyPlan} showConfirmation={showConfirmation}
+                isSidebarOpen={isSidebarOpen} setIsSidebarOpen={setIsSidebarOpen} isPomodoroCollapsed={isPomodoroCollapsed} setIsPomodoroCollapsed={setIsPomodoroCollapsed}
+                pomodoroSettings={pomodoroSettings} setPomodoroSettings={setPomodoroSettings} handlePomodoroSessionComplete={handlePomodoroSessionComplete} currentPomodoroTask={currentPomodoroTask}
+                studyPlan={studyPlan} selectedDate={selectedDate} setSelectedDate={setSelectedDate} isMobile={isMobile} navigatePeriod={navigatePeriod} highlightedDates={highlightedDates}
+                todayInNewYork={todayInNewYork} handleRebalance={handleRebalance} isLoading={isLoading} handleToggleCramMode={handleToggleCramMode} handleUpdateDeadlines={handleUpdateDeadlines}
+                isSettingsOpen={isSettingsOpen} setIsSettingsOpen={setIsSettingsOpen} handleUpdateTopicOrderAndRebalance={handleUpdateTopicOrderAndRebalance}
+                handleUpdateCramTopicOrderAndRebalance={handleUpdateCramTopicOrderAndRebalance} handleToggleSpecialTopicsInterleaving={handleToggleSpecialTopicsInterleaving}
+                handleAddOrUpdateException={handleAddOrUpdateException} handleUndo={handleUndo} previousStudyPlan={previousStudyPlan} showConfirmation={showConfirmation}
                 loadSchedule={loadSchedule} handleMasterResetTasks={handleMasterResetTasks}
             />
         </div>
-        <div 
-            className={`lg:hidden fixed inset-0 bg-black/60 z-[var(--z-sidebar-mobile-backdrop)] transition-opacity ${isSidebarOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`} 
-            onClick={() => setIsSidebarOpen(false)} 
-            aria-hidden="true"
-        ></div>
+        <div className={`lg:hidden fixed inset-0 bg-black/60 z-[var(--z-sidebar-mobile-backdrop)] transition-opacity ${isSidebarOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`} onClick={() => setIsSidebarOpen(false)} aria-hidden="true"></div>
         <div className="hidden lg:block fixed inset-y-0 left-0 z-30">
           <SidebarContent 
-                isSidebarOpen={isSidebarOpen} setIsSidebarOpen={setIsSidebarOpen} 
-                isPomodoroCollapsed={isPomodoroCollapsed} setIsPomodoroCollapsed={setIsPomodoroCollapsed}
-                pomodoroSettings={pomodoroSettings} setPomodoroSettings={setPomodoroSettings} 
-                handlePomodoroSessionComplete={handlePomodoroSessionComplete} currentPomodoroTask={currentPomodoroTask}
-                studyPlan={studyPlan} selectedDate={selectedDate} setSelectedDate={setSelectedDate} 
-                isMobile={isMobile} navigatePeriod={navigatePeriod} highlightedDates={highlightedDates}
-                todayInNewYork={todayInNewYork} handleRebalance={handleRebalance} isLoading={isLoading}
-                handleToggleCramMode={handleToggleCramMode} handleUpdateDeadlines={handleUpdateDeadlines}
-                isSettingsOpen={isSettingsOpen} setIsSettingsOpen={setIsSettingsOpen}
-                handleUpdateTopicOrderAndRebalance={handleUpdateTopicOrderAndRebalance}
-                handleUpdateCramTopicOrderAndRebalance={handleUpdateCramTopicOrderAndRebalance}
-                handleToggleSpecialTopicsInterleaving={handleToggleSpecialTopicsInterleaving}
-                handleAddOrUpdateException={handleAddOrUpdateException} handleUndo={handleUndo}
-                previousStudyPlan={previousStudyPlan} showConfirmation={showConfirmation}
+                isSidebarOpen={isSidebarOpen} setIsSidebarOpen={setIsSidebarOpen} isPomodoroCollapsed={isPomodoroCollapsed} setIsPomodoroCollapsed={setIsPomodoroCollapsed}
+                pomodoroSettings={pomodoroSettings} setPomodoroSettings={setPomodoroSettings} handlePomodoroSessionComplete={handlePomodoroSessionComplete} currentPomodoroTask={currentPomodoroTask}
+                studyPlan={studyPlan} selectedDate={selectedDate} setSelectedDate={setSelectedDate} isMobile={isMobile} navigatePeriod={navigatePeriod} highlightedDates={highlightedDates}
+                todayInNewYork={todayInNewYork} handleRebalance={handleRebalance} isLoading={isLoading} handleToggleCramMode={handleToggleCramMode} handleUpdateDeadlines={handleUpdateDeadlines}
+                isSettingsOpen={isSettingsOpen} setIsSettingsOpen={setIsSettingsOpen} handleUpdateTopicOrderAndRebalance={handleUpdateTopicOrderAndRebalance}
+                handleUpdateCramTopicOrderAndRebalance={handleUpdateCramTopicOrderAndRebalance} handleToggleSpecialTopicsInterleaving={handleToggleSpecialTopicsInterleaving}
+                handleAddOrUpdateException={handleAddOrUpdateException} handleUndo={handleUndo} previousStudyPlan={previousStudyPlan} showConfirmation={showConfirmation}
                 loadSchedule={loadSchedule} handleMasterResetTasks={handleMasterResetTasks}
             />
         </div>
@@ -547,7 +510,7 @@ const App: React.FC = () => {
                     <div className="text-right">
                       <div className="text-xs text-slate-400">First Pass Ends</div>
                       <div className="text-sm font-medium text-[var(--accent-purple)]">
-                        {parseDateString(studyPlan.firstPassEndDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                        {parseDateString(studyPlan.firstPassEndDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' })}
                       </div>
                     </div>
                   )}
@@ -629,7 +592,6 @@ const App: React.FC = () => {
         {modalStates.isResourceEditorOpen && <ResourceEditorModal isOpen={modalStates.isResourceEditorOpen} onClose={closeResourceEditor} onSave={handleSaveResource} onRequestArchive={handleRequestArchive} initialResource={modalData.editingResource} availableDomains={ALL_DOMAINS} availableResourceTypes={Object.values(ResourceType)}/>}
         <ConfirmationModal {...modalStates.confirmationState} onConfirm={handleConfirm} onClose={modalStates.confirmationState.onClose} />
       </div>
-    </>
   );
   
   return (
