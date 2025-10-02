@@ -465,8 +465,7 @@ const App: React.FC = () => {
   
   const MainAppContent = (
     <>
-      <div className="background-wallpaper" />
-      <div className="main-content-wrapper h-full w-full bg-transparent text-[var(--text-primary)] flex flex-col print:hidden">
+      <div className="h-full w-full bg-transparent text-[var(--text-primary)] flex flex-col print:hidden">
         <div 
             className={`lg:hidden fixed inset-y-0 left-0 z-[var(--z-sidebar-mobile)] transform transition-transform duration-300 ease-in-out ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}
         >

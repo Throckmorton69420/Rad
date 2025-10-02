@@ -69,7 +69,7 @@ html, body {
   height: 100%;
   background-color: transparent; /* VERY IMPORTANT: React root must be see-through */
   
-  /* CRITICAL: Create a new stacking context. This ensures the background div with z-index: -1 stays behind other content within #root. */
+  /* CRITICAL: Create a new stacking context. This ensures the content inside #root appears above the wallpaper. */
   position: relative;
   isolation: isolate;
   z-index: 0;
@@ -78,19 +78,12 @@ html, body {
 .background-wallpaper {
   position: fixed;
   inset: -20px; /* Overscan to prevent blurry edges on some screens */
-  /* z-index: -1; - REMOVED to fix a rendering bug in Safari where the wallpaper would not appear. */
+  z-index: -1; /* Place behind all content. Works with #root's stacking context. */
   background: url('/light-stream-blue-big-sur-kf.jpg') no-repeat center center;
   background-size: cover;
   filter: blur(24px) brightness(0.6);
   transform: scale(1.1); /* Zoom in slightly to fill overscan area */
 }
-
-.main-content-wrapper {
-  position: relative;
-  z-index: 1; /* Ensures all app content renders on top of the wallpaper. */
-  isolation: isolate; /* Creates a new stacking context for the content. */
-}
-
 
 /* --- 2. Glass Panel System --- */
 .static-glow-border,
