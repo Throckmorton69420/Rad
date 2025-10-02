@@ -4,6 +4,7 @@ import { ALL_DOMAINS } from '../constants';
 import { formatDuration, parseDateString } from '../utils/timeFormatter';
 import CustomSelect from '../CustomSelect';
 import { getDomainColorStyle } from '../utils/timeFormatter';
+import { Button } from './Button';
 
 interface ProgressDisplayProps {
   studyPlan: StudyPlan;
@@ -181,8 +182,11 @@ const ProgressDisplay: React.FC<ProgressDisplayProps> = ({ studyPlan }) => {
 
   return (
     <div className="text-[var(--text-primary)] pb-[calc(3rem+env(safe-area-inset-bottom))]">
-      <div>
-        <h2 className="text-2xl font-bold text-[var(--text-primary)] border-b border-[var(--separator-primary)] pb-3 text-center">Study Progress</h2>
+      <div className="flex justify-between items-center border-b border-[var(--separator-primary)] pb-3">
+        <h2 className="text-2xl font-bold text-[var(--text-primary)]">Study Progress</h2>
+        <Button onClick={() => window.print()} variant="secondary" size="sm">
+          <i className="fas fa-print mr-2"></i> Print Report
+        </Button>
       </div>
       
       <div className="mt-8">

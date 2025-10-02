@@ -23,6 +23,7 @@ import WelcomeModal from './components/WelcomeModal';
 import TopicOrderManager from './components/TopicOrderManager';
 import ModifyDayTasksModal from './components/ModifyDayTasksModal';
 import MasterResourcePoolViewer from './components/MasterResourcePoolViewer';
+import ScheduleReport from './components/ScheduleReport';
 import { formatDuration, getTodayInNewYork, parseDateString } from './utils/timeFormatter';
 
 
@@ -338,14 +339,7 @@ const App: React.FC = () => {
     }
   };
 
-  if (isLoading && !studyPlan) {
-    return <div className="flex flex-col items-center justify-center min-h-screen bg-black text-white p-4"><i className="fas fa-brain fa-spin fa-3x mb-6 text-[var(--accent-purple)]"></i><h1 className="text-3xl font-bold mb-3">{APP_TITLE}</h1><p className="text-lg mb-6">Connecting to the cloud...</p></div>;
-  }
-  
-  if (!studyPlan) {
-     return <div className="flex flex-col items-center justify-center min-h-screen bg-black text-white p-4"><i className="fas fa-exclamation-triangle fa-3x text-[var(--accent-red)] mb-4"></i><h1 className="text-2xl font-bold mb-2">Error</h1><p className="text-red-400 text-center mb-6">{systemNotification?.message || 'An unknown error occurred.'}</p><Button onClick={() => loadSchedule()} variant="primary">Try Again</Button></div>;
-  }
-
+  // FIX: Moved SidebarContent before MainAppContent to fix "used before its declaration" error.
   const SidebarContent = (
       <aside className={`w-80 bg-[var(--background-secondary)] text-[var(--text-secondary)] border-r border-[var(--separator-primary)] flex flex-col h-dvh isolated-scroll`}>
         <div className="flex-grow flex flex-col min-h-0">
@@ -431,8 +425,8 @@ const App: React.FC = () => {
       </aside>
   );
 
-  return (
-    <div className="h-full w-full bg-transparent text-[var(--text-primary)] flex flex-col">
+  const MainAppContent = (
+    <div className="h-full w-full bg-transparent text-[var(--text-primary)] flex flex-col print:hidden">
       {/* --- Sidebar (Now a true overlay for both mobile and desktop) --- */}
       <div 
           className={`lg:hidden fixed inset-y-0 left-0 z-[var(--z-sidebar-mobile)] transform transition-transform duration-300 ease-in-out ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}
@@ -563,6 +557,23 @@ const App: React.FC = () => {
       {modalStates.isResourceEditorOpen && <ResourceEditorModal isOpen={modalStates.isResourceEditorOpen} onClose={closeResourceEditor} onSave={handleSaveResource} onRequestArchive={handleRequestArchive} initialResource={modalData.editingResource} availableDomains={ALL_DOMAINS} availableResourceTypes={Object.values(ResourceType)}/>}
       <ConfirmationModal {...modalStates.confirmationState} onConfirm={handleConfirm} onClose={modalStates.confirmationState.onClose} />
     </div>
+  );
+
+  if (isLoading && !studyPlan) {
+    return <div className="flex flex-col items-center justify-center min-h-screen bg-black text-white p-4"><i className="fas fa-brain fa-spin fa-3x mb-6 text-[var(--accent-purple)]"></i><h1 className="text-3xl font-bold mb-3">{APP_TITLE}</h1><p className="text-lg mb-6">Connecting to the cloud...</p></div>;
+  }
+  
+  if (!studyPlan) {
+     return <div className="flex flex-col items-center justify-center min-h-screen bg-black text-white p-4"><i className="fas fa-exclamation-triangle fa-3x text-[var(--accent-red)] mb-4"></i><h1 className="text-2xl font-bold mb-2">Error</h1><p className="text-red-400 text-center mb-6">{systemNotification?.message || 'An unknown error occurred.'}</p><Button onClick={() => loadSchedule()} variant="primary">Try Again</Button></div>;
+  }
+  
+  return (
+    <>
+      {MainAppContent}
+      <div className="hidden print:block">
+        {studyPlan && <ScheduleReport studyPlan={studyPlan} />}
+      </div>
+    </>
   );
 };
 

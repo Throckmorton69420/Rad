@@ -320,3 +320,20 @@ aside {
   font-size: 0.65rem;
   line-height: 0.9rem;
 }
+
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 0.75in;
+  }
+  
+  body {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+    background-image: none !important;
+  }
+  
+  .break-inside-avoid {
+    break-inside: avoid;
+  }
+}
