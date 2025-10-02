@@ -32,13 +32,38 @@ export const useStudyPlanManager = () => {
                     .eq('id', 1)
                     .single();
 
-                if (error && error.code !== 'PGRST116') {
+                if (error && error.code !== 'PGRST116') { // PGRST116 is "No rows found"
                     throw new Error(error.message);
                 }
+
                 if (data && data.plan_data) {
                     const loadedData = data.plan_data as PlanDataBlob;
-                    const loadedPlan = loadedData.plan;
                     
+                    // --- Reconciliation Logic ---
+                    const freshCodePool = initialMasterResourcePool;
+                    const dbResources = loadedData.resources || [];
+                    
+                    const archivedIds = new Set<string>();
+                    const customResources: StudyResource[] = [];
+
+                    dbResources.forEach(res => {
+                        if (res.isArchived) {
+                            archivedIds.add(res.id);
+                        }
+                        if (res.id.startsWith('custom_')) {
+                            customResources.push(res);
+                        }
+                    });
+
+                    let reconciledPool = freshCodePool.map(codeRes => ({
+                        ...codeRes,
+                        isArchived: archivedIds.has(codeRes.id),
+                    }));
+                    
+                    reconciledPool.push(...customResources);
+                    // --- End Reconciliation ---
+
+                    const loadedPlan = loadedData.plan;
                     // Backwards compatibility checks
                     if (!loadedPlan.topicOrder) loadedPlan.topicOrder = DEFAULT_TOPIC_ORDER;
                     if (!loadedPlan.cramTopicOrder) loadedPlan.cramTopicOrder = DEFAULT_TOPIC_ORDER;
@@ -46,65 +71,52 @@ export const useStudyPlanManager = () => {
                     if (loadedPlan.areSpecialTopicsInterleaved === undefined) {
                         loadedPlan.areSpecialTopicsInterleaved = true;
                     }
-
-
+                    
                     setStudyPlan(loadedPlan);
-                    setGlobalMasterResourcePool(loadedData.resources);
-                    setUserExceptions(loadedData.exceptions);
+                    setGlobalMasterResourcePool(reconciledPool);
+                    setUserExceptions(loadedData.exceptions || []);
+                    
                     setIsNewUser(false);
-                    setSystemNotification({ type: 'info', message: 'Welcome back! Your plan has been restored from the cloud.' });
+                    setSystemNotification({ type: 'info', message: 'Welcome back! Your plan has been restored and updated.' });
                     setTimeout(() => setSystemNotification(null), 3000);
-                    setIsLoading(false);
-                    isInitialLoadRef.current = false;
                     setSaveStatus('saved');
                     setTimeout(() => setSaveStatus('idle'), 2000);
+                    setIsLoading(false);
+                    isInitialLoadRef.current = false;
                     return;
                 }
             }
-            
-            // For a regeneration, ensure all resources have up-to-date durations from their source properties (e.g., question counts)
-            let poolForGeneration = regenerate ? 
-                JSON.parse(JSON.stringify(globalMasterResourcePool)).map((resource: StudyResource) => {
-                    if (resource.type === ResourceType.QUESTIONS && resource.questionCount) resource.durationMinutes = Math.round(resource.questionCount * 1.1);
-                    else if (resource.type === ResourceType.QUESTION_REVIEW && resource.questionCount) resource.durationMinutes = Math.round(resource.questionCount * 0.6);
-                    return resource;
-                }) 
-                : initialMasterResourcePool;
 
-            if (regenerate) {
-              setGlobalMasterResourcePool(poolForGeneration);
-            }
-            
+            // This block runs for new users OR for a manual regeneration.
+            const poolForGeneration = initialMasterResourcePool;
             const exceptionsForGeneration = regenerate ? [] : userExceptions;
             if (regenerate) {
-              setUserExceptions([]); 
-            }
-            
-            const outcome: GeneratedStudyPlanOutcome = generateInitialSchedule(poolForGeneration, exceptionsForGeneration, studyPlan?.topicOrder, { allContent: '2025-11-03' });
-            
-            setStudyPlan(outcome.plan);
-            if (!regenerate) {
-                setGlobalMasterResourcePool(initialMasterResourcePool);
                 setUserExceptions([]);
             }
-            setIsNewUser(!regenerate);
+
+            const outcome: GeneratedStudyPlanOutcome = generateInitialSchedule(poolForGeneration, exceptionsForGeneration, studyPlan?.topicOrder, { allContent: '2025-11-03' });
+
+            setStudyPlan(outcome.plan);
+            setGlobalMasterResourcePool(poolForGeneration); // Use the fresh pool
             setPreviousStudyPlan(null);
-            
-            if(outcome.notifications && outcome.notifications.length > 0) {
+
+            if (outcome.notifications && outcome.notifications.length > 0) {
                 setSystemNotification(outcome.notifications[0]);
             } else {
-                 setSystemNotification({ type: 'info', message: regenerate ? 'The study plan has been regenerated!' : 'A new study plan has been generated for you!' });
+                setSystemNotification({ type: 'info', message: regenerate ? 'The study plan has been regenerated!' : 'A new study plan has been generated for you!' });
             }
             
+            setIsNewUser(!regenerate);
+
         } catch (err: any) {
-            console.error("Error loading data:", err);
-            setSystemNotification({ type: 'error', message: err.message || "Failed to load data from the cloud." });
+            console.error("Error loading/generating data:", err);
+            setSystemNotification({ type: 'error', message: err.message || "Failed to load or generate data." });
             setStudyPlan(null);
         } finally {
             setIsLoading(false);
             isInitialLoadRef.current = false;
         }
-    }, [studyPlan?.topicOrder, globalMasterResourcePool, userExceptions]);
+    }, [studyPlan?.topicOrder]);
 
     useEffect(() => {
         if (isInitialLoadRef.current || isLoading) return;
