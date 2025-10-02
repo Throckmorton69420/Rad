@@ -10,6 +10,9 @@ import {
 } from '../constants';
 import { getTodayInNewYork, formatDuration, parseDateString } from '../utils/timeFormatter';
 
+const SOFT_CAP_MINUTES = 10 * 60; // 10 hours
+const HARD_CAP_MINUTES = 14 * 60; // 14 hours
+
 const getDayName = (dateStr: string): string => {
   const date = parseDateString(dateStr);
   return date.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
@@ -101,6 +104,16 @@ const sortResources = (
         const priorityA = getPriorityScore(a);
         const priorityB = getPriorityScore(b);
         if (priorityA !== priorityB) return priorityA - priorityB;
+        
+        const isSpecialDomainA = a.domain === Domain.PHYSICS || a.domain === Domain.NUCLEAR_MEDICINE;
+        const isSpecialDomainB = b.domain === Domain.PHYSICS || b.domain === Domain.NUCLEAR_MEDICINE;
+
+        if (isSpecialDomainA && isSpecialDomainB && a.domain === b.domain) {
+            const isQuestionA = a.type === ResourceType.QUESTIONS || a.type === ResourceType.QUESTION_REVIEW;
+            const isQuestionB = b.type === ResourceType.QUESTIONS || b.type === ResourceType.QUESTION_REVIEW;
+            if (isQuestionA && !isQuestionB) return 1;
+            if (!isQuestionA && isQuestionB) return -1;
+        }
 
         const order = isCramMode ? cramTopicOrder : topicOrder;
         const topicIndexA = order.indexOf(a.domain);
@@ -112,6 +125,38 @@ const sortResources = (
         
         return a.title.localeCompare(b.title);
     });
+};
+
+const distributeDeficitTime = (studyDays: DailySchedule[], totalMinutesNeeded: number): void => {
+    if (studyDays.length === 0) return;
+
+    let totalMinutesAvailable = studyDays.reduce((acc, d) => acc + d.totalStudyTimeMinutes, 0);
+    if (totalMinutesNeeded <= totalMinutesAvailable) return;
+
+    let deficit = totalMinutesNeeded - totalMinutesAvailable;
+
+    // Phase 1: Fill all days up to the soft cap
+    for (const day of studyDays) {
+        if (deficit <= 0) break;
+        const potentialIncrease = SOFT_CAP_MINUTES - day.totalStudyTimeMinutes;
+        if (potentialIncrease > 0) {
+            const increase = Math.min(deficit, potentialIncrease);
+            day.totalStudyTimeMinutes += increase;
+            deficit -= increase;
+        }
+    }
+
+    if (deficit <= 0) return;
+
+    // Phase 2: Distribute remaining deficit evenly up to the hard cap
+    const daysBelowHardCap = studyDays.filter(d => d.totalStudyTimeMinutes < HARD_CAP_MINUTES);
+    if (daysBelowHardCap.length > 0) {
+        const extraTimePerDay = Math.ceil(deficit / daysBelowHardCap.length);
+        for (const day of daysBelowHardCap) {
+            const increase = Math.min(extraTimePerDay, HARD_CAP_MINUTES - day.totalStudyTimeMinutes);
+            day.totalStudyTimeMinutes += increase;
+        }
+    }
 };
 
 const adjustBudgetsForDeadlines = (
@@ -150,16 +195,8 @@ const adjustBudgetsForDeadlines = (
         const totalMinutesAvailable = daysUntilDeadline.reduce((acc, d) => acc + d.totalStudyTimeMinutes, 0);
         
         if (totalMinutesNeeded > totalMinutesAvailable) {
-            const deficit = totalMinutesNeeded - totalMinutesAvailable;
-            const extraTimePerDay = Math.ceil(deficit / daysUntilDeadline.length);
-
-            for (const day of daysUntilDeadline) {
-                day.totalStudyTimeMinutes += extraTimePerDay;
-                if (day.totalStudyTimeMinutes > 12 * 60) { // Cap at 12 hours
-                    day.totalStudyTimeMinutes = 12 * 60;
-                }
-            }
-            // Check again after capping
+            distributeDeficitTime(daysUntilDeadline, totalMinutesNeeded);
+            
             const newTotalMinutesAvailable = daysUntilDeadline.reduce((acc, d) => acc + d.totalStudyTimeMinutes, 0);
             if (totalMinutesNeeded > newTotalMinutesAvailable) {
                  notifications.push({ type: 'warning', message: `Could not fit all ${category.label} content by deadline even after maximizing daily study time.` });
@@ -180,7 +217,6 @@ const runSchedulingEngine = (
 
     const { topicOrder = [], isCramModeActive = false, cramTopicOrder = [], areSpecialTopicsInterleaved = true } = config;
     
-    // --- 1. Categorize and Filter Resources ---
     const activeResources = resourcePool.filter(r => !r.isArchived);
     const optionalResources = activeResources.filter(r => r.isOptional);
     let nonOptionalResources = activeResources.filter(r => !r.isOptional);
@@ -191,35 +227,22 @@ const runSchedulingEngine = (
         nonOptionalResources = nonOptionalResources.filter(r => r.domain !== Domain.PHYSICS && r.domain !== Domain.NUCLEAR_MEDICINE);
     }
     
-    // --- 2. Sort Main Pool & Calculate Time Needed ---
     let tasksToSchedule = sortResources(nonOptionalResources, topicOrder, isCramModeActive, cramTopicOrder);
     const totalMinutesNeeded = [...tasksToSchedule, ...physicsAndNucsPool].reduce((acc, r) => acc + r.durationMinutes, 0);
     
-    // --- 3. Deadline-Aware Budget Adjustment ---
     const studyDays = scheduleShell.filter(d => !d.isRestDay);
     if (studyDays.length > 0) {
-        let totalMinutesAvailable = studyDays.reduce((acc, d) => acc + d.totalStudyTimeMinutes, 0);
+        distributeDeficitTime(studyDays, totalMinutesNeeded);
         
-        if (totalMinutesNeeded > totalMinutesAvailable) {
-            const deficit = totalMinutesNeeded - totalMinutesAvailable;
-            const extraTimePerDay = Math.ceil(deficit / studyDays.length);
-
-            for (const day of studyDays) {
-                day.totalStudyTimeMinutes += extraTimePerDay;
-                if (day.totalStudyTimeMinutes > 14 * 60) day.totalStudyTimeMinutes = 14 * 60;
-            }
-        }
-        
-        totalMinutesAvailable = studyDays.reduce((acc, d) => acc + d.totalStudyTimeMinutes, 0);
+        const totalMinutesAvailable = studyDays.reduce((acc, d) => acc + d.totalStudyTimeMinutes, 0);
         if (totalMinutesNeeded > totalMinutesAvailable) {
             notifications.push({
                 type: 'error',
-                message: `Could not fit all content even after maximizing daily study time. ${formatDuration(totalMinutesNeeded - totalMinutesAvailable)} of content remains. Please extend your end date.`
+                message: `Could not fit all content. ${formatDuration(totalMinutesNeeded - totalMinutesAvailable)} remains. Please extend your end date or add more study time on exception days.`
             });
         }
     }
     
-    // --- 4. Main Scheduling Pass ---
     for (const day of scheduleShell) {
         if (day.isRestDay || tasksToSchedule.length === 0) continue;
         let remainingTime = day.totalStudyTimeMinutes;
@@ -252,14 +275,13 @@ const runSchedulingEngine = (
         }
     }
 
-    // --- 5. Interleaving Pass ---
     if (areSpecialTopicsInterleaved && physicsAndNucsPool.length > 0) {
         const sortedInterleavedPool = sortResources(physicsAndNucsPool, topicOrder, false, []);
         let dayIndex = 0;
         
         while(sortedInterleavedPool.length > 0) {
             const day = studyDays[dayIndex % studyDays.length];
-            if (!day) { dayIndex++; continue; } // Should not happen if studyDays.length > 0
+            if (!day) { dayIndex++; continue; }
 
             const CHUNK_SIZE = Math.min(30, sortedInterleavedPool[0].durationMinutes);
             const task = sortedInterleavedPool[0];
@@ -275,7 +297,6 @@ const runSchedulingEngine = (
         }
     }
 
-    // --- 6. Optional Pass ---
     const optionalTasks = sortResources(optionalResources, topicOrder, false, []);
     for (const day of scheduleShell) {
         if (day.isRestDay || optionalTasks.length === 0) continue;

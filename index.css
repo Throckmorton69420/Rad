@@ -333,7 +333,15 @@ aside {
     background-image: none !important;
   }
   
-  .break-inside-avoid {
+  .schedule-report-day {
     break-inside: avoid;
+    padding: 1rem;
+    border: 1px solid #d1d5db;
+    border-radius: 0.5rem;
+    box-shadow: none;
+  }
+
+  .new-week-page-break {
+    break-before: page;
   }
 }
