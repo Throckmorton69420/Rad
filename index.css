@@ -9,12 +9,12 @@
   --accent-yellow: hsl(45, 100%, 65%);
   --link-color: hsl(210, 100%, 75%);
 
-  /* --- Glass Materials (FINAL - Bright & Translucent) --- */
-  --glass-bg-panel: rgba(45, 45, 47, 0.5);   /* Increased transparency */
-  --glass-bg-chrome: rgba(30, 30, 32, 0.4); /* Increased transparency */
-  --glass-bg-modal: rgba(55, 55, 57, 0.6);  /* Increased transparency */
-  --glass-bg-hover: rgba(65, 65, 67, 0.65);
-  --glass-bg-active: rgba(110, 90, 130, 0.7);
+  /* --- Glass Materials (FINAL - More Translucent) --- */
+  --glass-bg-panel: rgba(40, 40, 42, 0.3);       /* More transparent */
+  --glass-bg-chrome: rgba(28, 28, 30, 0.25);    /* More transparent */
+  --glass-bg-modal: rgba(45, 45, 47, 0.4);      /* More transparent */
+  --glass-bg-hover: rgba(65, 65, 67, 0.5);      /* Adjusted hover */
+  --glass-bg-active: rgba(110, 90, 130, 0.6);   /* Adjusted active */
 
   /* --- Core Liquid Glass Effect --- */
   --glass-backdrop-filter: url(#liquid-glass-advanced);
@@ -83,38 +83,38 @@ body {
   height: 100vh;
   z-index: -1;
   overflow: hidden;
-  filter: blur(100px) saturate(1.2);
+  filter: blur(120px) saturate(1.2); /* Increased blur */
 }
 
 .blob {
   position: absolute;
   border-radius: 50%;
-  opacity: 0.6;
+  opacity: 0.5; /* Reduced opacity */
   will-change: transform;
 }
 
 .blob:nth-child(1) {
-  width: 50vmax; height: 50vmax;
+  width: 40vmax; height: 40vmax; /* Smaller */
   top: -10%; left: -20%;
   background: var(--accent-purple);
   animation: move-blob-1 40s infinite alternate ease-in-out;
 }
 .blob:nth-child(2) {
-  width: 45vmax; height: 45vmax;
+  width: 35vmax; height: 35vmax; /* Smaller */
   top: 10%; right: -25%;
-  background: hsl(190, 80%, 50%); /* Cyan */
+  background: hsl(220, 80%, 50%); /* Deep Blue */
   animation: move-blob-2 45s infinite alternate ease-in-out;
 }
 .blob:nth-child(3) {
-  width: 40vmax; height: 40vmax;
+  width: 30vmax; height: 30vmax; /* Smaller */
   bottom: -20%; left: 5%;
   background: hsl(330, 80%, 60%); /* Magenta */
   animation: move-blob-3 50s infinite alternate ease-in-out;
 }
 .blob:nth-child(4) {
-  width: 35vmax; height: 35vmax;
+  width: 25vmax; height: 25vmax; /* Smaller */
   bottom: -10%; right: -15%;
-  background: hsl(145, 70%, 55%); /* Green */
+  background: hsl(30, 90%, 60%); /* Orange */
   animation: move-blob-4 55s infinite alternate ease-in-out;
 }
 /* Hide the extra blobs to keep it clean */
@@ -148,7 +148,7 @@ body {
 
 /* FIX: New class for the main content area to ensure it's translucent */
 .main-content-area-glass {
-  background-color: rgba(28, 28, 30, 0.55);
+  background-color: rgba(18, 18, 18, 0.4); /* More transparent */
   border: none;
   border-radius: 0;
   box-shadow: none;
