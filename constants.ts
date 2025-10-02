@@ -1,7 +1,7 @@
 import { Domain, Constraints, ExceptionDateRule, ResourceType } from './types'; 
 import { getTodayInNewYork } from './utils/timeFormatter';
 
-export const EXAM_DATE_START = "2025-11-12";
+export const EXAM_DATE_START = "2025-11-11";
 
 // Use today's date for planning, correctly handled for timezone.
 const ACTUAL_TODAY_FOR_PLANNING = getTodayInNewYork();
@@ -13,7 +13,7 @@ const effectiveStartDate = ACTUAL_TODAY_FOR_PLANNING > CONFIGURED_STUDY_START_DA
                             : CONFIGURED_STUDY_START_DATE;
 
 export const STUDY_START_DATE = effectiveStartDate;
-export const STUDY_END_DATE = "2025-11-11"; 
+export const STUDY_END_DATE = "2025-11-03"; 
 
 export const DEFAULT_DAILY_STUDY_MINS = 330; // 5.5 hours baseline
 
@@ -56,9 +56,7 @@ export const DEFAULT_TOPIC_ORDER: Domain[] = [
 
 // Per user request, all default exception/rest days are removed.
 const rawExceptionRules: ExceptionDateRule[] = [
-    // FINAL REVIEW WEEK (User request)
-  // High-Yield Review Days Nov 9-11 (10 hours)
-  ...["2025-11-09", "2025-11-10", "2025-11-11"].map((date): ExceptionDateRule => ({ date, dayType: 'final-review', targetMinutes: 600 })),
+    // All dedicated review days have been removed as per user request.
 ];
 
 export const EXCEPTION_DATES_CONFIG: ExceptionDateRule[] = rawExceptionRules.filter((value, index, self) =>

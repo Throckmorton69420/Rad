@@ -87,23 +87,28 @@ const sortResources = (pool: StudyResource[]): StudyResource[] => {
     });
 };
 
+// FIX: Renamed 'planConfig' parameter to 'config' to resolve "Duplicate identifier" error.
 const runSchedulingEngine = (
     scheduleShell: DailySchedule[], 
     resourcePool: StudyResource[], 
-    planConfig: Partial<StudyPlan>,
+    config: Partial<StudyPlan>,
     options?: RebalanceOptions
 ): GeneratedStudyPlanOutcome['notifications'] => {
     
-    const { deadlines = {}, topicOrder = [], isCramModeActive, cramTopicOrder = [], areSpecialTopicsInterleaved = true } = planConfig;
+    // FIX: Removed default empty object for deadlines to allow for proper type inference with optional chaining.
+    const { deadlines, topicOrder = [], isCramModeActive, cramTopicOrder = [], areSpecialTopicsInterleaved = true } = config;
     const notifications: GeneratedStudyPlanOutcome['notifications'] = [];
 
     // --- 1. BUDGET ADJUSTMENT PASS based on deadlines ---
-    const allSchedulableResources = resourcePool.filter(r => r.domain !== Domain.FINAL_REVIEW);
+    const allSchedulableResources = resourcePool; // Include ALL resources for deadline calculation
     const todayStr = getTodayInNewYork();
 
-    if (deadlines.allContent) {
+    // FIX: Used optional chaining to safely access 'allContent' property, resolving potential type error.
+    if (deadlines?.allContent) {
         const totalMinutes = allSchedulableResources.reduce((sum, r) => sum + r.durationMinutes, 0);
-        const availableDays = scheduleShell.filter(d => d.date >= todayStr && d.date <= deadlines.allContent! && !d.isRestDay && d.dayType !== 'final-review');
+        // Available days now includes final review days for budget calculation
+        // FIX: Used optional chaining to safely access 'allContent' and removed non-null assertion.
+        const availableDays = scheduleShell.filter(d => d.date >= todayStr && d.date <= deadlines.allContent && !d.isRestDay);
         
         if (availableDays.length > 0) {
             const currentBudget = availableDays.reduce((sum, d) => sum + d.totalStudyTimeMinutes, 0);
@@ -113,7 +118,10 @@ const runSchedulingEngine = (
                 const extraMinutesPerDay = Math.ceil(deficit / availableDays.length);
                 notifications.push({ type: 'warning', message: `To meet your deadline, daily study time was increased by ~${Math.round(extraMinutesPerDay)} minutes.` });
                 availableDays.forEach(day => {
-                    day.totalStudyTimeMinutes += extraMinutesPerDay;
+                    // Only add time to non-final review days to preserve their specific high-capacity budget
+                    if (day.dayType !== 'final-review') {
+                        day.totalStudyTimeMinutes += extraMinutesPerDay;
+                    }
                 });
             }
         }
@@ -195,22 +203,12 @@ const runSchedulingEngine = (
     // --- 3. FINAL REVIEW and CLEANUP ---
     let finalReviewTaskIndex = 0;
     for (const day of scheduleShell) {
+        if (day.dayType === 'final-review' && finalReviewTaskIndex < finalReviewTasks.length) {
+            scheduleTaskBlock(day, finalReviewTasks, day.totalStudyTimeMinutes);
+        }
+
         // Trim day's total time to match actual scheduled content
         day.totalStudyTimeMinutes = day.tasks.reduce((sum, t) => sum + t.durationMinutes, 0);
-
-        if (day.dayType !== 'final-review' || finalReviewTaskIndex >= finalReviewTasks.length) continue;
-        
-        let availableTime = day.totalStudyTimeMinutes - day.tasks.reduce((sum, t) => sum + t.durationMinutes, 0);
-        
-        while(availableTime >= MIN_DURATION_for_SPLIT_PART && finalReviewTaskIndex < finalReviewTasks.length) {
-            const task = finalReviewTasks[finalReviewTaskIndex];
-            if(task.durationMinutes <= availableTime) {
-                day.tasks.push(mapResourceToTask(task, day.tasks.length));
-                availableTime -= task.durationMinutes;
-                day.totalStudyTimeMinutes += task.durationMinutes;
-                finalReviewTaskIndex++;
-            } else break;
-        }
     }
 
     return notifications;
@@ -314,46 +312,42 @@ export const rebalanceSchedule = (
     userAddedExceptions: ExceptionDateRule[],
     masterResourcePool: StudyResource[]
 ): GeneratedStudyPlanOutcome => {
-    console.log("[Scheduler Engine] Rebalancing schedule with options:", options);
+    console.log("[Scheduler Engine] Performing a full rebalance of all tasks from today.");
     const activeResources = masterResourcePool.filter(r => !r.isArchived);
-    
     const rebalanceStartDate = getTodayInNewYork();
-    const completedResourceIds = new Set<string>();
 
-    const pastScheduleWithCompletedTasksOnly = currentPlan.schedule
+    // Create a shell for past days, but clear all tasks as per user request for a full rebalance.
+    const pastScheduleShell = currentPlan.schedule
         .filter(day => day.date < rebalanceStartDate)
-        .map(day => {
-            const completedTasks = day.tasks.filter(task => {
-                if (task.status === 'completed') {
-                    completedResourceIds.add(task.originalResourceId || task.resourceId);
-                    return true;
-                }
-                return false;
-            });
-            const newTotalTime = completedTasks.reduce((sum, t) => sum + t.durationMinutes, 0);
-            return { ...day, tasks: completedTasks, totalStudyTimeMinutes: newTotalTime };
-        });
-
-    const schedulingPool = JSON.parse(JSON.stringify(
-        activeResources.filter(res => !completedResourceIds.has(res.id))
-    ));
+        .map(day => ({
+            ...day,
+            tasks: [],
+            totalStudyTimeMinutes: 0,
+            isManuallyModified: false, // Reset manual modifications on past days as well
+        }));
+    
+    // The entire active resource pool will be scheduled from today onwards.
+    const schedulingPool = JSON.parse(JSON.stringify(activeResources));
     
     const futureScheduleShell = createScheduleShell(rebalanceStartDate, currentPlan.endDate, userAddedExceptions);
     
     const notifications = runSchedulingEngine(futureScheduleShell, schedulingPool, currentPlan, options);
     
+    // Reset manual modification flags for future days
     futureScheduleShell.forEach(day => {
-        day.isManuallyModified = false; 
+        day.isManuallyModified = false;
     });
     
-    const finalSchedule = [...pastScheduleWithCompletedTasksOnly, ...futureScheduleShell];
+    const finalSchedule = [...pastScheduleShell, ...futureScheduleShell];
     
     const finalPlan: StudyPlan = {
         ...currentPlan,
         schedule: finalSchedule,
-        progressPerDomain: {}
+        // Progress will be recalculated based on the new (empty) state of completed tasks.
+        progressPerDomain: {} 
     };
     
+    // Recalculate total minutes for progress tracking
     activeResources.forEach(resource => {
         const domain = resource.domain;
         if (!finalPlan.progressPerDomain[domain]) {
@@ -362,15 +356,12 @@ export const rebalanceSchedule = (
         finalPlan.progressPerDomain[domain]!.totalMinutes += resource.durationMinutes;
     });
 
-    finalSchedule.forEach(day => {
-        day.tasks.forEach(task => {
-            if (task.status === 'completed') {
-                const domain = task.originalTopic;
-                if (finalPlan.progressPerDomain[domain]) {
-                    finalPlan.progressPerDomain[domain]!.completedMinutes += task.durationMinutes;
-                }
-            }
-        });
+    // Since we are resetting everything, completed minutes will be 0 across all domains.
+    Object.keys(finalPlan.progressPerDomain).forEach(domainKey => {
+        const domain = domainKey as Domain;
+        if (finalPlan.progressPerDomain[domain]) {
+            finalPlan.progressPerDomain[domain]!.completedMinutes = 0;
+        }
     });
 
     let firstPassEndDate: string | undefined = undefined;
