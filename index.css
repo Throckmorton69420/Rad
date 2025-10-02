@@ -56,12 +56,11 @@
 /* --- 1. Base Setup & THE DEFINITIVE Wallpaper Fix --- */
 html {
   height: 100%;
-  background-color: #000; /* Fallback background is now on the root element */
+  background-color: #000; /* Fallback background in case image fails */
 }
 
 body {
   height: 100%;
-  /* The body's background is now transparent by default, allowing the wallpaper behind it to show. */
   color: var(--text-primary);
   font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
@@ -74,21 +73,24 @@ body {
   height: 100%;
   background-color: transparent; /* VERY IMPORTANT: React root must be see-through */
   
-  /* CRITICAL: Create a new stacking context. This ensures the content inside #root appears above the wallpaper's parent (body). */
+  /* CRITICAL: Create a new stacking context. */
   position: relative;
   isolation: isolate;
-  z-index: 0;
+  /* This must have a higher z-index than the wallpaper to appear on top. */
+  z-index: 1;
 }
 
 .background-wallpaper {
   position: fixed;
   inset: -20px; /* Overscan to prevent blurry edges on some screens */
-  z-index: -1; /* Place behind all content. This puts it behind its stacking context parent, which is body. */
+  /* This sits on the base layer. z-index: -1 is avoided as it can render behind the body entirely. */
+  z-index: 0;
   background: url('/light-stream-blue-big-sur-kf.jpg') no-repeat center center;
   background-size: cover;
   filter: blur(24px) brightness(0.6);
   transform: scale(1.1); /* Zoom in slightly to fill overscan area */
 }
+
 
 /* --- 2. Glass Panel System --- */
 .static-glow-border,
