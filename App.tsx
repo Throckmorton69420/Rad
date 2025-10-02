@@ -72,81 +72,79 @@ const SidebarContent = React.memo(({
 }: SidebarContentProps) => (
     <aside className={`w-80 text-[var(--text-secondary)] flex flex-col h-dvh isolated-scroll glass-chrome`}>
         <div className="flex-grow flex flex-col min-h-0">
-            <div className="flex-grow overflow-y-auto isolated-scroll sidebar-content-area">
-                <div className="space-y-4">
-                    <div className="flex justify-end -mr-2 -mt-2 lg:hidden">
-                        <button onClick={() => setIsSidebarOpen(false)} className="p-2 text-[var(--text-primary)] hover:text-white" aria-label="Close menu">
-                            <i className="fas fa-times fa-lg"></i>
-                        </button>
-                    </div>
-                    <div>
-                        <button onClick={() => setIsPomodoroCollapsed(!isPomodoroCollapsed)} className="w-full text-lg font-semibold text-left text-[var(--text-primary)] flex justify-between items-center py-2">
-                            <span>Pomodoro Timer</span>
-                            <i className={`fas fa-chevron-down transition-transform ${isPomodoroCollapsed ? '' : 'rotate-180'}`}></i>
-                        </button>
-                        {!isPomodoroCollapsed && (
-                            <div className="animate-fade-in">
-                                <PomodoroTimerComponent settings={pomodoroSettings} setSettings={setPomodoroSettings} onSessionComplete={handlePomodoroSessionComplete} linkedTaskTitle={currentPomodoroTask?.title}/>
-                            </div>
-                        )}
-                    </div>
-
-                    <div className="border-b border-[var(--separator-primary)] my-2"></div>
-                    
-                    <div>
-                        <h2 className="text-lg font-semibold mb-3 border-b border-[var(--separator-primary)] pb-2 text-[var(--text-primary)]">Calendar</h2>
-                        <CalendarView 
-                            schedule={studyPlan.schedule} 
-                            selectedDate={selectedDate} 
-                            onDateSelect={(d) => {setSelectedDate(d); if (isMobile) setIsSidebarOpen(false);}} 
-                            viewMode={ViewMode.MONTHLY}
-                            currentDisplayDate={selectedDate} 
-                            onNavigatePeriod={(dir) => navigatePeriod(dir, 'Monthly')} 
-                            highlightedDates={highlightedDates} 
-                            today={todayInNewYork}
-                        />
-                    </div>
-                    
-                    <AdvancedControls
-                        onRebalance={(options) => { handleRebalance(options); if(options.type === 'topic-time') setSelectedDate(options.date); }} 
-                        isLoading={isLoading} 
-                        selectedDate={selectedDate} 
-                        isCramModeActive={studyPlan.isCramModeActive ?? false}
-                        onToggleCramMode={handleToggleCramMode}
-                        deadlines={studyPlan.deadlines}
-                        onUpdateDeadlines={handleUpdateDeadlines}
-                    />
-
-                    <div className="space-y-3">
-                        <button onClick={() => setIsSettingsOpen(!isSettingsOpen)} className="w-full text-lg font-semibold text-left text-[var(--text-primary)] flex justify-between items-center">
-                            <span>Schedule Settings</span>
-                            <i className={`fas fa-chevron-down transition-transform ${isSettingsOpen ? 'rotate-180' : ''}`}></i>
-                        </button>
-                        {isSettingsOpen && (
-                            <div className="animate-fade-in pl-1">
-                                <TopicOrderManager 
-                                    topicOrder={studyPlan.topicOrder} 
-                                    onSaveOrder={handleUpdateTopicOrderAndRebalance} 
-                                    cramTopicOrder={studyPlan.cramTopicOrder}
-                                    onSaveCramOrder={handleUpdateCramTopicOrderAndRebalance}
-                                    isLoading={isLoading} 
-                                    isCramModeActive={studyPlan.isCramModeActive ?? false}
-                                    areSpecialTopicsInterleaved={studyPlan.areSpecialTopicsInterleaved}
-                                    onToggleSpecialTopicsInterleaving={handleToggleSpecialTopicsInterleaving}
-                                />
-                            </div>
-                        )}
-                    </div>
-
-                    <AddExceptionDay onAddException={handleAddOrUpdateException} isLoading={isLoading} />
-                    
-                    <div>
-                        <h2 className="text-lg font-semibold mb-3 border-b border-[var(--separator-primary)] pb-2 text-[var(--text-primary)]">Actions</h2>
-                        <div className="space-y-2">
-                            <Button onClick={handleUndo} variant="secondary" className="w-full" disabled={!previousStudyPlan || isLoading}><i className="fas fa-undo mr-2"></i> Undo Last Plan Change</Button>
-                            <Button onClick={() => showConfirmation({title: "Regenerate Schedule?", message: "This will regenerate the entire schedule from scratch based on the current resource pool and save it to the cloud. Are you sure?", confirmText: "Regenerate", confirmVariant: 'danger', onConfirm: () => loadSchedule(true)})} variant="danger" className="w-full" disabled={isLoading}>Regenerate Schedule</Button>
-                            <Button onClick={() => showConfirmation({title: "Reset All Progress?", message: "Are you sure you want to mark all tasks as 'pending'?", confirmText: "Reset Progress", confirmVariant: 'danger', onConfirm: handleMasterResetTasks})} variant="danger" className="w-full" disabled={isLoading}>Reset Task Progress</Button>
+            <div className="flex-grow overflow-y-auto isolated-scroll sidebar-content-area p-4 space-y-4">
+                <div className="flex justify-end -mr-2 -mt-2 lg:hidden">
+                    <button onClick={() => setIsSidebarOpen(false)} className="p-2 text-[var(--text-primary)] hover:text-white" aria-label="Close menu">
+                        <i className="fas fa-times fa-lg"></i>
+                    </button>
+                </div>
+                <div>
+                    <button onClick={() => setIsPomodoroCollapsed(!isPomodoroCollapsed)} className="w-full text-lg font-semibold text-left text-[var(--text-primary)] flex justify-between items-center py-2">
+                        <span>Pomodoro Timer</span>
+                        <i className={`fas fa-chevron-down transition-transform ${isPomodoroCollapsed ? '' : 'rotate-180'}`}></i>
+                    </button>
+                    {!isPomodoroCollapsed && (
+                        <div className="animate-fade-in">
+                            <PomodoroTimerComponent settings={pomodoroSettings} setSettings={setPomodoroSettings} onSessionComplete={handlePomodoroSessionComplete} linkedTaskTitle={currentPomodoroTask?.title}/>
                         </div>
+                    )}
+                </div>
+
+                <div className="border-b border-[var(--separator-primary)] my-2"></div>
+                
+                <div>
+                    <h2 className="text-lg font-semibold mb-3 border-b border-[var(--separator-primary)] pb-2 text-[var(--text-primary)]">Calendar</h2>
+                    <CalendarView 
+                        schedule={studyPlan.schedule} 
+                        selectedDate={selectedDate} 
+                        onDateSelect={(d) => {setSelectedDate(d); if (isMobile) setIsSidebarOpen(false);}} 
+                        viewMode={ViewMode.MONTHLY}
+                        currentDisplayDate={selectedDate} 
+                        onNavigatePeriod={(dir) => navigatePeriod(dir, 'Monthly')} 
+                        highlightedDates={highlightedDates} 
+                        today={todayInNewYork}
+                    />
+                </div>
+                
+                <AdvancedControls
+                    onRebalance={(options) => { handleRebalance(options); if(options.type === 'topic-time') setSelectedDate(options.date); }} 
+                    isLoading={isLoading} 
+                    selectedDate={selectedDate} 
+                    isCramModeActive={studyPlan.isCramModeActive ?? false}
+                    onToggleCramMode={handleToggleCramMode}
+                    deadlines={studyPlan.deadlines}
+                    onUpdateDeadlines={handleUpdateDeadlines}
+                />
+
+                <div className="space-y-3">
+                    <button onClick={() => setIsSettingsOpen(!isSettingsOpen)} className="w-full text-lg font-semibold text-left text-[var(--text-primary)] flex justify-between items-center">
+                        <span>Schedule Settings</span>
+                        <i className={`fas fa-chevron-down transition-transform ${isSettingsOpen ? 'rotate-180' : ''}`}></i>
+                    </button>
+                    {isSettingsOpen && (
+                        <div className="animate-fade-in pl-1">
+                            <TopicOrderManager 
+                                topicOrder={studyPlan.topicOrder} 
+                                onSaveOrder={handleUpdateTopicOrderAndRebalance} 
+                                cramTopicOrder={studyPlan.cramTopicOrder}
+                                onSaveCramOrder={handleUpdateCramTopicOrderAndRebalance}
+                                isLoading={isLoading} 
+                                isCramModeActive={studyPlan.isCramModeActive ?? false}
+                                areSpecialTopicsInterleaved={studyPlan.areSpecialTopicsInterleaved}
+                                onToggleSpecialTopicsInterleaving={handleToggleSpecialTopicsInterleaving}
+                            />
+                        </div>
+                    )}
+                </div>
+
+                <AddExceptionDay onAddException={handleAddOrUpdateException} isLoading={isLoading} />
+                
+                <div>
+                    <h2 className="text-lg font-semibold mb-3 border-b border-[var(--separator-primary)] pb-2 text-[var(--text-primary)]">Actions</h2>
+                    <div className="space-y-2">
+                        <Button onClick={handleUndo} variant="secondary" className="w-full" disabled={!previousStudyPlan || isLoading}><i className="fas fa-undo mr-2"></i> Undo Last Plan Change</Button>
+                        <Button onClick={() => showConfirmation({title: "Regenerate Schedule?", message: "This will regenerate the entire schedule from scratch based on the current resource pool and save it to the cloud. Are you sure?", confirmText: "Regenerate", confirmVariant: 'danger', onConfirm: () => loadSchedule(true)})} variant="danger" className="w-full" disabled={isLoading}>Regenerate Schedule</Button>
+                        <Button onClick={() => showConfirmation({title: "Reset All Progress?", message: "Are you sure you want to mark all tasks as 'pending'?", confirmText: "Reset Progress", confirmVariant: 'danger', onConfirm: handleMasterResetTasks})} variant="danger" className="w-full" disabled={isLoading}>Reset Task Progress</Button>
                     </div>
                 </div>
             </div>
@@ -520,7 +518,7 @@ const App: React.FC = () => {
                   {studyPlan.firstPassEndDate && (
                     <div className="text-right">
                       <div className="text-xs text-slate-400">First Pass Ends</div>
-                      <div className="text-sm font-medium text-[var(--accent-purple)] interactive-glow-border">
+                      <div className="text-sm font-medium text-[var(--accent-purple)]">
                         {parseDateString(studyPlan.firstPassEndDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' })}
                       </div>
                     </div>
