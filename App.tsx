@@ -294,8 +294,6 @@ const App: React.FC = () => {
      e.preventDefault();
   };
 
-  const selectedDaySchedule = studyPlan?.schedule.find(day => day.date === selectedDate);
-  const currentPomodoroTask = currentPomodoroTaskId ? studyPlan?.schedule.flatMap(d => d.tasks).find(t => t.id === currentPomodoroTaskId) : null;
   const scheduledResourceIds = useMemo(() => {
     if (!studyPlan) return new Set<string>();
     return new Set(studyPlan.schedule.flatMap(day => day.tasks.map(task => task.originalResourceId || task.resourceId)));
@@ -339,6 +337,19 @@ const App: React.FC = () => {
     }
   };
 
+  if (isLoading && !studyPlan) {
+    return <div className="flex flex-col items-center justify-center min-h-screen bg-black text-white p-4"><i className="fas fa-brain fa-spin fa-3x mb-6 text-[var(--accent-purple)]"></i><h1 className="text-3xl font-bold mb-3">{APP_TITLE}</h1><p className="text-lg mb-6">Connecting to the cloud...</p></div>;
+  }
+  
+  if (!studyPlan) {
+     return <div className="flex flex-col items-center justify-center min-h-screen bg-black text-white p-4"><i className="fas fa-exclamation-triangle fa-3x text-[var(--accent-red)] mb-4"></i><h1 className="text-2xl font-bold mb-2">Error</h1><p className="text-red-400 text-center mb-6">{systemNotification?.message || 'An unknown error occurred.'}</p><Button onClick={() => loadSchedule()} variant="primary">Try Again</Button></div>;
+  }
+
+  // --- UI Components defined AFTER data loading guards ---
+  // This prevents crashes from trying to access properties of a null `studyPlan`.
+  const selectedDaySchedule = studyPlan.schedule.find(day => day.date === selectedDate);
+  const currentPomodoroTask = currentPomodoroTaskId ? studyPlan.schedule.flatMap(d => d.tasks).find(t => t.id === currentPomodoroTaskId) : null;
+  
   const SidebarContent = (
       <aside className={`w-80 bg-[var(--background-secondary)] text-[var(--text-secondary)] border-r border-[var(--separator-primary)] flex flex-col h-dvh isolated-scroll`}>
         <div className="flex-grow flex flex-col min-h-0">
@@ -497,7 +508,7 @@ const App: React.FC = () => {
                 </div>
 
                 <div className="flex-1 min-h-0 flex flex-col px-3 md:px-6">
-                    {isLoading && studyPlan && <div className="flex flex-col items-center justify-center p-10"> <i className="fas fa-spinner fa-spin fa-2x text-[var(--accent-purple)] mb-3"></i> <span className="text-[var(--text-primary)]">Loading...</span> </div>}
+                    {isLoading && <div className="flex flex-col items-center justify-center p-10"> <i className="fas fa-spinner fa-spin fa-2x text-[var(--accent-purple)] mb-3"></i> <span className="text-[var(--text-primary)]">Loading...</span> </div>}
                     
                     {!isLoading && activeTab === 'schedule' && (
                       <div className="flex-grow">
@@ -522,9 +533,9 @@ const App: React.FC = () => {
                       </div>
                     )}
                     
-                    {!isLoading && activeTab === 'progress' && studyPlan && <ProgressDisplay studyPlan={studyPlan} />}
+                    {!isLoading && activeTab === 'progress' && <ProgressDisplay studyPlan={studyPlan} />}
 
-                    {!isLoading && activeTab === 'content' && studyPlan && (
+                    {!isLoading && activeTab === 'content' && (
                         <MasterResourcePoolViewer 
                             resources={globalMasterResourcePool}
                             onOpenAddResourceModal={() => openResourceEditor(null)}
@@ -557,14 +568,6 @@ const App: React.FC = () => {
       <ConfirmationModal {...modalStates.confirmationState} onConfirm={handleConfirm} onClose={modalStates.confirmationState.onClose} />
     </div>
   );
-
-  if (isLoading && !studyPlan) {
-    return <div className="flex flex-col items-center justify-center min-h-screen bg-black text-white p-4"><i className="fas fa-brain fa-spin fa-3x mb-6 text-[var(--accent-purple)]"></i><h1 className="text-3xl font-bold mb-3">{APP_TITLE}</h1><p className="text-lg mb-6">Connecting to the cloud...</p></div>;
-  }
-  
-  if (!studyPlan) {
-     return <div className="flex flex-col items-center justify-center min-h-screen bg-black text-white p-4"><i className="fas fa-exclamation-triangle fa-3x text-[var(--accent-red)] mb-4"></i><h1 className="text-2xl font-bold mb-2">Error</h1><p className="text-red-400 text-center mb-6">{systemNotification?.message || 'An unknown error occurred.'}</p><Button onClick={() => loadSchedule()} variant="primary">Try Again</Button></div>;
-  }
   
   return (
     <>
