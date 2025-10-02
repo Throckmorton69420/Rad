@@ -71,11 +71,13 @@ body::before {
   height: 200%;
   z-index: -1;
   background-image:
-    radial-gradient(ellipse 40% 60% at 20% 30%, hsla(265, 90%, 65%, 0.45), transparent),
-    radial-gradient(ellipse 40% 60% at 80% 20%, hsla(190, 90%, 55%, 0.45), transparent),
-    radial-gradient(ellipse 40% 60% at 30% 80%, hsla(330, 85%, 60%, 0.4), transparent),
-    radial-gradient(ellipse 40% 60% at 70% 90%, hsla(210, 95%, 60%, 0.4), transparent);
-  animation: aurora-flow 45s ease-in-out infinite;
+    radial-gradient(ellipse 30% 50% at 20% 30%, hsla(265, 90%, 65%, 0.5), transparent),
+    radial-gradient(ellipse 30% 50% at 80% 20%, hsla(190, 90%, 55%, 0.5), transparent),
+    radial-gradient(ellipse 30% 50% at 30% 80%, hsla(330, 85%, 60%, 0.45), transparent),
+    radial-gradient(ellipse 30% 50% at 70% 90%, hsla(210, 95%, 60%, 0.45), transparent),
+    radial-gradient(ellipse 30% 50% at 50% 50%, hsla(10, 85%, 60%, 0.4), transparent),
+    radial-gradient(ellipse 30% 50% at 90% 70%, hsla(120, 70%, 55%, 0.4), transparent);
+  animation: aurora-flow 60s ease-in-out infinite;
 }
 
 
@@ -87,7 +89,7 @@ body::before {
 }
 
 /* --- Base Panel Styling (Liquid Glass) --- */
-.glass-panel, .glass-chrome, .modal-panel, .input-base, .button-secondary, .button-ghost, .progress-bar-track {
+.glass-panel, .glass-chrome, .modal-panel, .input-base, .button-secondary, .button-ghost, .progress-bar-track, .main-content-area-glass {
   border: 1px solid var(--glass-border-color);
   box-shadow: var(--glass-sheen), var(--glass-shadow);
   transition: background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
@@ -100,6 +102,14 @@ body::before {
 .glass-panel { background-color: var(--glass-bg-panel); }
 .glass-chrome { background-color: var(--glass-bg-chrome); }
 .modal-panel { background-color: var(--glass-bg-modal); border-radius: 16px; }
+
+/* FIX: New class for the main content area to ensure it's translucent */
+.main-content-area-glass {
+  background-color: rgba(28, 28, 30, 0.55);
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+}
 
 .glass-panel-interactive:hover:not(.is-pomodoro-active) {
   background-color: var(--glass-bg-hover);
