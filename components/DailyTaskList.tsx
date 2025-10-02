@@ -15,14 +15,10 @@ const DailyTaskList: React.FC<DailyTaskListProps> = ({
   onPomodoroTaskSelect,
   onNavigateDay,
   isPomodoroActive,
-  onDragOver,
-  onTaskDrop,
-  onTaskDragStart,
   onToggleRestDay,
   onUpdateTimeForDay,
   isLoading
 }) => {
-  const [draggedOver, setDraggedOver] = useState(false);
   const [pulsingTaskId, setPulsingTaskId] = useState<string | null>(null);
   const [isTimeEditorOpen, setIsTimeEditorOpen] = useState(false);
   const [editedTime, setEditedTime] = useState(dailySchedule.totalStudyTimeMinutes);
@@ -41,29 +37,12 @@ const DailyTaskList: React.FC<DailyTaskListProps> = ({
     setPulsingTaskId(task.id);
     setTimeout(() => setPulsingTaskId(null), 1000);
   };
-  
-  const handleDragEnter = (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    setDraggedOver(true);
-  };
-
-  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    setDraggedOver(false);
-  };
-  
-  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
-    onTaskDrop(e);
-    setDraggedOver(false);
-  };
 
   const handleSaveTime = () => {
     onUpdateTimeForDay(editedTime);
     setIsTimeEditorOpen(false);
   };
   
-  const dropZoneClasses = `flex-grow min-h-[200px] transition-colors p-1 rounded-lg ${draggedOver ? 'bg-purple-900/40' : ''}`;
-
   return (
     <div className="relative flex flex-col h-full text-[var(--text-primary)]">
       <div className="flex-shrink-0">
@@ -101,13 +80,7 @@ const DailyTaskList: React.FC<DailyTaskListProps> = ({
       </div>
       
       <div className="flex-grow">
-        <div 
-          className={`${dropZoneClasses} pb-32`}
-          onDragOver={onDragOver}
-          onDragEnter={handleDragEnter}
-          onDragLeave={handleDragLeave}
-          onDrop={handleDrop}
-        >
+        <div className="flex-grow min-h-[200px] transition-colors p-1 rounded-lg pb-32">
           {isRestDay ? (
             <div className="h-full flex flex-col justify-center items-center text-center p-6 bg-[var(--background-tertiary)] rounded-lg interactive-glow-border">
               <i className="fas fa-coffee fa-2x text-[var(--text-secondary)] mb-3"></i>
@@ -133,7 +106,6 @@ const DailyTaskList: React.FC<DailyTaskListProps> = ({
                   isCurrentPomodoroTask={currentPomodoroTaskId === task.id}
                   isPulsing={pulsingTaskId === task.id && !isPomodoroActive}
                   onSetPomodoro={() => handleSetPomodoro(task)}
-                  onDragStart={(e) => onTaskDragStart(e, task.id)}
                 />
               ))}
             </div>

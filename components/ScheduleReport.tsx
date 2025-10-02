@@ -10,7 +10,7 @@ const ScheduleReport: React.FC<ScheduleReportProps> = ({ studyPlan }) => {
   const totalPlannedMinutes = studyPlan.schedule.reduce((acc, day) => acc + (day.isRestDay ? 0 : day.totalStudyTimeMinutes), 0);
 
   return (
-    <div className="p-8 font-sans text-black bg-white">
+    <div className="p-8 font-sans text-black bg-white schedule-report-container">
       <header className="mb-8 text-center border-b pb-4">
         <div className="flex justify-between items-end">
           <span className="text-sm text-gray-500">Radiology Core Exam Study Planner</span>
@@ -71,11 +71,7 @@ const ScheduleReport: React.FC<ScheduleReportProps> = ({ studyPlan }) => {
         })}
       </div>
       <footer className="mt-8 pt-4 border-t text-center text-xs text-gray-500">
-        {Array.from({ length: Math.ceil(studyPlan.schedule.length / 4) }, (_, i) => i + 1).map(pageNum => (
-          // FIX: Cast style object to React.CSSProperties to allow for custom properties.
-          <span key={pageNum} className="print-footer" style={{'--page-num': `'Page ${pageNum} of ${Math.ceil(studyPlan.schedule.length / 4)}'`} as React.CSSProperties}></span>
-        ))}
-         Page {1} of {Math.ceil(studyPlan.schedule.length / 4)}
+        End of Report
       </footer>
     </div>
   );

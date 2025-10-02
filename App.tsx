@@ -280,20 +280,6 @@ const App: React.FC = () => {
       handleRebalance({ type: 'standard' });
   };
 
-  const onDragOver = (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-  };
-
-  const onTaskDragStart = (e: React.DragEvent<HTMLDivElement>, taskId: string) => {
-     showConfirmation({
-        title: "Modify Schedule?",
-        message: "To move tasks, please use the 'Modify Schedule' button. This provides a dedicated interface for dragging tasks on or off the schedule.",
-        onConfirm: () => openModal('isModifyDayTasksModalOpen'),
-        confirmText: "Open Modifier",
-     });
-     e.preventDefault();
-  };
-
   const scheduledResourceIds = useMemo(() => {
     if (!studyPlan) return new Set<string>();
     return new Set(studyPlan.schedule.flatMap(day => day.tasks.map(task => task.originalResourceId || task.resourceId)));
@@ -522,9 +508,6 @@ const App: React.FC = () => {
                                 onPomodoroTaskSelect={handlePomodoroTaskSelect} 
                                 onNavigateDay={navigateDate} 
                                 isPomodoroActive={pomodoroSettings.isActive}
-                                onTaskDrop={() => {}}
-                                onDragOver={onDragOver}
-                                onTaskDragStart={onTaskDragStart}
                                 onToggleRestDay={(isRest) => handleToggleRestDay(selectedDate, isRest)}
                                 onUpdateTimeForDay={handleUpdateTimeForDay}
                                 isLoading={isLoading}

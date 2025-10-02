@@ -325,12 +325,21 @@ aside {
   @page {
     size: A4 portrait;
     margin: 0.75in;
+    
+    @bottom-center {
+      content: "Page " counter(page) " of " counter(pages);
+      font-size: 10pt;
+      color: #6b7280;
+    }
   }
-  
-  body {
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
-    background-image: none !important;
+
+  html, body {
+    background: #fff !important;
+    color: #000 !important;
+  }
+
+  .schedule-report-container {
+    counter-reset: page 1;
   }
   
   .schedule-report-day {

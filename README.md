@@ -34,9 +34,9 @@ This is an interactive, day-by-day study planner for radiology residents prepari
 
 ## Deploying to Vercel
 
-When you deploy this project to Vercel, you need to configure the same environment variables you used in your local `.env` file. This is why you are seeing a "Configuration Error" on your deployed site.
+When you deploy this project to Vercel, you need to configure the same environment variables you used in your local `.env` file. This is a critical step for the deployed application to connect to your Supabase database.
 
-Here's how to fix it:
+Here's how to do it:
 
 1.  **Go to your Project Settings in Vercel:**
     Navigate to your project on the Vercel dashboard.
@@ -45,15 +45,15 @@ Here's how to fix it:
     Click on the "Settings" tab, and then select "Environment Variables" from the side menu.
 
 3.  **Add the Variables:**
-    You need to add two environment variables using the credentials you provided:
+    You need to add two environment variables, using the same names as in your `.env` file and the values from your Supabase project's API settings.
 
     *   **Variable 1:**
         *   **Name:** `VITE_SUPABASE_URL`
-        *   **Value:** `https://wwjibyasyzrlycrvogzy.supabase.co`
+        *   **Value:** `[Your Supabase Project URL]`
 
     *   **Variable 2:**
         *   **Name:** `VITE_SUPABASE_ANON_KEY`
-        *   **Value:** `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind3amlieWFzeXpybHljcnZvZ3p5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTExMDkxNDYsImV4cCI6MjA2NjY4NTE0Nn0.J4JxgoYhyJzWz6XY28tShWvdgbtZu2wNfcdcGC2fAkQ`
+        *   **Value:** `[Your Supabase Anon Key]`
 
     *Important: Make sure the variables are available to all environments (Production, Preview, and Development) in the Vercel settings.*
 

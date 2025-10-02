@@ -1,5 +1,8 @@
 import React from 'react';
 
+// Utility type to Omit properties from a type
+export type Omit<T, K extends keyof T> = Pick<T, Exclude<keyof T, K>>;
+
 export enum ResourceType {
   READING_TEXTBOOK = 'Textbook Reading',
   READING_GUIDE = 'Study Guide Reading',
@@ -117,9 +120,6 @@ export interface DailyTaskListProps {
   onPomodoroTaskSelect: (taskId: string | null) => void;
   onNavigateDay: (direction: 'next' | 'prev') => void;
   isPomodoroActive: boolean;
-  onTaskDrop: (e: React.DragEvent<HTMLDivElement>) => void;
-  onDragOver: (e: React.DragEvent<HTMLDivElement>) => void;
-  onTaskDragStart: (e: React.DragEvent<HTMLDivElement>, taskId: string) => void;
   onToggleRestDay: (isCurrentlyRestDay: boolean) => void;
   onUpdateTimeForDay: (newTotalMinutes: number) => void;
   isLoading: boolean;
