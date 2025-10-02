@@ -73,18 +73,16 @@ body {
 #root {
   height: 100%;
   background-color: transparent;
-  position: relative;
-  isolation: isolate;
 }
 
-#root::before {
-  content: '';
+.background-wallpaper {
   position: fixed;
-  inset: -10px;
+  inset: -20px; /* Overscan to prevent blurry edges from being visible */
   z-index: -1;
   background: url('/light-stream-blue-big-sur-kf.jpg') no-repeat center center;
   background-size: cover;
   filter: blur(24px) brightness(0.6);
+  transform: scale(1.1); /* Also helps hide blurry edges */
 }
 
 
