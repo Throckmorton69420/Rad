@@ -9,7 +9,6 @@ const urlsToCache = [
   '/favicon.ico',
   '/logo192.png',
   '/logo512.png',
-  '/light-stream-blue-big-sur-kf.jpg', // Cache the wallpaper
 ];
 
 // Install event: open cache and add core assets
