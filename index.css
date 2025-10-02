@@ -73,7 +73,7 @@ body::before {
   width: 110%;
   height: 110%;
   z-index: -1;
-  background: url('/background.jpg') no-repeat center center;
+  background: url('/light-stream-blue-big-sur-kf.jpg') no-repeat center center;
   background-size: cover;
   filter: blur(16px) brightness(0.6);
 }
