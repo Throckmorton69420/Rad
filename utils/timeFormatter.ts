@@ -114,32 +114,33 @@ export const getDomainColorStyle = (domain: Domain): { backgroundColor: string; 
   return { backgroundColor: colors.bg, color: colors.text };
 };
 
-const sourceColorMap: Record<string, string> = {
-  'Titan Radiology': 'hsl(160, 60%, 45%)', // Teal - Must be before 'Crack the Core'
-  'Crack the Core': 'hsl(210, 60%, 55%)', // Blue
-  'Core Radiology': 'hsl(265, 60%, 65%)', // Purple
-  'War Machine': 'hsl(10, 85%, 60%)', // Red-Orange
-  'Huda': 'hsl(25, 80%, 50%)', // Brown-Orange
-  'Physics Review': 'hsl(35, 100%, 60%)', // Orange
-  'QEVLAR': 'hsl(55, 100%, 65%)', // Yellow
-  'Board Vitals': 'hsl(200, 70%, 60%)', // Cyan-Blue
-  'NucApp': 'hsl(100, 50%, 55%)', // Green
-  'Case Companion': 'hsl(180, 30%, 50%)', // Muted Teal
-  'Discord': 'hsl(240, 80%, 70%)', // Blurple-ish
-  'Guide': 'hsl(0, 0%, 55%)', // Gray
-  'Qbank': 'hsl(220, 15%, 65%)', // Slate Gray
+const sourceColorMap: Record<string, {bg: string, text: string}> = {
+  'Titan Radiology': { bg: 'hsl(160, 60%, 45%)', text: '#FFFFFF' }, // Teal
+  'Crack the Core': { bg: 'hsl(210, 60%, 55%)', text: '#FFFFFF' }, // Blue
+  'Core Radiology': { bg: 'hsl(265, 60%, 65%)', text: '#FFFFFF' }, // Purple
+  'War Machine': { bg: 'hsl(10, 85%, 60%)', text: '#FFFFFF' }, // Red-Orange
+  'Huda': { bg: 'hsl(25, 80%, 50%)', text: '#FFFFFF' }, // Brown-Orange
+  'Physics Review': { bg: 'hsl(35, 100%, 60%)', text: '#000000' }, // Orange
+  'QEVLAR': { bg: 'hsl(55, 100%, 65%)', text: '#000000' }, // Yellow
+  'Board Vitals': { bg: 'hsl(200, 70%, 60%)', text: '#000000' }, // Cyan-Blue
+  'NucApp': { bg: 'hsl(100, 50%, 55%)', text: '#000000' }, // Green
+  'Case Companion': { bg: 'hsl(180, 30%, 50%)', text: '#FFFFFF' }, // Muted Teal
+  'Discord': { bg: 'hsl(240, 80%, 70%)', text: '#000000' }, // Blurple-ish
+  'Guide': { bg: 'hsl(0, 0%, 55%)', text: '#FFFFFF' }, // Gray
+  'Qbank': { bg: 'hsl(220, 15%, 65%)', text: '#000000' }, // Slate Gray
 };
 
-const defaultSourceColor = 'hsl(0, 0%, 30%)'; // A dark grey for unknown/custom sources
+const defaultSourceColor = { bg: 'hsl(0, 0%, 30%)', text: '#FFFFFF' }; // A dark grey for unknown/custom sources
 
-export const getSourceColor = (source: string | undefined): string => {
+export const getSourceColorStyle = (source: string | undefined): { backgroundColor: string; color: string } => {
   if (!source) {
-    return defaultSourceColor;
+    return { backgroundColor: defaultSourceColor.bg, color: defaultSourceColor.text };
   }
   for (const key in sourceColorMap) {
     if (source.includes(key)) {
-      return sourceColorMap[key];
+      const colors = sourceColorMap[key];
+      return { backgroundColor: colors.bg, color: colors.text };
     }
   }
-  return defaultSourceColor;
+  return { backgroundColor: defaultSourceColor.bg, color: defaultSourceColor.text };
 };

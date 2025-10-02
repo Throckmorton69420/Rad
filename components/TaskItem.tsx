@@ -2,7 +2,7 @@ import React from 'react';
 import { ScheduledTask, Domain, ResourceType, Omit } from '../types';
 import { Button } from './Button';
 import { formatDuration } from '../utils/timeFormatter';
-import { getDomainColorStyle, getSourceColor } from '../utils/timeFormatter';
+import { getDomainColorStyle, getSourceColorStyle } from '../utils/timeFormatter';
 
 // Remove onDragStart from the base TaskItemProps
 type PatchedTaskItemProps = Omit<import('../types').TaskItemProps, 'onDragStart'>;
@@ -18,7 +18,7 @@ const TaskItem: React.FC<PatchedTaskItemProps> = ({ task, onToggle, isCurrentPom
   const baseBg = isCurrentPomodoroTask ? 'bg-[var(--glass-background-active)]' : 'bg-[var(--background-tertiary)]';
   const taskBgColor = isCompleted ? baseBg : `${baseBg} hover:bg-[var(--background-tertiary-hover)]`;
   const taskOpacity = isCompleted ? 'opacity-60' : 'opacity-100';
-  const sourceColor = getSourceColor(task.bookSource || task.videoSource);
+  const sourceColorStyle = getSourceColorStyle(task.bookSource || task.videoSource);
   
   const cleanTitleForDisplay = (title: string, taskType: ResourceType) => {
     if (taskType === ResourceType.QUESTIONS || taskType === ResourceType.QUESTION_REVIEW) {
@@ -51,25 +51,29 @@ const TaskItem: React.FC<PatchedTaskItemProps> = ({ task, onToggle, isCurrentPom
         className={`p-1.5 rounded-lg shadow-sm transition-all duration-150 relative ${taskBgColor} ${taskOpacity} interactive-glow-border backdrop-blur-lg overflow-hidden`}
         role="group"
     >
-      <div className="absolute left-0 top-0 bottom-0 w-1.5" style={{ backgroundColor: sourceColor }} title={task.bookSource || task.videoSource || 'Custom Task'}></div>
+      <div className="absolute left-0 top-0 bottom-0 w-1.5" style={{ backgroundColor: sourceColorStyle.backgroundColor }} title={task.bookSource || task.videoSource || 'Custom Task'}></div>
       <div className="ml-2">
-        <div className="flex items-center">
+        <div className="flex items-start">
           <button 
             onClick={() => onToggle(task.id)} 
-            className="mr-2 ml-1 flex-shrink-0 cursor-pointer h-6 w-6 rounded-full flex items-center justify-center"
+            className="mr-2 ml-1 flex-shrink-0 cursor-pointer h-6 w-6 rounded-full flex items-center justify-center mt-1"
             aria-label={isCompleted ? "Mark task as pending" : "Mark task as complete"}
           >
             {isCompleted ? <i className="fas fa-check-circle text-[var(--accent-green)] text-2xl"></i> : <i className="far fa-circle text-[var(--text-secondary)] hover:text-[var(--text-primary)] text-2xl"></i>}
           </button>
 
-          <div className="group relative flex-grow min-w-0 cursor-pointer" onClick={() => !isCompleted && onToggle(task.id)} role="button" tabIndex={0} onKeyDown={e => { if (e.key === ' ' || e.key === 'Enter') onToggle(task.id)}}>
-            <h4 className={`text-sm font-semibold ${titleColor} truncate ${isCompleted ? 'line-through' : ''} leading-snug`} title={displayTitle}>
+          <div className="group relative flex-grow min-w-0 cursor-pointer flex flex-col items-start" onClick={() => !isCompleted && onToggle(task.id)} role="button" tabIndex={0} onKeyDown={e => { if (e.key === ' ' || e.key === 'Enter') onToggle(task.id)}}>
+            <h4 className={`text-sm font-semibold ${titleColor} ${isCompleted ? 'line-through' : ''} leading-snug`} title={displayTitle}>
               {displayTitle}
             </h4>
             {(task.bookSource || task.videoSource) && (
-              <p className="text-xs text-[var(--text-secondary)] truncate leading-snug" title={task.bookSource || task.videoSource}>
-                {task.bookSource || task.videoSource}
-              </p>
+              <span 
+                  className="text-sm font-semibold px-2 py-0.5 rounded-md mt-1 max-w-full truncate"
+                  style={{ backgroundColor: sourceColorStyle.backgroundColor, color: sourceColorStyle.color }}
+                  title={task.bookSource || task.videoSource}
+              >
+                  {task.bookSource || task.videoSource}
+              </span>
             )}
             <div className="task-tooltip pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-200">
               <div className="font-semibold">{displayTitle}</div>
@@ -77,7 +81,7 @@ const TaskItem: React.FC<PatchedTaskItemProps> = ({ task, onToggle, isCurrentPom
             </div>
           </div>
 
-          <div className="flex flex-col items-end justify-center ml-2 flex-shrink-0 min-w-[70px]">
+          <div className="flex flex-col items-end justify-start ml-2 flex-shrink-0 min-w-[70px]">
             <div className="text-sm text-[var(--text-primary)] font-medium">
               {(task.actualStudyTimeMinutes !== undefined && task.actualStudyTimeMinutes > 0) ? (
                     <span className="text-[var(--accent-green)]" title={`Logged: ${formatDuration(task.actualStudyTimeMinutes)}`}>{formatDuration(task.durationMinutes)}</span>
