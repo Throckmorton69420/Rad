@@ -149,9 +149,10 @@ body {
   border-color: rgba(255, 255, 255, 0.4);
 }
 
-/* --- UI Chrome Elements (Header & Sidebar) --- */
+/* --- UI Chrome Elements (Header, Sidebar, and Footers) --- */
 header.glass-chrome,
-aside.glass-chrome {
+aside.glass-chrome,
+div.glass-chrome {
   background-color: var(--glass-bg-chrome);
   backdrop-filter: var(--glass-backdrop-filter);
   -webkit-backdrop-filter: var(--glass-backdrop-filter);
@@ -166,6 +167,10 @@ header.glass-chrome {
 
 aside.glass-chrome {
   border-right: 1px solid var(--separator-primary);
+}
+
+div.glass-chrome {
+  border-top: 1px solid var(--separator-primary);
 }
 
 
