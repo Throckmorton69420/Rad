@@ -574,7 +574,14 @@ const App: React.FC = () => {
           </main>
 
           {systemNotification && (
-            <div className={`flex-shrink-0 p-3 text-sm text-center flex justify-between items-center text-white ${systemNotification.type === 'error' ? 'bg-red-500/80' : 'bg-purple-500/80'} backdrop-blur-md border-t border-white/10`}>
+            <div 
+                className={`flex-shrink-0 p-3 text-sm text-center flex justify-between items-center text-white border-t border-white/10`}
+                style={{
+                    backgroundColor: systemNotification.type === 'error' ? 'rgba(255, 69, 58, 0.5)' : 'rgba(191, 90, 242, 0.5)',
+                    backdropFilter: 'var(--glass-backdrop-filter)',
+                    WebkitBackdropFilter: 'var(--glass-backdrop-filter)',
+                }}
+            >
               <span className="text-left"><i className={`fas ${systemNotification.type === 'error' ? 'fa-exclamation-circle' : 'fa-info-circle'} mr-2`}></i>{systemNotification.message}</span>
               <button onClick={() => setSystemNotification(null)} className="ml-4 font-bold text-xl leading-none" aria-label="Dismiss notification">&times;</button>
             </div>

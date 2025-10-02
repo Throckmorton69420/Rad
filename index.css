@@ -8,18 +8,18 @@
 }
 
 :root {
-  /* Dark Mode "Liquid Glass" Palette */
-  --background-primary: #0D0D0F; /* Near black for the base */
-  --glass-bg-panel: rgba(28, 28, 30, 0.75); /* Main panels, tasks */
-  --glass-bg-chrome: rgba(22, 22, 24, 0.75); /* Sidebar, header */
-  --glass-bg-hover: rgba(44, 44, 46, 0.8);
-  --glass-bg-active: rgba(60, 60, 62, 0.85);
+  /* High-Fidelity Liquid Glass Palette */
+  --background-primary: #000000;
+  --glass-bg-panel: rgba(44, 44, 46, 0.5);   /* More translucent */
+  --glass-bg-chrome: rgba(30, 30, 32, 0.6);  /* More translucent, slightly darker for hierarchy */
+  --glass-bg-hover: rgba(255, 255, 255, 0.08); /* Additive white for hover */
+  --glass-bg-active: rgba(255, 255, 255, 0.12);
 
-  --text-primary: #f5f5f7;   /* Off-white for high contrast */
-  --text-secondary: #8e8e93; /* Lighter gray for secondary text */
+  --text-primary: #f5f5f7;
+  --text-secondary: rgba(235, 235, 245, 0.6); /* Semi-transparent for "vibrancy" effect */
 
-  --separator-primary: rgba(84, 84, 88, 0.65); /* Translucent separator */
-  --separator-secondary: rgba(60, 60, 67, 0.36);
+  --separator-primary: rgba(255, 255, 255, 0.15);
+  --separator-secondary: rgba(255, 255, 255, 0.1);
 
   /* Accent Colors */
   --accent-purple: #bf5af2;
@@ -28,14 +28,15 @@
   --accent-red: #ff453a;
 
   /* UI Element Specific */
-  --input-bg: rgba(44, 44, 46, 0.8);
-  --input-border: rgba(84, 84, 88, 0.65);
-  --button-secondary-bg: rgba(44, 44, 46, 0.8);
-  --button-secondary-hover-bg: rgba(60, 60, 62, 0.9);
+  --input-bg: rgba(22, 22, 24, 0.7);
+  --input-border: rgba(255, 255, 255, 0.15);
+  --button-secondary-bg: rgba(44, 44, 46, 0.7);
+  --button-secondary-hover-bg: rgba(60, 60, 62, 0.8);
   
   /* Glass Effect Properties */
-  --glass-backdrop-filter: blur(24px) saturate(180%);
-  --glass-border-color: rgba(255, 255, 255, 0.1);
+  --glass-backdrop-filter: blur(28px) saturate(180%);
+  --glass-border-color: rgba(255, 255, 255, 0.15);
+  --glass-shadow: inset 0 1.5px 1px rgba(255, 255, 255, 0.1), 0 8px 32px rgba(0,0,0,0.3);
 
   /* Z-Indexes */
   --z-header: 40;
@@ -48,13 +49,14 @@
 body {
   font-family: 'Inter', sans-serif;
   background-color: var(--background-primary);
+  /* Darker, more vibrant aurora effect */
   background-image: 
-    radial-gradient(at 20% 20%, hsla(270, 80%, 60%, 0.3) 0px, transparent 50%),
-    radial-gradient(at 80% 20%, hsla(180, 70%, 50%, 0.25) 0px, transparent 50%),
-    radial-gradient(at 20% 80%, hsla(210, 80%, 60%, 0.25) 0px, transparent 50%),
-    radial-gradient(at 80% 80%, hsla(330, 80%, 60%, 0.3) 0px, transparent 50%);
+    radial-gradient(at 10% 20%, hsla(270, 90%, 70%, 0.2) 0px, transparent 50%),
+    radial-gradient(at 90% 10%, hsla(190, 80%, 60%, 0.25) 0px, transparent 50%),
+    radial-gradient(at 20% 90%, hsla(210, 90%, 70%, 0.25) 0px, transparent 50%),
+    radial-gradient(at 80% 80%, hsla(330, 90%, 70%, 0.2) 0px, transparent 50%);
   background-size: 200% 200%;
-  animation: aurora-bg 20s ease infinite;
+  animation: aurora-bg 25s ease infinite;
 
   color: var(--text-primary);
   overscroll-behavior: none;
@@ -75,12 +77,15 @@ body {
   -webkit-backdrop-filter: var(--glass-backdrop-filter);
   backdrop-filter: var(--glass-backdrop-filter);
   border: 1px solid var(--glass-border-color);
-  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+  box-shadow: var(--glass-shadow);
 }
+
+/* Corrected Hover Effect */
 .interactive-glow-border:hover {
-  background-color: var(--glass-bg-hover);
-  border-color: rgba(255, 255, 255, 0.2);
+  background-color: color-mix(in srgb, var(--glass-bg-panel), var(--glass-bg-hover));
+  border-color: rgba(255, 255, 255, 0.25);
 }
+
 .modal-panel {
   background-color: var(--glass-bg-chrome);
   border-radius: 12px;
