@@ -78,11 +78,17 @@ html, body {
 .background-wallpaper {
   position: fixed;
   inset: -20px; /* Overscan to prevent blurry edges on some screens */
-  z-index: -1; /* CRITICAL: Send it behind its siblings inside the #root stacking context */
+  /* z-index: -1; - REMOVED to fix a rendering bug in Safari where the wallpaper would not appear. */
   background: url('/light-stream-blue-big-sur-kf.jpg') no-repeat center center;
   background-size: cover;
   filter: blur(24px) brightness(0.6);
   transform: scale(1.1); /* Zoom in slightly to fill overscan area */
+}
+
+.main-content-wrapper {
+  position: relative;
+  z-index: 1; /* Ensures all app content renders on top of the wallpaper. */
+  isolation: isolate; /* Creates a new stacking context for the content. */
 }
 
 
