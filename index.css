@@ -42,13 +42,26 @@
   --z-notification: 110;
 }
 
-/* --- NEW, DYNAMIC MULTI-COLOR AURORA BACKGROUND --- */
-@keyframes aurora-flow {
-  0% { transform: translate(0, 0) rotate(0deg); }
-  25% { transform: translate(5vw, -10vh) rotate(30deg); }
-  50% { transform: translate(-5vw, 10vh) rotate(-30deg); }
-  75% { transform: translate(10vw, 5vh) rotate(15deg); }
-  100% { transform: translate(0, 0) rotate(0deg); }
+/* --- DYNAMIC MULTI-COLOR AURORA BACKGROUND --- */
+@keyframes move-blob-1 {
+  0%   { transform: translate(-10%, -10%) scale(1); }
+  50%  { transform: translate(20%, -30%) scale(1.2); }
+  100% { transform: translate(-10%, -10%) scale(1); }
+}
+@keyframes move-blob-2 {
+  0%   { transform: translate(15%, 20%) scale(1); }
+  50%  { transform: translate(-25%, 0%) scale(0.8); }
+  100% { transform: translate(15%, 20%) scale(1); }
+}
+@keyframes move-blob-3 {
+  0%   { transform: translate(-20%, 20%) scale(1); }
+  50%  { transform: translate(30%, 30%) scale(1.1); }
+  100% { transform: translate(-20%, 20%) scale(1); }
+}
+@keyframes move-blob-4 {
+  0%   { transform: translate(25%, -25%) scale(1); }
+  50%  { transform: translate(-15%, 15%) scale(0.9); }
+  100% { transform: translate(25%, -25%) scale(1); }
 }
 
 body {
@@ -62,22 +75,52 @@ body {
   position: relative;
 }
 
-body::before {
-  content: '';
+#aurora-background {
   position: fixed;
-  top: -50%;
-  left: -50%;
-  width: 200%;
-  height: 200%;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
   z-index: -1;
-  background-image:
-    radial-gradient(ellipse 30% 50% at 20% 30%, hsla(265, 90%, 65%, 0.5), transparent),
-    radial-gradient(ellipse 30% 50% at 80% 20%, hsla(190, 90%, 55%, 0.5), transparent),
-    radial-gradient(ellipse 30% 50% at 30% 80%, hsla(330, 85%, 60%, 0.45), transparent),
-    radial-gradient(ellipse 30% 50% at 70% 90%, hsla(210, 95%, 60%, 0.45), transparent),
-    radial-gradient(ellipse 30% 50% at 50% 50%, hsla(10, 85%, 60%, 0.4), transparent),
-    radial-gradient(ellipse 30% 50% at 90% 70%, hsla(120, 70%, 55%, 0.4), transparent);
-  animation: aurora-flow 60s ease-in-out infinite;
+  overflow: hidden;
+  filter: blur(100px) saturate(1.2);
+}
+
+.blob {
+  position: absolute;
+  border-radius: 50%;
+  opacity: 0.6;
+  will-change: transform;
+}
+
+.blob:nth-child(1) {
+  width: 50vmax; height: 50vmax;
+  top: -10%; left: -20%;
+  background: var(--accent-purple);
+  animation: move-blob-1 40s infinite alternate ease-in-out;
+}
+.blob:nth-child(2) {
+  width: 45vmax; height: 45vmax;
+  top: 10%; right: -25%;
+  background: hsl(190, 80%, 50%); /* Cyan */
+  animation: move-blob-2 45s infinite alternate ease-in-out;
+}
+.blob:nth-child(3) {
+  width: 40vmax; height: 40vmax;
+  bottom: -20%; left: 5%;
+  background: hsl(330, 80%, 60%); /* Magenta */
+  animation: move-blob-3 50s infinite alternate ease-in-out;
+}
+.blob:nth-child(4) {
+  width: 35vmax; height: 35vmax;
+  bottom: -10%; right: -15%;
+  background: hsl(145, 70%, 55%); /* Green */
+  animation: move-blob-4 55s infinite alternate ease-in-out;
+}
+/* Hide the extra blobs to keep it clean */
+.blob:nth-child(5),
+.blob:nth-child(6) {
+  display: none;
 }
 
 

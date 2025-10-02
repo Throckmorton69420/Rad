@@ -24,7 +24,7 @@ export const generateGlassMaps = ({
   height = 512,
   borderRadius = 36,
   bezelWidth = 50,
-  refractionStrength = 75,
+  refractionStrength = 100,
   highlightStrength = 1.0,
 }: {
   width?: number;
