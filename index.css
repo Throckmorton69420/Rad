@@ -132,7 +132,7 @@ body {
 }
 
 /* --- Base Panel Styling (Liquid Glass) --- */
-.glass-panel, .glass-chrome, .modal-panel, .input-base, .button-secondary, .button-ghost, .progress-bar-track, .main-content-area-glass {
+.glass-panel, .glass-chrome, .modal-panel, .input-base, .button-secondary, .button-ghost, .progress-bar-track {
   border: 1px solid var(--glass-border-color);
   box-shadow: var(--glass-sheen), var(--glass-shadow);
   transition: background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
@@ -146,13 +146,14 @@ body {
 .glass-chrome { background-color: var(--glass-bg-chrome); }
 .modal-panel { background-color: var(--glass-bg-modal); border-radius: 16px; }
 
-/* FIX: New class for the main content area to ensure it's translucent */
-.main-content-area-glass {
-  background-color: rgba(18, 18, 18, 0.4); /* More transparent */
-  border: none;
+/* FIX: Specific override for the main content area panel */
+main.glass-panel {
+  background-color: rgba(18, 18, 18, 0.4);
   border-radius: 0;
+  border: none;
   box-shadow: none;
 }
+
 
 .glass-panel-interactive:hover:not(.is-pomodoro-active) {
   background-color: var(--glass-bg-hover);
