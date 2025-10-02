@@ -493,7 +493,7 @@ const App: React.FC = () => {
         </div>
 
         <div className="flex-grow lg:pl-80 flex flex-col min-h-0">
-          <header className="flex-shrink-0 bg-[var(--background-secondary)] text-[var(--text-primary)] px-3 md:px-4 pb-3 md:pb-4 border-b border-[var(--separator-primary)] flex justify-between items-center sticky top-0 z-[var(--z-header)] pt-[calc(0.75rem+env(safe-area-inset-top))] md:pt-[calc(1rem+env(safe-area-inset-top))] pl-[calc(0.75rem+env(safe-area-inset-left))] pr-[calc(0.75rem+env(safe-area-inset-right))]">
+          <header className="flex-shrink-0 text-[var(--text-primary)] px-3 md:px-4 pb-3 md:pb-4 flex justify-between items-center sticky top-0 z-[var(--z-header)] pt-[calc(0.75rem+env(safe-area-inset-top))] md:pt-[calc(1rem+env(safe-area-inset-top))] pl-[calc(0.75rem+env(safe-area-inset-left))] pr-[calc(0.75rem+env(safe-area-inset-right))] glass-chrome">
             <div className="flex items-center">
                 <button className="lg:hidden p-2 -ml-2 mr-2 text-[var(--text-primary)] hover:bg-[var(--background-tertiary-hover)] rounded-full" onClick={() => setIsSidebarOpen(p => !p)} aria-label="Toggle menu">
                     <i className="fas fa-bars fa-lg"></i>
@@ -516,7 +516,7 @@ const App: React.FC = () => {
                 <div className="hidden sm:block">
                     <SaveStatusIndicator />
                 </div>
-                <div className="p-2 rounded-lg interactive-glow-border flex flex-col md:flex-row md:items-center md:space-x-4 gap-y-1">
+                <div className="p-2 rounded-lg flex flex-col md:flex-row md:items-center md:space-x-4 gap-y-1">
                   {studyPlan.firstPassEndDate && (
                     <div className="text-right">
                       <div className="text-xs text-slate-400">First Pass Ends</div>

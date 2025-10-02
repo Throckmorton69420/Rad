@@ -22,9 +22,9 @@ function roundedRect(ctx: CanvasRenderingContext2D, x: number, y: number, width:
 export const generateGlassMaps = ({
   width = 512,
   height = 512,
-  borderRadius = 32,
-  bezelWidth = 40,
-  refractionStrength = 30,
+  borderRadius = 36,
+  bezelWidth = 50,
+  refractionStrength = 60,
   highlightStrength = 0.7,
 }: {
   width?: number;
@@ -83,7 +83,7 @@ export const generateGlassMaps = ({
       const index = (y * width + x) * 4;
       if (distToBezel >= 0 && distToBezel <= bezelWidth) {
         const normalizedDist = 1 - (distToBezel / bezelWidth);
-        const magnitude = Math.sin(normalizedDist * Math.PI / 2) * refractionStrength;
+        const magnitude = Math.pow(normalizedDist, 1.5) * refractionStrength;
         
         data[index] = 128 - normalX * magnitude; // Red channel for X displacement
         data[index + 1] = 128 - normalY * magnitude; // Green channel for Y displacement

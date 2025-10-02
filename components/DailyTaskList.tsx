@@ -112,7 +112,7 @@ const DailyTaskList: React.FC<DailyTaskListProps> = ({
         </div>
       </div>
 
-      <div className="sticky bottom-0 pt-3 bg-[var(--background-secondary)] border-t border-[var(--glass-border-color)] pb-[calc(1rem+env(safe-area-inset-bottom))]">
+      <div className="sticky bottom-0 pt-3 glass-chrome pb-[calc(1rem+env(safe-area-inset-bottom))]">
         <div className="flex space-x-2">
           <Button onClick={onOpenModifyDayModal} variant="primary" className="flex-grow">
             <i className="fas fa-edit mr-2"></i> Modify Schedule

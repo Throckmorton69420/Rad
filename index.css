@@ -10,11 +10,11 @@
   --link-color: hsl(210, 100%, 75%);
 
   /* --- Glass Materials --- */
-  --glass-bg-panel: rgba(36, 36, 38, 0.5);
-  --glass-bg-chrome: rgba(28, 28, 30, 0.55);
-  --glass-bg-modal: rgba(44, 44, 46, 0.6);
-  --glass-bg-hover: rgba(68, 68, 70, 0.65);
-  --glass-bg-active: rgba(90, 70, 110, 0.7);
+  --glass-bg-panel: rgba(36, 36, 38, 0.65);
+  --glass-bg-chrome: rgba(28, 28, 30, 0.7);
+  --glass-bg-modal: rgba(44, 44, 46, 0.75);
+  --glass-bg-hover: rgba(68, 68, 70, 0.7);
+  --glass-bg-active: rgba(90, 70, 110, 0.75);
 
   /* --- Core Liquid Glass Effect --- */
   /* Applies a URL-referenced SVG filter for refraction. */
@@ -22,9 +22,9 @@
 
   /* --- Glass Edges & Depth --- */
   --glass-border-color: rgba(255, 255, 255, 0.12);
-  --glass-sheen: inset 0 1.5px 1px 0 rgba(255, 255, 255, 0.08);
+  --glass-sheen: inset 0 0 0 1px rgba(255, 255, 255, 0.07), inset 0 1.5px 1px 0 rgba(255, 255, 255, 0.1);
   /* Enhanced shadow for more depth and a "floating" feel. */
-  --glass-shadow: 0 12px 48px rgba(0, 0, 0, 0.45);
+  --glass-shadow: 0 12px Vercel - Reverted Radiology Core Exam Study Planner_index_css_1.css(20,20) rgba(0, 0, 0, 0.45);
 
   /* --- Other UI Elements --- */
   --separator-primary: rgba(255, 255, 255, 0.12);
