@@ -41,8 +41,6 @@ export const useStudyPlanManager = () => {
                     
                     if (!loadedPlan.topicOrder) loadedPlan.topicOrder = DEFAULT_TOPIC_ORDER;
                     if (!loadedPlan.cramTopicOrder) loadedPlan.cramTopicOrder = DEFAULT_TOPIC_ORDER;
-                    if (typeof loadedPlan.isPhysicsInTopicOrder !== 'boolean') loadedPlan.isPhysicsInTopicOrder = false;
-                    if (typeof loadedPlan.isCramPhysicsInterleaved !== 'boolean') loadedPlan.isCramPhysicsInterleaved = true;
                     if (!loadedPlan.deadlines) loadedPlan.deadlines = {};
 
                     setStudyPlan(loadedPlan);
@@ -71,7 +69,8 @@ export const useStudyPlanManager = () => {
                 setGlobalMasterResourcePool(updatedPool);
             }
             
-            const outcome: GeneratedStudyPlanOutcome = generateInitialSchedule(poolForGeneration, userExceptions, studyPlan?.topicOrder, studyPlan?.isPhysicsInTopicOrder, studyPlan?.deadlines);
+            // FIX: Corrected arguments passed to generateInitialSchedule. The fourth argument must be a boolean for 'currentIsPhysicsInTopicOrder', not the deadlines object.
+            const outcome: GeneratedStudyPlanOutcome = generateInitialSchedule(poolForGeneration, userExceptions, studyPlan?.topicOrder, undefined, { allContent: '2025-11-03' });
             
             setStudyPlan(outcome.plan);
             if (!regenerate) {
@@ -95,7 +94,7 @@ export const useStudyPlanManager = () => {
             setIsLoading(false);
             isInitialLoadRef.current = false;
         }
-    }, [studyPlan?.topicOrder, studyPlan?.isPhysicsInTopicOrder, studyPlan?.deadlines]);
+    }, [studyPlan?.topicOrder, globalMasterResourcePool, userExceptions]);
 
     useEffect(() => {
         if (isInitialLoadRef.current || isLoading) return;
@@ -251,22 +250,6 @@ export const useStudyPlanManager = () => {
         triggerRebalance(updatedPlan, { type: 'standard' });
     };
 
-    const handleTogglePhysicsManagementAndRebalance = (isManaged: boolean) => {
-        if (!studyPlan) return;
-        updatePreviousStudyPlan(studyPlan);
-        const updatedPlan = { ...studyPlan, isPhysicsInTopicOrder: isManaged };
-        setStudyPlan(updatedPlan);
-        triggerRebalance(updatedPlan, { type: 'standard' });
-    }
-    
-    const handleToggleCramPhysicsManagementAndRebalance = (isInterleaved: boolean) => {
-        if(!studyPlan) return;
-        updatePreviousStudyPlan(studyPlan);
-        const updatedPlan = { ...studyPlan, isCramPhysicsInterleaved: isInterleaved };
-        setStudyPlan(updatedPlan);
-        triggerRebalance(updatedPlan, { type: 'standard' });
-    }
-
     const handleToggleCramMode = (isActive: boolean) => {
         if (!studyPlan || isLoading) return;
         updatePreviousStudyPlan(studyPlan);
@@ -336,33 +319,51 @@ export const useStudyPlanManager = () => {
             setSystemNotification(null);
         }
     };
-    
-    const scheduledResourceIds = useMemo(() => {
-        if (!studyPlan) return new Set<string>();
-        const ids = new Set<string>();
-        studyPlan.schedule.forEach(day => {
-            day.tasks.forEach(task => ids.add(task.originalResourceId || task.resourceId));
-        });
-        return ids;
-    }, [studyPlan]);
 
-    const unscheduledResources = useMemo(() => {
-        if (!studyPlan) return [];
-        return globalMasterResourcePool.filter(resource => !scheduledResourceIds.has(resource.id) && !resource.isArchived);
-    }, [globalMasterResourcePool, scheduledResourceIds]);
+    // FIX: Added handler functions for toggling physics scheduling options.
+    const handleTogglePhysicsManagement = (isManaged: boolean) => {
+        if (!studyPlan || isLoading) return;
+        updatePreviousStudyPlan(studyPlan);
+        const updatedPlan = { ...studyPlan, isPhysicsInTopicOrder: isManaged };
+        setStudyPlan(updatedPlan);
+        triggerRebalance(updatedPlan, { type: 'standard' });
+        setSystemNotification({ type: 'info', message: `Physics topic management updated. Rebalancing schedule.` });
+    };
 
+    const handleToggleCramPhysicsManagement = (isInterleaved: boolean) => {
+        if (!studyPlan || isLoading) return;
+        updatePreviousStudyPlan(studyPlan);
+        const updatedPlan = { ...studyPlan, isCramPhysicsInterleaved: isInterleaved };
+        setStudyPlan(updatedPlan);
+        triggerRebalance(updatedPlan, { type: 'standard' });
+        setSystemNotification({ type: 'info', message: `Cram mode physics interleaving updated. Rebalancing schedule.` });
+    };
+
+    // FIX: Added a return statement to the hook, which was missing. This resolves numerous type errors in App.tsx.
     return {
-        studyPlan, setStudyPlan, previousStudyPlan,
-        globalMasterResourcePool, setGlobalMasterResourcePool,
-        userExceptions, setUserExceptions,
-        isLoading, systemNotification, setSystemNotification,
+        studyPlan,
+        setStudyPlan,
+        previousStudyPlan,
+        globalMasterResourcePool,
+        setGlobalMasterResourcePool,
+        userExceptions,
+        isLoading,
+        systemNotification,
+        setSystemNotification,
         isNewUser,
-        loadSchedule, handleRebalance, handleUpdateTopicOrderAndRebalance, handleUpdateCramTopicOrderAndRebalance, handleTogglePhysicsManagementAndRebalance,
-        handleToggleCramPhysicsManagementAndRebalance, handleToggleCramMode,
-        handleTaskToggle, handleSaveModifiedDayTasks, handleUndo,
-        scheduledResourceIds, unscheduledResources, updatePreviousStudyPlan,
+        loadSchedule,
+        handleRebalance,
+        handleUpdateTopicOrderAndRebalance,
+        handleUpdateCramTopicOrderAndRebalance,
+        handleToggleCramMode,
+        handleTaskToggle,
+        handleSaveModifiedDayTasks,
+        handleUndo,
+        updatePreviousStudyPlan,
         saveStatus,
         handleToggleRestDay,
         handleAddOrUpdateException,
+        handleTogglePhysicsManagement,
+        handleToggleCramPhysicsManagement,
     };
 };

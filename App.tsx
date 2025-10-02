@@ -37,14 +37,16 @@ const App: React.FC = () => {
     userExceptions,
     isLoading, systemNotification, setSystemNotification,
     isNewUser,
-    loadSchedule, handleRebalance, handleUpdateTopicOrderAndRebalance, handleUpdateCramTopicOrderAndRebalance, handleTogglePhysicsManagementAndRebalance,
-    handleToggleCramPhysicsManagementAndRebalance,
+    loadSchedule, handleRebalance, handleUpdateTopicOrderAndRebalance, handleUpdateCramTopicOrderAndRebalance,
     handleToggleCramMode,
     handleTaskToggle, handleSaveModifiedDayTasks, handleUndo,
     updatePreviousStudyPlan,
     saveStatus,
     handleToggleRestDay,
     handleAddOrUpdateException,
+    // FIX: Added new handlers for physics management from the study plan manager hook.
+    handleTogglePhysicsManagement,
+    handleToggleCramPhysicsManagement,
   } = useStudyPlanManager();
 
   const {
@@ -265,7 +267,6 @@ const App: React.FC = () => {
     e.preventDefault();
   };
 
-  // FIX: Add taskId parameter to match the expected prop type in DailyTaskListProps.
   const onTaskDragStart = (e: React.DragEvent<HTMLDivElement>, taskId: string) => {
      showConfirmation({
         title: "Modify Schedule?",
@@ -369,11 +370,12 @@ const App: React.FC = () => {
                         cramTopicOrder={studyPlan.cramTopicOrder}
                         onSaveCramOrder={handleUpdateCramTopicOrderAndRebalance}
                         isLoading={isLoading} 
-                        isPhysicsInTopicOrder={studyPlan.isPhysicsInTopicOrder}
-                        onTogglePhysicsManagement={handleTogglePhysicsManagementAndRebalance}
                         isCramModeActive={studyPlan.isCramModeActive ?? false}
-                        isCramPhysicsInterleaved={studyPlan.isCramPhysicsInterleaved}
-                        onToggleCramPhysicsManagement={handleToggleCramPhysicsManagementAndRebalance}
+                        // FIX: Pass down state and handlers for physics scheduling management.
+                        isPhysicsInTopicOrder={studyPlan.isPhysicsInTopicOrder ?? false}
+                        onTogglePhysicsManagement={handleTogglePhysicsManagement}
+                        isCramPhysicsInterleaved={studyPlan.isCramPhysicsInterleaved ?? true}
+                        onToggleCramPhysicsManagement={handleToggleCramPhysicsManagement}
                         />
                     </div>
                   )}

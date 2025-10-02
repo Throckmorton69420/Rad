@@ -1,4 +1,5 @@
 
+
 import { StudyResource, ResourceType, Domain } from '../types';
 
 export const addResourceToGlobalPool = (
@@ -766,7 +767,6 @@ const discordVideos = [
     {"category": "CHEST", "title": "Dr. Sanjeev Bhalla, Cardiac Case Review", "duration": "01:00:12"},
     {"category": "CHEST", "title": "Dr. Sanjeev Bhalla, Cardiac Case Review 2", "duration": "01:00:30"},
     {"category": "PHYSICS", "title": "Dr. Tim Szczykutowicz, Physics Review", "duration": "01:04:36"},
-    {"category": "NIS", "title": "Dr. Tim Szczykutowicz, NIS Review", "duration": "01:01:36"},
     {"category": "IR", "title": "Dr. Michael D. Darcy, IR Case Review", "duration": "00:56:51"},
     {"category": "IR", "title": "Dr. Michael D. Darcy, IR Case Review 2", "duration": "01:02:08"},
     {"category": "IR", "title": "Dr. Jeffrey Chick, University of Washington", "duration": "01:00:23"},

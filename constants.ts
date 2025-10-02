@@ -34,20 +34,19 @@ export const PROGRESS_UPDATE_INTERVAL_MS = 250; // Made faster for a better UI f
 
 export const APP_TITLE = "Radiology Core Exam Planner";
 
-// Default order for studying topics. Physics is foundational.
+// Default order for studying topics, based on user-provided course structure.
+// Physics and Nucs are handled separately and interleaved throughout the schedule.
 export const DEFAULT_TOPIC_ORDER: Domain[] = [
-    Domain.PHYSICS,
-    Domain.BREAST_IMAGING,
     Domain.GASTROINTESTINAL_IMAGING,
     Domain.GENITOURINARY_IMAGING,
     Domain.THORACIC_IMAGING,
-    Domain.CARDIOVASCULAR_IMAGING,
     Domain.MUSCULOSKELETAL_IMAGING,
     Domain.NEURORADIOLOGY,
     Domain.PEDIATRIC_RADIOLOGY,
-    Domain.NUCLEAR_MEDICINE,
-    Domain.ULTRASOUND_IMAGING,
+    Domain.CARDIOVASCULAR_IMAGING,
+    Domain.BREAST_IMAGING,
     Domain.INTERVENTIONAL_RADIOLOGY,
+    Domain.ULTRASOUND_IMAGING,
     Domain.NIS,
     Domain.RISC,
 ];
