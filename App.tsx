@@ -574,7 +574,7 @@ const App: React.FC = () => {
           </main>
 
           {systemNotification && (
-            <div className={`flex-shrink-0 p-3 text-sm text-center flex justify-between items-center ${systemNotification.type === 'error' ? 'bg-red-800/90 text-red-100' : 'bg-purple-800/90 text-purple-100'} backdrop-blur-sm border-t border-white/10`}>
+            <div className={`flex-shrink-0 p-3 text-sm text-center flex justify-between items-center ${systemNotification.type === 'error' ? 'bg-red-900/60 text-red-100' : 'bg-purple-900/60 text-purple-100'} backdrop-blur-md border-t border-white/10`}>
               <span className="text-left"><i className={`fas ${systemNotification.type === 'error' ? 'fa-exclamation-circle' : 'fa-info-circle'} mr-2`}></i>{systemNotification.message}</span>
               <button onClick={() => setSystemNotification(null)} className="ml-4 font-bold text-xl leading-none" aria-label="Dismiss notification">&times;</button>
             </div>

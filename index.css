@@ -1,45 +1,45 @@
 :root {
   /* Core Palette */
   --text-primary: #f5f5f7;
-  --text-secondary: rgba(235, 235, 245, 0.6);
+  --text-secondary: rgba(235, 235, 245, 0.65);
   --text-placeholder: rgba(235, 235, 245, 0.4);
 
   /* Accents */
   --accent-purple: #c084fc; 
-  --accent-purple-glow: hsla(262, 92%, 77%, 0.4);
+  --accent-purple-glow: hsla(262, 92%, 77%, 0.3);
   --accent-green: #32D74B;
   --accent-red: #FF453A;
   --accent-yellow: #FFD60A;
   
-  /* --- Corrected Glass UI System --- */
-  /* Main panels like task lists, progress cards */
-  --glass-bg-panel: rgba(30, 30, 30, 0.75);
-  /* Hover state for main panels */
-  --glass-bg-panel-hover: rgba(45, 45, 45, 0.8);
-  /* Sidebar and Header for hierarchy */
-  --glass-bg-chrome: rgba(18, 18, 18, 0.8);
+  /* --- True Liquid Glass UI System --- */
+  /* Main content panels (e.g., calendar, task items) */
+  --glass-bg-panel: rgba(40, 40, 40, 0.6);
+  /* Hover state for interactive panels */
+  --glass-bg-panel-hover: rgba(55, 55, 55, 0.7);
+  /* App chrome (sidebar, header, sticky footers) */
+  --glass-bg-chrome: rgba(28, 28, 30, 0.7);
+  
   /* Buttons */
   --glass-bg-button-primary: hsla(262, 92%, 77%, 0.25);
   --glass-bg-button-primary-hover: hsla(262, 92%, 77%, 0.4);
   --glass-bg-button-secondary: rgba(80, 80, 80, 0.5);
   --glass-bg-button-secondary-hover: rgba(100, 100, 100, 0.6);
   
+  /* Core Glass Properties */
   --glass-backdrop-blur: blur(24px) saturate(180%);
-  --glass-border-color: rgba(255, 255, 255, 0.1);
-  --glass-border-color-hover: rgba(255, 255, 255, 0.25);
-  --glass-inner-highlight: inset 0 1px 1px 0 rgba(255, 255, 255, 0.05);
+  --glass-border-color: rgba(255, 255, 255, 0.08);
+  --glass-border-color-hover: rgba(255, 255, 255, 0.2);
+  /* The crucial inner highlight for the "sheen" effect */
+  --glass-inner-highlight: inset 0 1px 1px 0 rgba(255, 255, 255, 0.08);
 
-  /* Mappings for components */
+  /* Mappings for components (simplifies class usage) */
   --background-secondary: var(--glass-bg-chrome);
   --background-tertiary: var(--glass-bg-panel);
   --background-tertiary-hover: var(--glass-bg-panel-hover);
-  --glass-background-panel: var(--glass-bg-panel);
-  --glass-background-button: var(--glass-bg-button-primary);
-  --glass-background-button-hover: var(--glass-bg-button-primary-hover);
 
-  /* Separators */
-  --separator-primary: rgba(84, 84, 88, 0.65);
-  --separator-secondary: rgba(84, 84, 88, 0.4);
+  /* Separators - now using the glass border for consistency */
+  --separator-primary: var(--glass-border-color);
+  --separator-secondary: rgba(255, 255, 255, 0.05);
 
   /* Sizing & Z-Index */
   --border-radius-sm: 10px;
@@ -56,7 +56,7 @@
 /* --- 1. Base Setup & Wallpaper --- */
 html {
   height: 100%;
-  background-color: #0a0a0c; /* Fallback and base background color */
+  background-color: #0a0a0c;
 }
 
 body {
@@ -66,53 +66,38 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   -webkit-tap-highlight-color: transparent;
-  overflow: hidden; /* Prevent body from scrolling */
-  background-color: #0a0a0c; /* Ensure body has the dark base */
+  overflow: hidden;
+  background-color: #0a0a0c;
 }
 
-
-/* 
-  This pseudo-element creates a dynamic, blurred, aurora-like background using CSS gradients.
-  It is animated to give a subtle sense of motion.
-*/
 @keyframes moveGradients {
   0% { background-position: 0% 50%; }
   50% { background-position: 100% 50%; }
   100% { background-position: 0% 50%; }
 }
 
+/* Darker, more subtle aurora background */
 body::before {
   content: '';
   position: fixed;
-  inset: 0;
+  inset: -10px; /* Overscan to prevent hard edges from blur */
   z-index: 0;
   
-  /* Darker, higher-contrast gradient for a "dark mode" aurora effect */
   background-image: 
-    radial-gradient(at 20% 20%, hsla(220, 90%, 40%, 0.25) 0px, transparent 50%),
-    radial-gradient(at 80% 20%, hsla(180, 80%, 30%, 0.25) 0px, transparent 50%),
-    radial-gradient(at 50% 50%, hsla(340, 80%, 45%, 0.2) 0px, transparent 50%),
-    radial-gradient(at 80% 80%, hsla(30, 90%, 40%, 0.25) 0px, transparent 50%),
-    radial-gradient(at 20% 80%, hsla(265, 85%, 45%, 0.3) 0px, transparent 50%);
+    radial-gradient(at 15% 25%, hsla(265, 50%, 25%, 0.2) 0px, transparent 50%),
+    radial-gradient(at 80% 30%, hsla(180, 50%, 25%, 0.15) 0px, transparent 50%),
+    radial-gradient(at 50% 60%, hsla(280, 40%, 30%, 0.1) 0px, transparent 50%),
+    radial-gradient(at 85% 85%, hsla(210, 50%, 30%, 0.15) 0px, transparent 50%),
+    radial-gradient(at 20% 80%, hsla(340, 50%, 25%, 0.15) 0px, transparent 50%);
   
-  background-size: 200% 200%; /* Make background larger than viewport for animation */
-  
-  /* Blur and dim the effect for a darker feel */
-  filter: blur(80px) brightness(0.7);
-  
-  /* Animate the background position for a slow, flowing effect */
-  animation: moveGradients 30s ease infinite;
-  
-  /* Slightly scale up to prevent blurred edges from showing */
-  transform: scale(1.1);
+  background-size: 250% 250%;
+  filter: blur(100px) brightness(0.6);
+  animation: moveGradients 45s ease infinite;
 }
-
 
 #root {
   height: 100%;
-  background-color: transparent; /* Must be transparent to see the background layer */
-  
-  /* Creates a stacking context to ensure content is above the ::before pseudo-element */
+  background-color: transparent;
   position: relative;
   isolation: isolate;
   z-index: 1;
@@ -145,7 +130,7 @@ header, aside {
   background-color: var(--glass-bg-chrome);
   -webkit-backdrop-filter: var(--glass-backdrop-blur);
   backdrop-filter: var(--glass-backdrop-blur);
-  border-color: var(--glass-border-color); /* Uses border-right/bottom */
+  border-color: var(--glass-border-color);
 }
 
 /* Buttons */
@@ -157,10 +142,11 @@ header, aside {
 }
 .button-primary {
   background-color: var(--glass-bg-button-primary);
+  border-color: hsla(262, 92%, 77%, 0.4);
 }
 .button-primary:hover {
   background-color: var(--glass-bg-button-primary-hover);
-  border-color: var(--glass-border-color-hover);
+  border-color: hsla(262, 92%, 77%, 0.6);
 }
 .button-secondary {
   background-color: var(--glass-bg-button-secondary);
@@ -170,12 +156,12 @@ header, aside {
   border-color: var(--glass-border-color-hover);
 }
 .button-danger {
-  background-color: hsla(4, 80%, 50%, 0.5);
-  border-color: hsla(4, 80%, 60%, 0.5);
+  background-color: hsla(4, 70%, 50%, 0.5);
+  border-color: hsla(4, 70%, 60%, 0.5);
 }
 .button-danger:hover {
-  background-color: hsla(4, 80%, 50%, 0.7);
-  border-color: hsla(4, 80%, 60%, 0.7);
+  background-color: hsla(4, 70%, 50%, 0.7);
+  border-color: hsla(4, 70%, 60%, 0.7);
 }
 .button-ghost {
   background-color: transparent;
@@ -190,7 +176,7 @@ header, aside {
 
 /* Modals */
 .modal-panel {
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
+  box-shadow: var(--glass-inner-highlight), 0 25px 50px -12px rgba(0, 0, 0, 0.5);
 }
 
 /* Forms */
