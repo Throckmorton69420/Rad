@@ -67,6 +67,22 @@ body {
   -moz-osx-font-smoothing: grayscale;
   -webkit-tap-highlight-color: transparent;
   overflow: hidden; /* Prevent body scrolling */
+  
+  /* Apply the background image directly to the body */
+  background: url('/light-stream-blue-big-sur-kf.jpg') no-repeat center center fixed;
+  background-size: cover;
+}
+
+/* Create a pseudo-element overlay for the blur effect */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  /* This sits behind the #root content but on top of the body's background */
+  z-index: 0; 
+  /* Use backdrop-filter for a more performant and stable blur effect */
+  -webkit-backdrop-filter: blur(24px) brightness(60%);
+  backdrop-filter: blur(24px) brightness(60%);
 }
 
 #root {
@@ -76,20 +92,11 @@ body {
   /* CRITICAL: Create a new stacking context. */
   position: relative;
   isolation: isolate;
-  /* This must have a higher z-index than the wallpaper to appear on top. */
+  /* This must have a higher z-index than the body::before overlay to appear on top. */
   z-index: 1;
 }
 
-.background-wallpaper {
-  position: fixed;
-  inset: -20px; /* Overscan to prevent blurry edges on some screens */
-  /* This sits on the base layer. z-index: -1 is avoided as it can render behind the body entirely. */
-  z-index: 0;
-  background: url('/light-stream-blue-big-sur-kf.jpg') no-repeat center center;
-  background-size: cover;
-  filter: blur(24px) brightness(0.6);
-  transform: scale(1.1); /* Zoom in slightly to fill overscan area */
-}
+/* The old .background-wallpaper class is no longer needed and has been removed. */
 
 
 /* --- 2. Glass Panel System --- */
