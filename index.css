@@ -52,8 +52,6 @@ html {
 }
 
 body {
-  position: relative; /* Establish stacking context for the pseudo-element */
-  overflow: hidden; /* To contain the scaled pseudo-element */
   min-height: 100vh; /* Fallback for older browsers */
   min-height: 100dvh; /* Modern, dynamic viewport height */
   -webkit-tap-highlight-color: transparent;
