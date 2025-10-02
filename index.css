@@ -56,7 +56,7 @@
 /* --- 1. Base Setup & Wallpaper --- */
 html {
   height: 100%;
-  background-color: #000; /* Fallback background color */
+  background-color: #0a0a0c; /* Fallback and base background color */
 }
 
 body {
@@ -67,31 +67,46 @@ body {
   -moz-osx-font-smoothing: grayscale;
   -webkit-tap-highlight-color: transparent;
   overflow: hidden; /* Prevent body from scrolling */
-  /* The background image is now handled by the ::before pseudo-element */
+  background-color: #0a0a0c; /* Ensure body has the dark base */
 }
 
+
 /* 
-  This pseudo-element acts as the dedicated background layer.
-  It is fixed to the viewport, displays the wallpaper, and applies a blur effect.
-  The main content in #root sits on top of this layer.
+  This pseudo-element creates a dynamic, blurred, aurora-like background using CSS gradients.
+  It is animated to give a subtle sense of motion.
 */
+@keyframes moveGradients {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
 body::before {
   content: '';
   position: fixed;
   inset: 0;
-  z-index: 0; /* Sits behind the main content */
+  z-index: 0;
   
-  /* Image is applied here from the variable set in App.tsx */
-  background-image: var(--wallpaper-url);
-  background-position: center center;
-  background-size: cover;
+  /* A complex layered gradient to mimic the desired abstract image */
+  background-image: 
+    radial-gradient(at 20% 20%, hsla(217, 100%, 50%, 0.3) 0px, transparent 50%),
+    radial-gradient(at 80% 20%, hsla(180, 100%, 40%, 0.3) 0px, transparent 50%),
+    radial-gradient(at 50% 50%, hsla(340, 90%, 50%, 0.2) 0px, transparent 50%),
+    radial-gradient(at 80% 80%, hsla(40, 100%, 50%, 0.3) 0px, transparent 50%),
+    radial-gradient(at 20% 80%, hsla(260, 100%, 60%, 0.4) 0px, transparent 50%);
+  
+  background-size: 200% 200%; /* Make background larger than viewport for animation */
   
   /* Blur and dim the image */
-  filter: blur(16px) brightness(60%);
+  filter: blur(80px) brightness(1);
+  
+  /* Animate the background position for a slow, flowing effect */
+  animation: moveGradients 30s ease infinite;
   
   /* Slightly scale up to prevent blurred edges from showing */
-  transform: scale(1.05);
+  transform: scale(1.1);
 }
+
 
 #root {
   height: 100%;
