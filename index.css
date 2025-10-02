@@ -10,11 +10,11 @@
   --link-color: hsl(210, 100%, 75%);
 
   /* --- Glass Materials --- */
-  --glass-bg-panel: rgba(36, 36, 38, 0.65);
-  --glass-bg-chrome: rgba(28, 28, 30, 0.7);
-  --glass-bg-modal: rgba(44, 44, 46, 0.75);
-  --glass-bg-hover: rgba(68, 68, 70, 0.7);
-  --glass-bg-active: rgba(90, 70, 110, 0.75);
+  --glass-bg-panel: rgba(36, 36, 38, 0.8);
+  --glass-bg-chrome: rgba(28, 28, 30, 0.8);
+  --glass-bg-modal: rgba(44, 44, 46, 0.85);
+  --glass-bg-hover: rgba(68, 68, 70, 0.8);
+  --glass-bg-active: rgba(90, 70, 110, 0.85);
 
   /* --- Core Liquid Glass Effect --- */
   /* Applies a URL-referenced SVG filter for refraction. */
@@ -22,9 +22,9 @@
 
   /* --- Glass Edges & Depth --- */
   --glass-border-color: rgba(255, 255, 255, 0.12);
-  --glass-sheen: inset 0 0 0 1px rgba(255, 255, 255, 0.07), inset 0 1.5px 1px 0 rgba(255, 255, 255, 0.1);
-  /* Enhanced shadow for more depth and a "floating" feel. */
-  --glass-shadow: 0 12px Vercel - Reverted Radiology Core Exam Study Planner_index_css_1.css(20,20) rgba(0, 0, 0, 0.45);
+  --glass-sheen: inset 0 1.5px 1px 0 rgba(255, 255, 255, 0.2), inset 0 0 0 1px rgba(255, 255, 255, 0.15);
+  /* Softened shadow for a lighter feel. */
+  --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
 
   /* --- Other UI Elements --- */
   --separator-primary: rgba(255, 255, 255, 0.12);
@@ -75,19 +75,28 @@ body {
 }
 
 /* --- Base Panel Styling (Liquid Glass) --- */
-.glass-panel, .glass-chrome, .modal-panel {
-  -webkit-backdrop-filter: var(--glass-backdrop-filter);
-  backdrop-filter: var(--glass-backdrop-filter);
+.glass-panel, .glass-chrome, .modal-panel, .input-base, .button-secondary, .button-ghost, .progress-bar-track {
   border: 1px solid var(--glass-border-color);
   box-shadow: var(--glass-sheen), var(--glass-shadow);
   transition: background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
   border-radius: 12px;
 }
-.glass-panel { background-color: var(--glass-bg-panel); }
-.glass-chrome { background-color: var(--glass-bg-chrome); }
+
+.glass-panel { 
+  background-color: var(--glass-bg-panel); 
+  backdrop-filter: var(--glass-backdrop-filter);
+  -webkit-backdrop-filter: var(--glass-backdrop-filter);
+}
+.glass-chrome { 
+  background-color: var(--glass-bg-chrome); 
+  backdrop-filter: var(--glass-backdrop-filter);
+  -webkit-backdrop-filter: var(--glass-backdrop-filter);
+}
 .modal-panel { 
   background-color: var(--glass-bg-modal);
   border-radius: 16px; 
+  backdrop-filter: var(--glass-backdrop-filter);
+  -webkit-backdrop-filter: var(--glass-backdrop-filter);
 }
 .glass-panel-interactive:hover:not(.is-pomodoro-active) {
   background-color: var(--glass-bg-hover);
@@ -123,11 +132,14 @@ body {
 /* --- UI Chrome --- */
 .bg-\[\--background-secondary\] {
   background-color: var(--glass-bg-chrome) !important;
-  -webkit-backdrop-filter: var(--glass-backdrop-filter);
   backdrop-filter: var(--glass-backdrop-filter);
+  -webkit-backdrop-filter: var(--glass-backdrop-filter);
   border-radius: 0;
   box-shadow: none;
+  border: none;
+  border-right: 1px solid var(--separator-primary);
 }
+
 .border-\[\--separator-primary\] { border-color: var(--separator-primary) !important; }
 
 .sidebar-content-area {
@@ -141,11 +153,11 @@ body {
 .button-base { border: none; cursor: pointer; -webkit-tap-highlight-color: transparent; user-select: none; }
 .button-primary { background-color: var(--button-primary-bg); }
 .button-primary:hover:not(:disabled) { background-color: color-mix(in srgb, var(--button-primary-bg), #fff 15%); }
-.button-secondary { background-color: var(--button-secondary-bg); border: 1px solid var(--glass-border-color); -webkit-backdrop-filter: var(--glass-backdrop-filter); backdrop-filter: var(--glass-backdrop-filter); }
+.button-secondary { background-color: var(--button-secondary-bg); border: 1px solid var(--glass-border-color); backdrop-filter: var(--glass-backdrop-filter); -webkit-backdrop-filter: var(--glass-backdrop-filter); }
 .button-secondary:hover:not(:disabled) { background-color: var(--button-secondary-hover-bg); }
 .button-danger { background-color: var(--button-danger-bg); }
 .button-danger:hover:not(:disabled) { background-color: color-mix(in srgb, var(--button-danger-bg), #fff 15%); }
-.button-ghost { background-color: transparent; box-shadow: none; border: none; -webkit-backdrop-filter: var(--glass-backdrop-filter); backdrop-filter: var(--glass-backdrop-filter); }
+.button-ghost { background-color: transparent; box-shadow: none; border: none; backdrop-filter: var(--glass-backdrop-filter); -webkit-backdrop-filter: var(--glass-backdrop-filter); }
 .button-ghost:hover:not(:disabled) { background-color: rgba(191, 90, 242, 0.15); }
 
 /* --- Inputs & Selections --- */
@@ -153,8 +165,8 @@ body {
   width: 100%; padding: 0.5rem 0.75rem; background-color: var(--input-bg);
   border: 1px solid var(--input-border); border-radius: 0.5rem; color: var(--text-primary);
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
-  -webkit-backdrop-filter: var(--glass-backdrop-filter);
   backdrop-filter: var(--glass-backdrop-filter);
+  -webkit-backdrop-filter: var(--glass-backdrop-filter);
 }
 .input-base:focus {
   outline: none; border-color: var(--accent-purple);
@@ -169,8 +181,8 @@ body {
 /* --- Progress Bar --- */
 .progress-bar-track {
   background-color: rgba(0,0,0,0.2);
-  -webkit-backdrop-filter: var(--glass-backdrop-filter);
   backdrop-filter: var(--glass-backdrop-filter);
+  -webkit-backdrop-filter: var(--glass-backdrop-filter);
 }
 .progress-bar-fill {
   background-image: linear-gradient(45deg, var(--accent-purple), color-mix(in srgb, var(--accent-purple), #fff 30%));

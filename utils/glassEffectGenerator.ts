@@ -24,8 +24,8 @@ export const generateGlassMaps = ({
   height = 512,
   borderRadius = 36,
   bezelWidth = 50,
-  refractionStrength = 60,
-  highlightStrength = 0.7,
+  refractionStrength = 70,
+  highlightStrength = 0.9,
 }: {
   width?: number;
   height?: number;
@@ -83,7 +83,8 @@ export const generateGlassMaps = ({
       const index = (y * width + x) * 4;
       if (distToBezel >= 0 && distToBezel <= bezelWidth) {
         const normalizedDist = 1 - (distToBezel / bezelWidth);
-        const magnitude = Math.pow(normalizedDist, 1.5) * refractionStrength;
+        // Using a stronger power curve concentrates the effect near the edge.
+        const magnitude = Math.pow(normalizedDist, 2.5) * refractionStrength;
         
         data[index] = 128 - normalX * magnitude; // Red channel for X displacement
         data[index + 1] = 128 - normalY * magnitude; // Green channel for Y displacement
@@ -115,17 +116,17 @@ export const generateGlassMaps = ({
   highCtx.save();
   roundedRect(highCtx, 2, 2, width - 4, height - 4, borderRadius - 2);
   highCtx.strokeStyle = `rgba(255, 255, 255, ${highlightStrength})`;
-  highCtx.lineWidth = 2;
-  highCtx.filter = 'blur(4px)';
+  highCtx.lineWidth = 2.5;
+  highCtx.filter = 'blur(5px)';
   highCtx.stroke();
   highCtx.restore();
 
   // Create a sharper inner line
   highCtx.save();
   roundedRect(highCtx, 1.5, 1.5, width - 3, height - 3, borderRadius - 1.5);
-  highCtx.strokeStyle = `rgba(255, 255, 255, ${highlightStrength * 0.5})`;
+  highCtx.strokeStyle = `rgba(255, 255, 255, ${highlightStrength * 0.6})`;
   highCtx.lineWidth = 1;
-  highCtx.filter = 'blur(1px)';
+  highCtx.filter = 'blur(2px)';
   highCtx.stroke();
   highCtx.restore();
 
@@ -133,7 +134,7 @@ export const generateGlassMaps = ({
   highCtx.globalCompositeOperation = 'destination-in';
   const gradient = highCtx.createLinearGradient(0, 0, 0, height);
   gradient.addColorStop(0, `rgba(255, 255, 255, 1)`);
-  gradient.addColorStop(0.3, `rgba(255, 255, 255, 0)`);
+  gradient.addColorStop(0.4, `rgba(255, 255, 255, 0)`);
   highCtx.fillStyle = gradient;
   highCtx.fillRect(0, 0, width, height);
 
