@@ -53,19 +53,22 @@ html {
 }
 
 body {
-  position: relative; /* Establish stacking context */
-  isolation: isolate; /* Cleaner stacking context */
   min-height: 100vh; /* Fallback for older browsers */
   min-height: 100dvh; /* Modern, dynamic viewport height */
   -webkit-tap-highlight-color: transparent;
-  /* background-color removed to let pseudo-element show through */
   color: var(--text-primary);
   font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-body::before {
+#root {
+  height: 100%;
+  position: relative;
+  isolation: isolate;
+}
+
+#root::before {
   content: '';
   position: fixed;
   left: -5%;
@@ -73,13 +76,9 @@ body::before {
   width: 110%;
   height: 110%;
   z-index: -1;
-  background: url('/light-stream-blue-big-sur-kf.jpg') no-repeat center center;
+  background: url('light-stream-blue-big-sur-kf.jpg') no-repeat center center;
   background-size: cover;
   filter: blur(16px) brightness(0.6);
-}
-
-#root {
-  height: 100%;
 }
 
 h1, h2 {
