@@ -25,12 +25,18 @@ const ProgressItem: React.FC<{label: string; percentage: number; completed: numb
   </div>
 );
 
-const DeadlineItem: React.FC<{ label: string; deadline?: string; projected: string; onTrack: boolean }> = ({ label, deadline, projected, onTrack }) => (
+const DeadlineItem: React.FC<{ label: string; deadline?: string; projected: string | null; onTrack: boolean }> = ({ label, deadline, projected, onTrack }) => (
     <div className="flex justify-between items-center text-sm py-1.5 border-b border-[var(--separator-secondary)]">
         <span className="text-[var(--text-primary)]">{label}</span>
         <div className="text-right">
-            <span className={`font-bold ${onTrack ? 'text-[var(--accent-green)]' : 'text-[var(--accent-red)]'}`} title="Projected Completion Date">{projected}</span>
-            {deadline && <span className="text-xs text-[var(--text-secondary)] ml-2" title="Your Target Deadline">(Target: {deadline})</span>}
+            <span className={`font-bold ${onTrack ? 'text-[var(--accent-green)]' : 'text-[var(--accent-red)]'}`} title="Projected Completion Date">
+              {projected ? parseDateString(projected).toLocaleDateString('en-US', { timeZone: 'UTC', month: 'short', day: 'numeric' }) : 'N/A'}
+            </span>
+            {deadline && (
+              <span className="text-xs text-[var(--text-secondary)] ml-2" title="Your Target Deadline">
+                (Target: {parseDateString(deadline).toLocaleDateString('en-US', { timeZone: 'UTC', month: 'short', day: 'numeric' })})
+              </span>
+            )}
         </div>
     </div>
 );
@@ -59,13 +65,13 @@ const ProgressDisplay: React.FC<ProgressDisplayProps> = ({ studyPlan }) => {
   const overallProgressPercentage = totalScheduledMinutes > 0 ? (totalCompletedMinutes / totalScheduledMinutes) * 100 : 0;
 
   const projectedDates = useMemo(() => {
-    const findLastDate = (filterFn: (task: any) => boolean) => {
+    const findLastDate = (filterFn: (task: any) => boolean): string | null => {
         for (let i = studyPlan.schedule.length - 1; i >= 0; i--) {
             if (studyPlan.schedule[i].tasks.some(filterFn)) {
-                return parseDateString(studyPlan.schedule[i].date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                return studyPlan.schedule[i].date; // Return full YYYY-MM-DD string
             }
         }
-        return 'N/A';
+        return null;
     };
 
     return {
@@ -76,9 +82,9 @@ const ProgressDisplay: React.FC<ProgressDisplayProps> = ({ studyPlan }) => {
     };
   }, [studyPlan.schedule]);
 
-  const isOnTrack = (deadline?: string, projected?: string) => {
-    if (!deadline || !projected || projected === 'N/A') return true;
-    return new Date(projected) <= new Date(deadline);
+  const isOnTrack = (deadline?: string, projected?: string | null) => {
+    if (!deadline || !projected) return true;
+    return parseDateString(projected) <= parseDateString(deadline);
   };
   
   // --- Intelligent Hierarchical Filtering ---

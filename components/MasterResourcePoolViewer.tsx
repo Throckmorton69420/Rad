@@ -2,7 +2,6 @@ import React, { useState, useMemo } from 'react';
 import { StudyResource, Domain, ResourceType } from '../types';
 import { Button } from './Button';
 import { formatDuration, getDomainColorStyle } from '../utils/timeFormatter';
-// FIX: Corrected typo in ALL_DOMAINS import.
 import { ALL_DOMAINS } from '../constants';
 import CustomSelect from '../CustomSelect';
 
