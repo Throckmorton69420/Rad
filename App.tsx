@@ -339,7 +339,6 @@ const App: React.FC = () => {
     }
   };
 
-  // FIX: Moved SidebarContent before MainAppContent to fix "used before its declaration" error.
   const SidebarContent = (
       <aside className={`w-80 bg-[var(--background-secondary)] text-[var(--text-secondary)] border-r border-[var(--separator-primary)] flex flex-col h-dvh isolated-scroll`}>
         <div className="flex-grow flex flex-col min-h-0">
