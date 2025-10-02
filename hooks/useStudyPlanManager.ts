@@ -39,9 +39,14 @@ export const useStudyPlanManager = () => {
                     const loadedData = data.plan_data as PlanDataBlob;
                     const loadedPlan = loadedData.plan;
                     
+                    // Backwards compatibility checks
                     if (!loadedPlan.topicOrder) loadedPlan.topicOrder = DEFAULT_TOPIC_ORDER;
                     if (!loadedPlan.cramTopicOrder) loadedPlan.cramTopicOrder = DEFAULT_TOPIC_ORDER;
                     if (!loadedPlan.deadlines) loadedPlan.deadlines = {};
+                    if (loadedPlan.areSpecialTopicsInterleaved === undefined) {
+                        loadedPlan.areSpecialTopicsInterleaved = true;
+                    }
+
 
                     setStudyPlan(loadedPlan);
                     setGlobalMasterResourcePool(loadedData.resources);
@@ -258,6 +263,15 @@ export const useStudyPlanManager = () => {
         setSystemNotification({ type: 'info', message: `Cram mode ${isActive ? 'activated' : 'deactivated'}. Rebalancing schedule.` });
     };
 
+    const handleToggleSpecialTopicsInterleaving = (isActive: boolean) => {
+        if (!studyPlan || isLoading) return;
+        updatePreviousStudyPlan(studyPlan);
+        const updatedPlan = { ...studyPlan, areSpecialTopicsInterleaved: isActive };
+        setStudyPlan(updatedPlan);
+        triggerRebalance(updatedPlan, { type: 'standard' });
+        setSystemNotification({ type: 'info', message: `Interleaving is now ${isActive ? 'ON' : 'OFF'}. Rebalancing...` });
+    };
+
     const handleTaskToggle = (taskId: string, selectedDate: string) => {
         setStudyPlan((prevPlan): StudyPlan | null => {
             if (!prevPlan) return null;
@@ -335,6 +349,7 @@ export const useStudyPlanManager = () => {
         handleUpdateTopicOrderAndRebalance,
         handleUpdateCramTopicOrderAndRebalance,
         handleToggleCramMode,
+        handleToggleSpecialTopicsInterleaving,
         handleTaskToggle,
         handleSaveModifiedDayTasks,
         handleUndo,

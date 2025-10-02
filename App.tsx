@@ -39,6 +39,7 @@ const App: React.FC = () => {
     isNewUser,
     loadSchedule, handleRebalance, handleUpdateTopicOrderAndRebalance, handleUpdateCramTopicOrderAndRebalance,
     handleToggleCramMode,
+    handleToggleSpecialTopicsInterleaving,
     handleTaskToggle, handleSaveModifiedDayTasks, handleUndo,
     updatePreviousStudyPlan,
     saveStatus,
@@ -368,6 +369,8 @@ const App: React.FC = () => {
                         onSaveCramOrder={handleUpdateCramTopicOrderAndRebalance}
                         isLoading={isLoading} 
                         isCramModeActive={studyPlan.isCramModeActive ?? false}
+                        areSpecialTopicsInterleaved={studyPlan.areSpecialTopicsInterleaved}
+                        onToggleSpecialTopicsInterleaving={handleToggleSpecialTopicsInterleaving}
                         />
                     </div>
                   )}

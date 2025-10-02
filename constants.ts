@@ -34,8 +34,8 @@ export const PROGRESS_UPDATE_INTERVAL_MS = 250; // Made faster for a better UI f
 
 export const APP_TITLE = "Radiology Core Exam Planner";
 
-// Default order for studying topics, based on user-provided course structure.
-// Physics and Nucs are handled separately and interleaved throughout the schedule.
+// Default order for studying topics. Physics and Nucs are included here as a fallback
+// if the user disables the default interleaving behavior.
 export const DEFAULT_TOPIC_ORDER: Domain[] = [
     Domain.GASTROINTESTINAL_IMAGING,
     Domain.GENITOURINARY_IMAGING,
@@ -47,6 +47,8 @@ export const DEFAULT_TOPIC_ORDER: Domain[] = [
     Domain.BREAST_IMAGING,
     Domain.INTERVENTIONAL_RADIOLOGY,
     Domain.ULTRASOUND_IMAGING,
+    Domain.PHYSICS,
+    Domain.NUCLEAR_MEDICINE,
     Domain.NIS,
     Domain.RISC,
 ];

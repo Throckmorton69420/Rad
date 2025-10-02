@@ -6,15 +6,15 @@ const TopicOrderManager: React.FC<TopicOrderManagerProps> = ({
   topicOrder, onSaveOrder, 
   cramTopicOrder = [], onSaveCramOrder,
   isLoading, 
-  isCramModeActive
+  isCramModeActive,
+  areSpecialTopicsInterleaved,
+  onToggleSpecialTopicsInterleaving
 }) => {
   const [localOrder, setLocalOrder] = useState<Domain[]>(topicOrder);
   const [draggedDomain, setDraggedDomain] = useState<Domain | null>(null);
   const dragItem = useRef<Domain | null>(null);
 
-  const nonDraggableTopics: Domain[] = [
-      Domain.PHYSICS,
-      Domain.NUCLEAR_MEDICINE,
+  const nonDraggableBaseTopics: Domain[] = [
       Domain.MIXED_REVIEW, 
       Domain.FINAL_REVIEW, 
       Domain.QUESTION_BANK_CATCHUP, 
@@ -110,23 +110,38 @@ const TopicOrderManager: React.FC<TopicOrderManagerProps> = ({
       onSaveOrder(localOrder);
     }
   };
+  
+  const isDirty = JSON.stringify(localOrder) !== JSON.stringify(isCramModeActive ? cramTopicOrder : topicOrder);
 
   return (
     <div className="p-4 rounded-lg space-y-3 bg-[var(--background-tertiary)] interactive-glow-border">
       <h3 className="text-md font-semibold mb-1 text-[var(--text-primary)]">
         {isCramModeActive ? 'Cram Mode Topic Order' : 'Topic Order Manager'}
       </h3>
-      <p className="text-xs text-[var(--text-secondary)] mb-2">Drag and drop to set your preferred study order. Physics and Nuclear Medicine are automatically interleaved and cannot be reordered.</p>
+      <p className="text-xs text-[var(--text-secondary)] mb-2">Drag to set your study order. Disabling interleaving will schedule Physics/Nucs in large blocks based on their order below.</p>
+      
+      <div className="p-3 bg-purple-900/20 rounded-md space-y-2 border border-purple-800/50">
+          <label className="flex items-center justify-between text-sm text-purple-200 cursor-pointer font-semibold">
+              <span><i className="fas fa-random mr-2"></i> Interleave Physics & Nucs</span>
+               <label className="ios-switch">
+                    <input type="checkbox" checked={areSpecialTopicsInterleaved} onChange={(e) => onToggleSpecialTopicsInterleaving(e.target.checked)} id="interleave-toggle"/>
+                    <span className="slider"></span>
+                </label>
+          </label>
+          <p className="text-xxs text-purple-400/80 px-1">Recommended. Schedules topics in smaller, regular chunks.</p>
+      </div>
       
       <ul onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}>
         {localOrder.map((domain) => {
-          const isDraggable = !nonDraggableTopics.includes(domain);
+          const isSpecialInterleavedTopic = areSpecialTopicsInterleaved && (domain === Domain.PHYSICS || domain === Domain.NUCLEAR_MEDICINE);
+          const isDraggable = !nonDraggableBaseTopics.includes(domain) && !isSpecialInterleavedTopic;
           const isDragging = draggedDomain === domain;
+
           return (
             <li
               key={domain}
               data-domain={domain}
-              className={`topic-list-item flex items-center p-1.5 rounded-md backdrop-blur-lg relative interactive-glow-border ${isDraggable ? 'bg-[var(--background-tertiary)]' : 'bg-[var(--background-tertiary)] opacity-70'} ${isDragging ? 'is-dragging' : ''}`}
+              className={`topic-list-item flex items-center p-1.5 rounded-md backdrop-blur-lg relative interactive-glow-border ${isDraggable ? 'bg-[var(--background-tertiary)]' : 'bg-black/20 opacity-70'} ${isDragging ? 'is-dragging' : ''}`}
               onDragOver={(e) => isDraggable && handleDragOver(e)}
             >
               <div 
@@ -143,7 +158,7 @@ const TopicOrderManager: React.FC<TopicOrderManagerProps> = ({
           );
         })}
       </ul>
-      <Button onClick={handleSave} className="w-full mt-3" variant="primary" size="sm" disabled={isLoading}>
+      <Button onClick={handleSave} className="w-full mt-3" variant="primary" size="sm" disabled={isLoading || !isDirty}>
         <i className="fas fa-save mr-2"></i> Save Order & Rebalance
       </Button>
     </div>

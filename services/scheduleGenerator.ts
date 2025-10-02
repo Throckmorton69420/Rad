@@ -94,7 +94,7 @@ const runSchedulingEngine = (
     options?: RebalanceOptions
 ): GeneratedStudyPlanOutcome['notifications'] => {
     
-    const { deadlines = {}, topicOrder = [], isCramModeActive, cramTopicOrder = [] } = planConfig;
+    const { deadlines = {}, topicOrder = [], isCramModeActive, cramTopicOrder = [], areSpecialTopicsInterleaved = true } = planConfig;
     const notifications: GeneratedStudyPlanOutcome['notifications'] = [];
 
     // --- 1. BUDGET ADJUSTMENT PASS based on deadlines ---
@@ -121,15 +121,14 @@ const runSchedulingEngine = (
 
     // --- 2. TASK SCHEDULING PASS ---
     // A. Categorize resources
-    let physicsTasks = sortResources(resourcePool.filter(r => r.domain === Domain.PHYSICS));
-    let nucMedTasks = sortResources(resourcePool.filter(r => r.domain === Domain.NUCLEAR_MEDICINE));
+    let physicsTasks = areSpecialTopicsInterleaved ? sortResources(resourcePool.filter(r => r.domain === Domain.PHYSICS)) : [];
+    let nucMedTasks = areSpecialTopicsInterleaved ? sortResources(resourcePool.filter(r => r.domain === Domain.NUCLEAR_MEDICINE)) : [];
     const finalReviewTasks = sortResources(resourcePool.filter(r => r.domain === Domain.FINAL_REVIEW));
     
-    const mainTopicTasks = sortResources(resourcePool.filter(r => 
-        r.domain !== Domain.PHYSICS &&
-        r.domain !== Domain.NUCLEAR_MEDICINE &&
-        r.domain !== Domain.FINAL_REVIEW
-    )).sort((a, b) => {
+    const mainTopicTasks = sortResources(resourcePool.filter(r => {
+        const isSpecialTopic = r.domain === Domain.PHYSICS || r.domain === Domain.NUCLEAR_MEDICINE;
+        return r.domain !== Domain.FINAL_REVIEW && (!areSpecialTopicsInterleaved || !isSpecialTopic);
+    })).sort((a, b) => {
         const order = isCramModeActive ? cramTopicOrder : topicOrder;
         const topicIndexA = order.indexOf(a.domain);
         const topicIndexB = order.indexOf(b.domain);
@@ -137,8 +136,7 @@ const runSchedulingEngine = (
         return (a.sequenceOrder ?? Infinity) - (b.sequenceOrder ?? Infinity);
     });
 
-
-    // B. Schedule day by day with interleaving
+    // B. Schedule day by day
     let workdayCounter = 0;
     const physicsFrequency = 2; // every 2 workdays
     const nucMedFrequency = 3;  // every 3 workdays
@@ -175,16 +173,17 @@ const runSchedulingEngine = (
         
         let availableTime = day.totalStudyTimeMinutes;
 
-        // Interleave Physics
-        if (workdayCounter % physicsFrequency === 0 && physicsTasks.length > 0) {
-            const timeForBlock = Math.min(interleaveBlockSize, availableTime);
-            if(timeForBlock > 0) availableTime -= scheduleTaskBlock(day, physicsTasks, timeForBlock);
-        }
+        // Conditional Interleaving
+        if (areSpecialTopicsInterleaved) {
+            if (workdayCounter % physicsFrequency === 0 && physicsTasks.length > 0) {
+                const timeForBlock = Math.min(interleaveBlockSize, availableTime);
+                if (timeForBlock > 0) availableTime -= scheduleTaskBlock(day, physicsTasks, timeForBlock);
+            }
 
-        // Interleave Nuclear Medicine
-        if (workdayCounter % nucMedFrequency === 0 && nucMedTasks.length > 0) {
-            const timeForBlock = Math.min(interleaveBlockSize, availableTime);
-            if(timeForBlock > 0) availableTime -= scheduleTaskBlock(day, nucMedTasks, timeForBlock);
+            if (workdayCounter % nucMedFrequency === 0 && nucMedTasks.length > 0) {
+                const timeForBlock = Math.min(interleaveBlockSize, availableTime);
+                if (timeForBlock > 0) availableTime -= scheduleTaskBlock(day, nucMedTasks, timeForBlock);
+            }
         }
 
         // Fill remaining time with main topic tasks
@@ -257,7 +256,7 @@ export const generateInitialSchedule = (
     masterResourcePool: StudyResource[], 
     userAddedExceptions: ExceptionDateRule[],
     currentTopicOrder?: Domain[],
-    deadlines?: DeadlineSettings
+    deadlines?: DeadlineSettings,
 ): GeneratedStudyPlanOutcome => {
     console.log("[Scheduler Engine] Starting initial schedule generation.");
     const schedulingPool = JSON.parse(JSON.stringify(masterResourcePool.filter(r => !r.isArchived)));
@@ -267,6 +266,7 @@ export const generateInitialSchedule = (
         cramTopicOrder: currentTopicOrder || DEFAULT_TOPIC_ORDER,
         isCramModeActive: false,
         deadlines: deadlines || {},
+        areSpecialTopicsInterleaved: true, // Default to true for new plans
     };
 
     const schedule = createScheduleShell(STUDY_START_DATE, STUDY_END_DATE, userAddedExceptions);
@@ -291,6 +291,7 @@ export const generateInitialSchedule = (
         cramTopicOrder: planConfig.cramTopicOrder,
         isCramModeActive: planConfig.isCramModeActive,
         deadlines: planConfig.deadlines,
+        areSpecialTopicsInterleaved: planConfig.areSpecialTopicsInterleaved,
     };
 
     let firstPassEndDate: string | undefined = undefined;

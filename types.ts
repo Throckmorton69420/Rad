@@ -148,6 +148,7 @@ export interface StudyPlan {
   cramTopicOrder: Domain[];
   isCramModeActive?: boolean;
   deadlines: DeadlineSettings;
+  areSpecialTopicsInterleaved: boolean;
 }
 
 export interface ExceptionDateRule {
@@ -278,6 +279,8 @@ export interface TopicOrderManagerProps {
   onSaveCramOrder?: (newOrder: Domain[]) => void;
   isLoading: boolean;
   isCramModeActive: boolean;
+  areSpecialTopicsInterleaved: boolean;
+  onToggleSpecialTopicsInterleaving: (isActive: boolean) => void;
 }
 
 export interface AdvancedControlsProps {
