@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { DailySchedule, StudyPlan, ScheduledTask, PomodoroSettings, ViewMode, Domain, ResourceType, AddTaskModalProps, StudyResource, ResourceEditorModalProps, ExceptionDateRule, DeadlineSettings, RebalanceOptions, ShowConfirmationOptions } from './types';
 import { EXAM_DATE_START, APP_TITLE, ALL_DOMAINS, POMODORO_DEFAULT_STUDY_MINS, POMODORO_DEFAULT_REST_MINS } from './constants';
 import { addResourceToGlobalPool } from './services/studyResources';
+import { generateGlassMaps } from './utils/glassEffectGenerator';
 
 import { usePersistentState } from './hooks/usePersistentState';
 import { useStudyPlanManager } from './hooks/useStudyPlanManager';
@@ -191,6 +192,28 @@ const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'schedule' | 'progress' | 'content'>('schedule');
   const [highlightedDates, setHighlightedDates] = useState<string[]>([]);
   const [isPomodoroCollapsed, setIsPomodoroCollapsed] = usePersistentState('radiology_pomodoro_collapsed', true);
+
+  useEffect(() => {
+    // Generate maps for a generic panel size. This is a compromise as we can't
+    // generate a map for every single element's unique size.
+    const { displacement, highlight } = generateGlassMaps({
+      width: 400,
+      height: 600,
+      borderRadius: 16,
+      bezelWidth: 30,
+      refractionStrength: 25,
+      highlightStrength: 0.7
+    });
+
+    // FIX: Cast to unknown first to satisfy TypeScript's type checking for SVG elements.
+    const displacementEl = document.getElementById('displacementMapImage') as unknown as SVGImageElement | null;
+    // FIX: Cast to unknown first to satisfy TypeScript's type checking for SVG elements.
+    const highlightEl = document.getElementById('specularHighlightImage') as unknown as SVGImageElement | null;
+
+    if (displacementEl) displacementEl.setAttribute('href', displacement);
+    if (highlightEl) highlightEl.setAttribute('href', highlight);
+    
+  }, []);
 
   useEffect(() => {
     loadSchedule();

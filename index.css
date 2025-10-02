@@ -17,9 +17,8 @@
   --glass-bg-active: rgba(90, 70, 110, 0.7);
 
   /* --- Core Liquid Glass Effect --- */
-  /* Applies a base blur and saturation, then a URL-referenced SVG filter for refraction. */
-  /* Browsers that don't support url() in backdrop-filter will gracefully fall back to the blur. */
-  --glass-backdrop-filter: blur(12px) saturate(150%) url(#liquid-glass-filter);
+  /* Applies a URL-referenced SVG filter for refraction. */
+  --glass-backdrop-filter: url(#liquid-glass-advanced);
 
   /* --- Glass Edges & Depth --- */
   --glass-border-color: rgba(255, 255, 255, 0.12);
