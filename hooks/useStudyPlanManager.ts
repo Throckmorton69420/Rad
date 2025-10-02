@@ -69,8 +69,7 @@ export const useStudyPlanManager = () => {
                 setGlobalMasterResourcePool(updatedPool);
             }
             
-            // FIX: Corrected arguments passed to generateInitialSchedule. The fourth argument must be a boolean for 'currentIsPhysicsInTopicOrder', not the deadlines object.
-            const outcome: GeneratedStudyPlanOutcome = generateInitialSchedule(poolForGeneration, userExceptions, studyPlan?.topicOrder, undefined, { allContent: '2025-11-03' });
+            const outcome: GeneratedStudyPlanOutcome = generateInitialSchedule(poolForGeneration, userExceptions, studyPlan?.topicOrder, { allContent: '2025-11-03' });
             
             setStudyPlan(outcome.plan);
             if (!regenerate) {
@@ -320,26 +319,6 @@ export const useStudyPlanManager = () => {
         }
     };
 
-    // FIX: Added handler functions for toggling physics scheduling options.
-    const handleTogglePhysicsManagement = (isManaged: boolean) => {
-        if (!studyPlan || isLoading) return;
-        updatePreviousStudyPlan(studyPlan);
-        const updatedPlan = { ...studyPlan, isPhysicsInTopicOrder: isManaged };
-        setStudyPlan(updatedPlan);
-        triggerRebalance(updatedPlan, { type: 'standard' });
-        setSystemNotification({ type: 'info', message: `Physics topic management updated. Rebalancing schedule.` });
-    };
-
-    const handleToggleCramPhysicsManagement = (isInterleaved: boolean) => {
-        if (!studyPlan || isLoading) return;
-        updatePreviousStudyPlan(studyPlan);
-        const updatedPlan = { ...studyPlan, isCramPhysicsInterleaved: isInterleaved };
-        setStudyPlan(updatedPlan);
-        triggerRebalance(updatedPlan, { type: 'standard' });
-        setSystemNotification({ type: 'info', message: `Cram mode physics interleaving updated. Rebalancing schedule.` });
-    };
-
-    // FIX: Added a return statement to the hook, which was missing. This resolves numerous type errors in App.tsx.
     return {
         studyPlan,
         setStudyPlan,
@@ -363,7 +342,5 @@ export const useStudyPlanManager = () => {
         saveStatus,
         handleToggleRestDay,
         handleAddOrUpdateException,
-        handleTogglePhysicsManagement,
-        handleToggleCramPhysicsManagement,
     };
 };

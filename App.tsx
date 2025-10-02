@@ -44,9 +44,6 @@ const App: React.FC = () => {
     saveStatus,
     handleToggleRestDay,
     handleAddOrUpdateException,
-    // FIX: Added new handlers for physics management from the study plan manager hook.
-    handleTogglePhysicsManagement,
-    handleToggleCramPhysicsManagement,
   } = useStudyPlanManager();
 
   const {
@@ -371,11 +368,6 @@ const App: React.FC = () => {
                         onSaveCramOrder={handleUpdateCramTopicOrderAndRebalance}
                         isLoading={isLoading} 
                         isCramModeActive={studyPlan.isCramModeActive ?? false}
-                        // FIX: Pass down state and handlers for physics scheduling management.
-                        isPhysicsInTopicOrder={studyPlan.isPhysicsInTopicOrder ?? false}
-                        onTogglePhysicsManagement={handleTogglePhysicsManagement}
-                        isCramPhysicsInterleaved={studyPlan.isCramPhysicsInterleaved ?? true}
-                        onToggleCramPhysicsManagement={handleToggleCramPhysicsManagement}
                         />
                     </div>
                   )}

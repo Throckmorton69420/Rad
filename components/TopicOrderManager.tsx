@@ -6,16 +6,15 @@ const TopicOrderManager: React.FC<TopicOrderManagerProps> = ({
   topicOrder, onSaveOrder, 
   cramTopicOrder = [], onSaveCramOrder,
   isLoading, 
-  isPhysicsInTopicOrder, onTogglePhysicsManagement,
-  isCramModeActive,
-  isCramPhysicsInterleaved, onToggleCramPhysicsManagement
+  isCramModeActive
 }) => {
   const [localOrder, setLocalOrder] = useState<Domain[]>(topicOrder);
   const [draggedDomain, setDraggedDomain] = useState<Domain | null>(null);
   const dragItem = useRef<Domain | null>(null);
 
   const nonDraggableTopics: Domain[] = [
-      ...((isCramModeActive && !isCramPhysicsInterleaved) || (!isCramModeActive && isPhysicsInTopicOrder) ? [] : [Domain.PHYSICS]),
+      Domain.PHYSICS,
+      Domain.NUCLEAR_MEDICINE,
       Domain.MIXED_REVIEW, 
       Domain.FINAL_REVIEW, 
       Domain.QUESTION_BANK_CATCHUP, 
@@ -117,28 +116,8 @@ const TopicOrderManager: React.FC<TopicOrderManagerProps> = ({
       <h3 className="text-md font-semibold mb-1 text-[var(--text-primary)]">
         {isCramModeActive ? 'Cram Mode Topic Order' : 'Topic Order Manager'}
       </h3>
-      <p className="text-xs text-[var(--text-secondary)] mb-2">Drag and drop to set your preferred study order.</p>
-
-      {!isCramModeActive && (
-        <label className="flex items-center justify-between text-sm text-[var(--text-primary)] cursor-pointer p-2 bg-[var(--background-tertiary)] rounded-lg backdrop-blur-lg">
-            <span>Interleave Physics</span>
-            <label className="ios-switch">
-              <input type="checkbox" checked={!isPhysicsInTopicOrder} onChange={(e) => onTogglePhysicsManagement(!e.target.checked)} />
-              <span className="slider"></span>
-            </label>
-        </label>
-      )}
-
-      {isCramModeActive && (
-        <label className="flex items-center justify-between text-sm text-[var(--text-primary)] cursor-pointer p-2 bg-[var(--background-tertiary)] rounded-lg backdrop-blur-lg">
-            <span>Interleave Physics</span>
-            <label className="ios-switch">
-              <input type="checkbox" checked={isCramPhysicsInterleaved} onChange={(e) => onToggleCramPhysicsManagement(e.target.checked)} />
-              <span className="slider"></span>
-            </label>
-        </label>
-      )}
-
+      <p className="text-xs text-[var(--text-secondary)] mb-2">Drag and drop to set your preferred study order. Physics and Nuclear Medicine are automatically interleaved and cannot be reordered.</p>
+      
       <ul onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}>
         {localOrder.map((domain) => {
           const isDraggable = !nonDraggableTopics.includes(domain);

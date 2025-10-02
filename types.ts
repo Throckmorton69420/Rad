@@ -148,9 +148,6 @@ export interface StudyPlan {
   cramTopicOrder: Domain[];
   isCramModeActive?: boolean;
   deadlines: DeadlineSettings;
-  // FIX: Added missing properties to StudyPlan type.
-  isPhysicsInTopicOrder?: boolean;
-  isCramPhysicsInterleaved?: boolean;
 }
 
 export interface ExceptionDateRule {
@@ -281,11 +278,6 @@ export interface TopicOrderManagerProps {
   onSaveCramOrder?: (newOrder: Domain[]) => void;
   isLoading: boolean;
   isCramModeActive: boolean;
-  // FIX: Added missing properties to support physics management toggles.
-  isPhysicsInTopicOrder?: boolean;
-  onTogglePhysicsManagement?: (isManaged: boolean) => void;
-  isCramPhysicsInterleaved?: boolean;
-  onToggleCramPhysicsManagement?: (isInterleaved: boolean) => void;
 }
 
 export interface AdvancedControlsProps {

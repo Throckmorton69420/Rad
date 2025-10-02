@@ -87,85 +87,6 @@ const sortResources = (pool: StudyResource[]): StudyResource[] => {
     });
 };
 
-const runCramModeScheduling = (
-    scheduleShell: DailySchedule[], 
-    resourcePool: StudyResource[], 
-    cramTopicOrder: Domain[], 
-    isCramPhysicsInterleaved: boolean
-) => {
-    console.log("Running CRAM mode scheduling. Physics Interleaved:", isCramPhysicsInterleaved);
-    const allCramVideos = resourcePool.filter(r => r.videoSource === 'Crack the Core - Titan Radiology Videos');
-    const otherTasks = resourcePool.filter(r => r.videoSource !== 'Crack the Core - Titan Radiology Videos');
-
-    let physicsVideos: StudyResource[] = [];
-    let nonPhysicsVideos: StudyResource[];
-
-    if (isCramPhysicsInterleaved) {
-        physicsVideos = sortResources(allCramVideos.filter(v => v.domain === Domain.PHYSICS));
-        nonPhysicsVideos = allCramVideos.filter(v => v.domain !== Domain.PHYSICS);
-    } else {
-        nonPhysicsVideos = allCramVideos;
-    }
-
-    const topicOrderMap = new Map(cramTopicOrder.map((domain, index) => [domain, index]));
-
-    const sortedNonPhysicsVideos = nonPhysicsVideos.sort((a, b) => {
-        const orderA = topicOrderMap.get(a.domain) ?? Infinity;
-        const orderB = topicOrderMap.get(b.domain) ?? Infinity;
-        if (orderA !== orderB) return orderA - orderB;
-        return (a.sequenceOrder ?? Infinity) - (b.sequenceOrder ?? Infinity);
-    });
-
-    let allTasksToSchedule = [...sortedNonPhysicsVideos, ...sortResources(otherTasks)];
-    let workdayCounter = 0;
-    const physicsFrequency = 2;
-    const physicsTimeSlot = 60;
-    let nextPhysicsTaskIndex = 0;
-
-    for (const day of scheduleShell) {
-        if (day.isRestDay) continue;
-        workdayCounter++;
-        let availableTime = day.totalStudyTimeMinutes;
-
-        if (isCramPhysicsInterleaved && (workdayCounter % physicsFrequency === 0) && nextPhysicsTaskIndex < physicsVideos.length && availableTime > 0) {
-            let timeForPhysics = Math.min(physicsTimeSlot, availableTime);
-            if (timeForPhysics >= MIN_DURATION_for_SPLIT_PART) {
-                const taskToSchedule = physicsVideos[nextPhysicsTaskIndex];
-                if (taskToSchedule.durationMinutes <= timeForPhysics) {
-                    day.tasks.push(mapResourceToTask(taskToSchedule, day.tasks.length));
-                    availableTime -= taskToSchedule.durationMinutes;
-                    nextPhysicsTaskIndex++;
-                } else {
-                    const split = splitTask(taskToSchedule, timeForPhysics);
-                    if (split) {
-                        day.tasks.push(mapResourceToTask(split.part1, day.tasks.length));
-                        availableTime -= split.part1.durationMinutes;
-                        physicsVideos[nextPhysicsTaskIndex] = split.part2;
-                    }
-                }
-            }
-        }
-
-        while (availableTime > 0 && allTasksToSchedule.length > 0) {
-            const taskToSchedule = allTasksToSchedule[0];
-            if (taskToSchedule.durationMinutes <= availableTime) {
-                day.tasks.push(mapResourceToTask(taskToSchedule, day.tasks.length));
-                availableTime -= taskToSchedule.durationMinutes;
-                allTasksToSchedule.shift();
-            } else {
-                if (!taskToSchedule.isSplittable || availableTime < MIN_DURATION_for_SPLIT_PART) break;
-                const split = splitTask(taskToSchedule, availableTime);
-                if (split) {
-                    day.tasks.push(mapResourceToTask(split.part1, day.tasks.length));
-                    availableTime -= split.part1.durationMinutes;
-                    allTasksToSchedule[0] = split.part2;
-                } else break;
-            }
-        }
-    }
-};
-
-
 const runSchedulingEngine = (
     scheduleShell: DailySchedule[], 
     resourcePool: StudyResource[], 
@@ -173,119 +94,102 @@ const runSchedulingEngine = (
     options?: RebalanceOptions
 ): GeneratedStudyPlanOutcome['notifications'] => {
     
+    const { deadlines = {}, topicOrder = [], isCramModeActive, cramTopicOrder = [] } = planConfig;
     const notifications: GeneratedStudyPlanOutcome['notifications'] = [];
-    const { deadlines = {}, isCramModeActive, cramTopicOrder = [], isCramPhysicsInterleaved, topicOrder = [], isPhysicsInTopicOrder } = planConfig;
-
-    if (isCramModeActive) {
-        runCramModeScheduling(scheduleShell, resourcePool, cramTopicOrder, !!isCramPhysicsInterleaved);
-        return notifications;
-    }
 
     // --- 1. BUDGET ADJUSTMENT PASS based on deadlines ---
-    const primaryResources = resourcePool.filter(r => r.isPrimaryMaterial);
-    const jobs: { category: string, resources: StudyResource[], deadline?: string }[] = [
-        { category: 'physics', resources: primaryResources.filter(r => r.domain === Domain.PHYSICS), deadline: deadlines.physicsContent },
-        { category: 'nucMed', resources: primaryResources.filter(r => r.domain === Domain.NUCLEAR_MEDICINE), deadline: deadlines.nucMedContent },
-        { category: 'other', resources: primaryResources.filter(r => r.domain !== Domain.PHYSICS && r.domain !== Domain.NUCLEAR_MEDICINE), deadline: deadlines.otherContent }
-    ];
-    if (deadlines.allContent) {
-        jobs.push({ category: 'all', resources: primaryResources, deadline: deadlines.allContent });
-    }
-
+    const allSchedulableResources = resourcePool.filter(r => r.domain !== Domain.FINAL_REVIEW);
     const todayStr = getTodayInNewYork();
-    for (const job of jobs.filter(j => j.deadline)) {
-        const totalMinutes = job.resources.reduce((sum, r) => sum + r.durationMinutes, 0);
-        const availableDays = scheduleShell.filter(d => d.date >= todayStr && d.date <= job.deadline! && !d.isRestDay);
-        if (availableDays.length === 0) continue;
 
-        const currentBudget = availableDays.reduce((sum, d) => sum + d.totalStudyTimeMinutes, 0);
-        const deficit = totalMinutes - currentBudget;
+    if (deadlines.allContent) {
+        const totalMinutes = allSchedulableResources.reduce((sum, r) => sum + r.durationMinutes, 0);
+        const availableDays = scheduleShell.filter(d => d.date >= todayStr && d.date <= deadlines.allContent! && !d.isRestDay && d.dayType !== 'final-review');
+        
+        if (availableDays.length > 0) {
+            const currentBudget = availableDays.reduce((sum, d) => sum + d.totalStudyTimeMinutes, 0);
+            const deficit = totalMinutes - currentBudget;
 
-        if (deficit > 0) {
-            const extraMinutesPerDay = Math.ceil(deficit / availableDays.length);
-            notifications.push({ type: 'warning', message: `To meet the ${job.category} deadline, daily study time for the period was increased by ~${Math.round(extraMinutesPerDay)} minutes.` });
-            availableDays.forEach(day => {
-                day.totalStudyTimeMinutes += extraMinutesPerDay;
-            });
+            if (deficit > 0) {
+                const extraMinutesPerDay = Math.ceil(deficit / availableDays.length);
+                notifications.push({ type: 'warning', message: `To meet your deadline, daily study time was increased by ~${Math.round(extraMinutesPerDay)} minutes.` });
+                availableDays.forEach(day => {
+                    day.totalStudyTimeMinutes += extraMinutesPerDay;
+                });
+            }
         }
     }
 
     // --- 2. TASK SCHEDULING PASS ---
-    // A. Categorize remaining resources
-    const allQuestionTasks = resourcePool.filter(r => r.type === ResourceType.QUESTIONS);
-    const reviewTasks = resourcePool.filter(r => r.type === ResourceType.QUESTION_REVIEW);
-    const otherSecondaryResources = sortResources(resourcePool.filter(r => !r.isPrimaryMaterial && r.type !== ResourceType.QUESTIONS && r.type !== ResourceType.QUESTION_REVIEW));
-    const reviewTaskMap = new Map(reviewTasks.map(t => [t.pairedResourceIds?.[0], t]).filter((pair): pair is [string, StudyResource] => pair[0] !== undefined));
-    const finalReviewResources = sortResources(resourcePool.filter(r => r.domain === Domain.FINAL_REVIEW));
-
-    // B. Create a unified, prioritized list of primary tasks
-    const getDeadline = (resource: StudyResource): string => {
-        if (deadlines.allContent) return deadlines.allContent;
-        if (resource.domain === Domain.PHYSICS && deadlines.physicsContent) return deadlines.physicsContent;
-        if (resource.domain === Domain.NUCLEAR_MEDICINE && deadlines.nucMedContent) return deadlines.nucMedContent;
-        if (resource.domain !== Domain.PHYSICS && resource.domain !== Domain.NUCLEAR_MEDICINE && deadlines.otherContent) return deadlines.otherContent;
-        return '9999-12-31'; // No specific deadline, sort to the end
-    };
+    // A. Categorize resources
+    let physicsTasks = sortResources(resourcePool.filter(r => r.domain === Domain.PHYSICS));
+    let nucMedTasks = sortResources(resourcePool.filter(r => r.domain === Domain.NUCLEAR_MEDICINE));
+    const finalReviewTasks = sortResources(resourcePool.filter(r => r.domain === Domain.FINAL_REVIEW));
     
-    const primaryTasksToSchedule = sortResources(primaryResources).sort((a, b) => {
-        const deadlineA = getDeadline(a);
-        const deadlineB = getDeadline(b);
-        if (deadlineA !== deadlineB) return deadlineA.localeCompare(deadlineB);
-        // Fallback to topic order if deadlines are the same or not set
-        const topicIndexA = topicOrder.indexOf(a.domain);
-        const topicIndexB = topicOrder.indexOf(b.domain);
+    const mainTopicTasks = sortResources(resourcePool.filter(r => 
+        r.domain !== Domain.PHYSICS &&
+        r.domain !== Domain.NUCLEAR_MEDICINE &&
+        r.domain !== Domain.FINAL_REVIEW
+    )).sort((a, b) => {
+        const order = isCramModeActive ? cramTopicOrder : topicOrder;
+        const topicIndexA = order.indexOf(a.domain);
+        const topicIndexB = order.indexOf(b.domain);
         if (topicIndexA !== topicIndexB) return (topicIndexA === -1 ? Infinity : topicIndexA) - (topicIndexB === -1 ? Infinity : topicIndexB);
         return (a.sequenceOrder ?? Infinity) - (b.sequenceOrder ?? Infinity);
     });
 
-    // C. Schedule day by day
-    for (const day of scheduleShell) {
-        if (day.isRestDay || day.dayType === 'final-review') continue;
 
-        let availableTime = day.totalStudyTimeMinutes;
+    // B. Schedule day by day with interleaving
+    let workdayCounter = 0;
+    const physicsFrequency = 2; // every 2 workdays
+    const nucMedFrequency = 3;  // every 3 workdays
+    const interleaveBlockSize = 60; // 60 minutes
 
-        // Fill with primary tasks first
-        while (availableTime >= MIN_DURATION_for_SPLIT_PART && primaryTasksToSchedule.length > 0) {
-            const task = primaryTasksToSchedule[0];
-            if (task.durationMinutes <= availableTime) {
-                day.tasks.push(mapResourceToTask(task, day.tasks.length));
-                availableTime -= task.durationMinutes;
-                primaryTasksToSchedule.shift();
+    const scheduleTaskBlock = (day: DailySchedule, taskPool: StudyResource[], timeToFill: number) => {
+        let scheduledTime = 0;
+        while (timeToFill > 0 && taskPool.length > 0) {
+            const taskToSchedule = taskPool[0];
+            if (taskToSchedule.durationMinutes <= timeToFill) {
+                day.tasks.push(mapResourceToTask(taskToSchedule, day.tasks.length));
+                const scheduledDuration = taskToSchedule.durationMinutes;
+                timeToFill -= scheduledDuration;
+                scheduledTime += scheduledDuration;
+                taskPool.shift();
             } else {
-                const split = splitTask(task, availableTime);
+                if (!taskToSchedule.isSplittable || timeToFill < MIN_DURATION_for_SPLIT_PART) break;
+                const split = splitTask(taskToSchedule, timeToFill);
                 if (split) {
                     day.tasks.push(mapResourceToTask(split.part1, day.tasks.length));
-                    availableTime -= split.part1.durationMinutes;
-                    primaryTasksToSchedule[0] = split.part2;
-                }
-                break;
+                    const scheduledDuration = split.part1.durationMinutes;
+                    timeToFill -= scheduledDuration;
+                    scheduledTime += scheduledDuration;
+                    taskPool[0] = split.part2;
+                } else break;
             }
         }
-        
-        // Fill remaining time with other tasks (Q&A, secondary)
-        // (Simplified logic for now, can be enhanced with better Q&A pairing)
-         while (availableTime >= MIN_DURATION_for_SPLIT_PART && allQuestionTasks.length > 0) {
-            const task = allQuestionTasks[0];
-            const review = reviewTaskMap.get(task.id);
-            const blockDuration = task.durationMinutes + (review?.durationMinutes || 0);
+        return scheduledTime;
+    };
 
-            if (blockDuration <= availableTime) {
-                day.tasks.push(mapResourceToTask(task, day.tasks.length));
-                if (review) day.tasks.push(mapResourceToTask(review, day.tasks.length));
-                availableTime -= blockDuration;
-                allQuestionTasks.shift();
-                if(review) reviewTaskMap.delete(task.id);
-            } else {
-                break; // Don't split question blocks for simplicity
-            }
+    for (const day of scheduleShell) {
+        if (day.isRestDay || day.dayType === 'final-review') continue;
+        workdayCounter++;
+        
+        let availableTime = day.totalStudyTimeMinutes;
+
+        // Interleave Physics
+        if (workdayCounter % physicsFrequency === 0 && physicsTasks.length > 0) {
+            const timeForBlock = Math.min(interleaveBlockSize, availableTime);
+            if(timeForBlock > 0) availableTime -= scheduleTaskBlock(day, physicsTasks, timeForBlock);
         }
-         while (availableTime >= MIN_DURATION_for_SPLIT_PART && otherSecondaryResources.length > 0) {
-            const task = otherSecondaryResources[0];
-             if (task.durationMinutes <= availableTime) {
-                day.tasks.push(mapResourceToTask(task, day.tasks.length));
-                availableTime -= task.durationMinutes;
-                otherSecondaryResources.shift();
-            } else break;
+
+        // Interleave Nuclear Medicine
+        if (workdayCounter % nucMedFrequency === 0 && nucMedTasks.length > 0) {
+            const timeForBlock = Math.min(interleaveBlockSize, availableTime);
+            if(timeForBlock > 0) availableTime -= scheduleTaskBlock(day, nucMedTasks, timeForBlock);
+        }
+
+        // Fill remaining time with main topic tasks
+        if(availableTime > 0) {
+            availableTime -= scheduleTaskBlock(day, mainTopicTasks, availableTime);
         }
     }
     
@@ -295,12 +199,12 @@ const runSchedulingEngine = (
         // Trim day's total time to match actual scheduled content
         day.totalStudyTimeMinutes = day.tasks.reduce((sum, t) => sum + t.durationMinutes, 0);
 
-        if (day.dayType !== 'final-review' || finalReviewTaskIndex >= finalReviewResources.length) continue;
+        if (day.dayType !== 'final-review' || finalReviewTaskIndex >= finalReviewTasks.length) continue;
         
-        let availableTime = DEFAULT_CONSTRAINTS.dailyTimeBudget[1] - day.totalStudyTimeMinutes;
+        let availableTime = day.totalStudyTimeMinutes - day.tasks.reduce((sum, t) => sum + t.durationMinutes, 0);
         
-        while(availableTime >= MIN_DURATION_for_SPLIT_PART && finalReviewTaskIndex < finalReviewResources.length) {
-            const task = finalReviewResources[finalReviewTaskIndex];
+        while(availableTime >= MIN_DURATION_for_SPLIT_PART && finalReviewTaskIndex < finalReviewTasks.length) {
+            const task = finalReviewTasks[finalReviewTaskIndex];
             if(task.durationMinutes <= availableTime) {
                 day.tasks.push(mapResourceToTask(task, day.tasks.length));
                 availableTime -= task.durationMinutes;
@@ -353,7 +257,6 @@ export const generateInitialSchedule = (
     masterResourcePool: StudyResource[], 
     userAddedExceptions: ExceptionDateRule[],
     currentTopicOrder?: Domain[],
-    currentIsPhysicsInTopicOrder?: boolean,
     deadlines?: DeadlineSettings
 ): GeneratedStudyPlanOutcome => {
     console.log("[Scheduler Engine] Starting initial schedule generation.");
@@ -362,9 +265,7 @@ export const generateInitialSchedule = (
     const planConfig = {
         topicOrder: currentTopicOrder || DEFAULT_TOPIC_ORDER,
         cramTopicOrder: currentTopicOrder || DEFAULT_TOPIC_ORDER,
-        isPhysicsInTopicOrder: currentIsPhysicsInTopicOrder ?? false,
         isCramModeActive: false,
-        isCramPhysicsInterleaved: true,
         deadlines: deadlines || {},
     };
 
@@ -388,9 +289,7 @@ export const generateInitialSchedule = (
         progressPerDomain: progressPerDomain,
         topicOrder: planConfig.topicOrder,
         cramTopicOrder: planConfig.cramTopicOrder,
-        isPhysicsInTopicOrder: planConfig.isPhysicsInTopicOrder,
         isCramModeActive: planConfig.isCramModeActive,
-        isCramPhysicsInterleaved: planConfig.isCramPhysicsInterleaved,
         deadlines: planConfig.deadlines,
     };
 
