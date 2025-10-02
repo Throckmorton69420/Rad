@@ -5,6 +5,7 @@ import {
     DEFAULT_CONSTRAINTS,
     MIN_DURATION_for_SPLIT_PART,
     DEFAULT_TOPIC_ORDER,
+    DEFAULT_DAILY_STUDY_MINS,
 } from '../constants';
 import { getTodayInNewYork, formatDuration, parseDateString } from '../utils/timeFormatter';
 
@@ -255,12 +256,18 @@ const createScheduleShell = (
         
         let isRestDay = false;
         let dayType: DailySchedule['dayType'] = 'workday';
-        let timeBudget = 14 * 60;
+        let timeBudget: number;
 
         if (exceptionRule) {
             isRestDay = !!exceptionRule.isRestDayOverride;
             dayType = exceptionRule.dayType;
-            timeBudget = isRestDay ? 0 : (exceptionRule.targetMinutes ?? 14 * 60);
+            // Use the exception's target time, falling back to the default.
+            timeBudget = isRestDay ? 0 : (exceptionRule.targetMinutes ?? DEFAULT_DAILY_STUDY_MINS);
+        } else {
+            // Apply default logic for a standard day
+            isRestDay = false; // All default rest days have been removed.
+            dayType = 'workday';
+            timeBudget = DEFAULT_DAILY_STUDY_MINS;
         }
         
         schedule.push({ date: dateStr, tasks: [], totalStudyTimeMinutes: timeBudget, isRestDay, dayType, dayName: getDayName(dateStr) });

@@ -137,7 +137,7 @@ const AdvancedControls: React.FC<AdvancedControlsProps> = ({
             <label className="block text-sm font-medium mb-1 text-[var(--text-primary)]">New Total Study Time for Day:</label>
             <TimeInputScroller valueInMinutes={overallStudyTimeTotalMinutes} onChange={setOverallStudyTimeTotalMinutes} maxHours={12} />
           </div>
-          <Button onClick={handleTopicTimeRebalance} className="w-full" size="sm" disabled={isLoading}>Apply Topic/Time Rebalance</Button>
+          <Button onClick={handleTopicTimeRebalance} className="w-full" size="sm" disabled={isLoading || true}>Apply Topic/Time Rebalance</Button>
         </div>
       )}
 
