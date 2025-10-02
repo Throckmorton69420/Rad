@@ -37,6 +37,7 @@ interface SidebarContentProps {
     currentPomodoroTask: ScheduledTask | null;
     studyPlan: StudyPlan;
     selectedDate: string;
+    // FIX: Changed setSelectedDate prop type from `React.Dispatch<React.SetStateAction<boolean>>` to `React.Dispatch<React.SetStateAction<string>>` to match the actual state type, resolving type mismatch errors.
     setSelectedDate: React.Dispatch<React.SetStateAction<string>>;
     isMobile: boolean;
     navigatePeriod: (direction: 'next' | 'prev', viewMode: 'Weekly' | 'Monthly') => void;
@@ -194,20 +195,12 @@ const App: React.FC = () => {
   const [isPomodoroCollapsed, setIsPomodoroCollapsed] = usePersistentState('radiology_pomodoro_collapsed', true);
 
   useEffect(() => {
-    // Generate maps for a generic panel size. This is a compromise as we can't
-    // generate a map for every single element's unique size.
-    const { displacement, highlight } = generateGlassMaps({
-      width: 400,
-      height: 600,
-      borderRadius: 16,
-      bezelWidth: 30,
-      refractionStrength: 25,
-      highlightStrength: 0.7
-    });
+    // Generate maps for a generic square size. This scales better across
+    // different component aspect ratios.
+    const { displacement, highlight } = generateGlassMaps({});
 
-    // FIX: Cast to unknown first to satisfy TypeScript's type checking for SVG elements.
+    // FIX: Correctly cast the result of getElementById to SVGImageElement using 'unknown' as an intermediary to satisfy TypeScript's strict casting rules between HTMLElement and SVGElement.
     const displacementEl = document.getElementById('displacementMapImage') as unknown as SVGImageElement | null;
-    // FIX: Cast to unknown first to satisfy TypeScript's type checking for SVG elements.
     const highlightEl = document.getElementById('specularHighlightImage') as unknown as SVGImageElement | null;
 
     if (displacementEl) displacementEl.setAttribute('href', displacement);

@@ -20,12 +20,12 @@ function roundedRect(ctx: CanvasRenderingContext2D, x: number, y: number, width:
  * to create a realistic liquid glass effect.
  */
 export const generateGlassMaps = ({
-  width = 400,
-  height = 600,
-  borderRadius = 16,
-  bezelWidth = 30,
-  refractionStrength = 20, // Max pixel displacement
-  highlightStrength = 0.6,
+  width = 512,
+  height = 512,
+  borderRadius = 32,
+  bezelWidth = 40,
+  refractionStrength = 30,
+  highlightStrength = 0.7,
 }: {
   width?: number;
   height?: number;
