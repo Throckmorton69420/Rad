@@ -63,12 +63,12 @@ const TaskItem: React.FC<PatchedTaskItemProps> = ({ task, onToggle, isCurrentPom
           </button>
 
           <div className="group relative flex-grow min-w-0 cursor-pointer flex flex-col items-start" onClick={() => !isCompleted && onToggle(task.id)} role="button" tabIndex={0} onKeyDown={e => { if (e.key === ' ' || e.key === 'Enter') onToggle(task.id)}}>
-            <h4 className={`text-sm font-semibold ${titleColor} ${isCompleted ? 'line-through' : ''} leading-snug`} title={displayTitle}>
+            <h4 className={`text-base font-semibold ${titleColor} ${isCompleted ? 'line-through' : ''} leading-snug`} title={displayTitle}>
               {displayTitle}
             </h4>
             {(task.bookSource || task.videoSource) && (
               <span 
-                  className="text-sm font-semibold px-2 py-0.5 rounded-md mt-1 max-w-full truncate"
+                  className="text-xs font-semibold px-2 py-0.5 rounded-md mt-1 max-w-full truncate"
                   style={{ backgroundColor: sourceColorStyle.backgroundColor, color: sourceColorStyle.color }}
                   title={task.bookSource || task.videoSource}
               >
