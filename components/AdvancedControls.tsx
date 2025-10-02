@@ -3,6 +3,7 @@ import { Domain, AdvancedControlsProps, DeadlineSettings } from '../types';
 import { Button } from './Button';
 import TimeInputScroller from './TimeInputScroller';
 import { parseDateString } from '../utils/timeFormatter';
+import { ALL_DOMAINS } from '../constants';
 
 const DeadlineManager: React.FC<{
     deadlines: DeadlineSettings;
@@ -57,7 +58,6 @@ const DeadlineManager: React.FC<{
 };
 
 
-// FIX: Changed component to use React.FC to resolve "Cannot find namespace 'JSX'" error and align with project conventions.
 const AdvancedControls: React.FC<AdvancedControlsProps> = ({ 
     onRebalance, isLoading, selectedDate, isCramModeActive, onToggleCramMode,
     deadlines, onUpdateDeadlines 
@@ -89,7 +89,21 @@ const AdvancedControls: React.FC<AdvancedControlsProps> = ({
     });
     setShowTopicTimeOptions(false);
   };
-
+  
+  const handleTopicToggle = (domainToToggle: Domain) => {
+    setSelectedTopics(prev => {
+        const isSelected = prev.includes(domainToToggle);
+        if (isSelected) {
+            return prev.filter(d => d !== domainToToggle);
+        } else {
+            if (prev.length < 4) {
+                return [...prev, domainToToggle];
+            }
+            alert("You can select up to 4 topics.");
+            return prev;
+        }
+    });
+};
 
   return (
     <div className="p-4 rounded-lg space-y-3 bg-[var(--background-tertiary)] interactive-glow-border">
@@ -129,15 +143,28 @@ const AdvancedControls: React.FC<AdvancedControlsProps> = ({
       {showTopicTimeOptions && (
         <div className="p-3 bg-[var(--background-tertiary)] rounded-lg mt-2 space-y-3 animate-fade-in">
            <p className="text-sm font-medium text-[var(--text-primary)]">
-             For Day: <span className="font-bold">{parseDateString(selectedDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}</span>
+             For Day: <span className="font-bold">{new Date(selectedDate + 'T00:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}</span>
            </p>
-          <p className="text-sm font-medium text-[var(--text-primary)]">Select up to 4 topics (Not available)</p>
+          <p className="text-sm font-medium text-[var(--text-primary)]">Select up to 4 topics:</p>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+            {ALL_DOMAINS.map(domain => (
+                <Button
+                    key={domain}
+                    onClick={() => handleTopicToggle(domain)}
+                    variant={selectedTopics.includes(domain) ? 'primary' : 'secondary'}
+                    size="sm"
+                    className="!text-xxs !py-1"
+                >
+                    {domain}
+                </Button>
+            ))}
+          </div>
           
           <div>
             <label className="block text-sm font-medium mb-1 text-[var(--text-primary)]">New Total Study Time for Day:</label>
             <TimeInputScroller valueInMinutes={overallStudyTimeTotalMinutes} onChange={setOverallStudyTimeTotalMinutes} maxHours={12} />
           </div>
-          <Button onClick={handleTopicTimeRebalance} className="w-full" size="sm" disabled={isLoading || true}>Apply Topic/Time Rebalance</Button>
+          <Button onClick={handleTopicTimeRebalance} className="w-full" size="sm" disabled={isLoading || selectedTopics.length === 0}>Apply Topic/Time Rebalance</Button>
         </div>
       )}
 

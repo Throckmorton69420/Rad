@@ -6,6 +6,7 @@ import {
     MIN_DURATION_for_SPLIT_PART,
     DEFAULT_TOPIC_ORDER,
     DEFAULT_DAILY_STUDY_MINS,
+    ALL_DOMAINS,
 } from '../constants';
 import { getTodayInNewYork, formatDuration, parseDateString } from '../utils/timeFormatter';
 
@@ -113,12 +114,70 @@ const sortResources = (
     });
 };
 
+const adjustBudgetsForDeadlines = (
+    scheduleShell: DailySchedule[],
+    resourcePool: StudyResource[],
+    deadlines: DeadlineSettings
+): GeneratedStudyPlanOutcome['notifications'] => {
+    if (!deadlines || Object.keys(deadlines).length === 0) {
+        return [];
+    }
+    
+    const notifications: GeneratedStudyPlanOutcome['notifications'] = [];
+    const today = getTodayInNewYork();
+    
+    const deadlineCategories: { key: keyof DeadlineSettings, domains: Domain[], label: string }[] = [
+        { key: 'physicsContent', domains: [Domain.PHYSICS], label: 'Physics' },
+        { key: 'nucMedContent', domains: [Domain.NUCLEAR_MEDICINE], label: 'Nuclear Medicine' },
+        { key: 'otherContent', domains: ALL_DOMAINS.filter(d => d !== Domain.PHYSICS && d !== Domain.NUCLEAR_MEDICINE), label: 'Other Topics' },
+    ];
+
+    for (const category of deadlineCategories) {
+        const deadlineStr = deadlines[category.key];
+        if (!deadlineStr) continue;
+
+        const categoryResources = resourcePool.filter(r => category.domains.includes(r.domain) && r.isPrimaryMaterial);
+        const totalMinutesNeeded = categoryResources.reduce((acc, r) => acc + r.durationMinutes, 0);
+
+        const daysUntilDeadline = scheduleShell.filter(d => d.date >= today && d.date <= deadlineStr && !d.isRestDay);
+        if (daysUntilDeadline.length === 0) {
+            if (totalMinutesNeeded > 0) {
+                notifications.push({ type: 'error', message: `Cannot meet ${category.label} deadline. No study days available before ${deadlineStr}.` });
+            }
+            continue;
+        }
+
+        const totalMinutesAvailable = daysUntilDeadline.reduce((acc, d) => acc + d.totalStudyTimeMinutes, 0);
+        
+        if (totalMinutesNeeded > totalMinutesAvailable) {
+            const deficit = totalMinutesNeeded - totalMinutesAvailable;
+            const extraTimePerDay = Math.ceil(deficit / daysUntilDeadline.length);
+
+            for (const day of daysUntilDeadline) {
+                day.totalStudyTimeMinutes += extraTimePerDay;
+                if (day.totalStudyTimeMinutes > 12 * 60) { // Cap at 12 hours
+                    day.totalStudyTimeMinutes = 12 * 60;
+                }
+            }
+            // Check again after capping
+            const newTotalMinutesAvailable = daysUntilDeadline.reduce((acc, d) => acc + d.totalStudyTimeMinutes, 0);
+            if (totalMinutesNeeded > newTotalMinutesAvailable) {
+                 notifications.push({ type: 'warning', message: `Could not fit all ${category.label} content by deadline even after maximizing daily study time.` });
+            }
+        }
+    }
+    return notifications;
+};
+
 const runSchedulingEngine = (
     scheduleShell: DailySchedule[], 
     resourcePool: StudyResource[], 
     config: Partial<StudyPlan>,
 ): GeneratedStudyPlanOutcome['notifications'] => {
-    const notifications: GeneratedStudyPlanOutcome['notifications'] = [];
+    
+    const deadlineNotifications = adjustBudgetsForDeadlines(scheduleShell, resourcePool, config.deadlines || {});
+    const notifications: GeneratedStudyPlanOutcome['notifications'] = [...deadlineNotifications];
+
     const { topicOrder = [], isCramModeActive = false, cramTopicOrder = [], areSpecialTopicsInterleaved = true } = config;
     
     // --- 1. Categorize and Filter Resources ---
@@ -352,18 +411,12 @@ export const generateInitialSchedule = (
 
 
 export const rebalanceSchedule = (
-    currentPlan: StudyPlan, 
-    options: RebalanceOptions, 
+    currentPlan: StudyPlan,
+    options: RebalanceOptions,
     userAddedExceptions: ExceptionDateRule[],
     masterResourcePool: StudyResource[]
 ): GeneratedStudyPlanOutcome => {
-    console.log("[Scheduler Engine] Rebalancing schedule from today onwards.");
     const activeResources = masterResourcePool.filter(r => !r.isArchived);
-    const rebalanceStartDate = getTodayInNewYork();
-
-    const pastScheduleShell = currentPlan.schedule
-        .filter(day => day.date < rebalanceStartDate)
-        .map(day => ({...day})); 
 
     const completedOriginalResourceIds = new Set<string>();
     currentPlan.schedule.flatMap(day => day.tasks).forEach(task => {
@@ -372,15 +425,58 @@ export const rebalanceSchedule = (
         }
     });
 
-    const schedulingPool = JSON.parse(JSON.stringify(
+    const baseSchedulingPool = JSON.parse(JSON.stringify(
         activeResources.filter(r => !completedOriginalResourceIds.has(r.id))
     ));
-    
-    const futureScheduleShell = createScheduleShell(rebalanceStartDate, currentPlan.endDate, userAddedExceptions);
-    
-    const notifications = runSchedulingEngine(futureScheduleShell, schedulingPool, currentPlan);
-    
-    const finalSchedule = [...pastScheduleShell, ...futureScheduleShell];
+
+    let finalSchedule: DailySchedule[];
+    let notifications: GeneratedStudyPlanOutcome['notifications'] = [];
+
+    if (options.type === 'topic-time') {
+        console.log("[Scheduler Engine] Rebalancing with Topic/Time specification.");
+        const { date: modifiedDate, topics, totalTimeMinutes } = options;
+
+        const pastScheduleShell = currentPlan.schedule.filter(day => day.date < modifiedDate).map(day => ({ ...day }));
+
+        const modifiedDayTemplate = currentPlan.schedule.find(d => d.date === modifiedDate) || createScheduleShell(modifiedDate, modifiedDate, userAddedExceptions)[0];
+        const modifiedDay: DailySchedule = {
+            ...modifiedDayTemplate,
+            tasks: [],
+            totalStudyTimeMinutes: totalTimeMinutes,
+            isRestDay: totalTimeMinutes === 0,
+            isManuallyModified: true,
+        };
+
+        let priorityPool = baseSchedulingPool.filter((r: StudyResource) => topics.includes(r.domain));
+        let remainingPool = baseSchedulingPool.filter((r: StudyResource) => !topics.includes(r.domain));
+        
+        const modifiedDayNotifications = runSchedulingEngine([modifiedDay], priorityPool, currentPlan);
+        notifications.push(...modifiedDayNotifications);
+        
+        remainingPool.push(...priorityPool); // Add back unused priority tasks
+
+        const futureStartDate = new Date(parseDateString(modifiedDate));
+        futureStartDate.setUTCDate(futureStartDate.getUTCDate() + 1);
+        const futureStartDateStr = futureStartDate.toISOString().split('T')[0];
+        
+        let futureScheduleShell: DailySchedule[] = [];
+        if (futureStartDateStr <= currentPlan.endDate) {
+            futureScheduleShell = createScheduleShell(futureStartDateStr, currentPlan.endDate, userAddedExceptions);
+            const futureNotifications = runSchedulingEngine(futureScheduleShell, remainingPool, currentPlan);
+            notifications.push(...futureNotifications);
+        }
+        
+        finalSchedule = [...pastScheduleShell, modifiedDay, ...futureScheduleShell];
+
+    } else { // Standard rebalance
+        console.log("[Scheduler Engine] Rebalancing schedule from today onwards.");
+        const rebalanceStartDate = getTodayInNewYork();
+        const pastScheduleShell = currentPlan.schedule.filter(day => day.date < rebalanceStartDate).map(day => ({ ...day }));
+        const futureScheduleShell = createScheduleShell(rebalanceStartDate, currentPlan.endDate, userAddedExceptions);
+        
+        notifications = runSchedulingEngine(futureScheduleShell, baseSchedulingPool, currentPlan);
+        finalSchedule = [...pastScheduleShell, ...futureScheduleShell];
+    }
     
     const finalPlan: StudyPlan = { ...currentPlan, schedule: finalSchedule };
     
