@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { ModifyDayTasksModalProps, ScheduledTask, StudyResource, Domain, ResourceType } from '../types';
 import { Button } from './Button';
-import { formatDuration } from '../utils/timeFormatter';
+import { formatDuration, parseDateString } from '../utils/timeFormatter';
 import FocusTrap from 'focus-trap-react';
 import { useDragSelect } from '../hooks/useDragSelect';
 import { ALL_DOMAINS } from '../constants';
@@ -213,7 +213,7 @@ const ModifyDayTasksModal: React.FC<ModifyDayTasksModalProps> = ({
             <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-2 md:p-4 z-[var(--z-modal)]" role="dialog" aria-modal="true" aria-labelledby="modify-day-title">
                 <div className="modal-panel static-glow-border w-full max-w-6xl text-[var(--text-primary)] flex flex-col max-h-[90vh]">
                     <header className="flex justify-between items-center p-3 md:p-4 flex-shrink-0 translucent-header">
-                        <h2 id="modify-day-title" className="text-lg md:text-xl font-semibold">Modify Day: {new Date(selectedDate + 'T00:00:00').toLocaleDateString()}</h2>
+                        <h2 id="modify-day-title" className="text-lg md:text-xl font-semibold">Modify Day: {parseDateString(selectedDate).toLocaleDateString()}</h2>
                         <Button onClick={onClose} variant="ghost" size="sm" className="!p-1 !text-[var(--text-secondary)] hover:!text-[var(--text-primary)]" aria-label="Close">
                             <i className="fas fa-times fa-lg"></i>
                         </Button>

@@ -1,6 +1,19 @@
 // utils/timeFormatter.ts
 import { Domain } from '../types';
 
+/**
+ * Robustly parses a 'YYYY-MM-DD' string into a Date object at midnight local time.
+ * This avoids timezone issues and parsing inconsistencies across browsers.
+ * @param dateStr The date string to parse.
+ * @returns A Date object.
+ */
+export const parseDateString = (dateStr: string): Date => {
+    const [year, month, day] = dateStr.split('-').map(Number);
+    // Month is 0-indexed in JS Date constructor (e.g., January is 0)
+    return new Date(year, month - 1, day);
+};
+
+
 export const formatDuration = (totalMinutes: number | undefined | null): string => {
   if (totalMinutes == null || isNaN(totalMinutes) || totalMinutes < 0) {
     return '0 min';

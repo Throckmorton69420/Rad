@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { DailySchedule, ViewMode, Domain } from '../types';
 import { Button } from './Button';
-import { getDomainColorStyle } from '../utils/timeFormatter';
+import { getDomainColorStyle, parseDateString } from '../utils/timeFormatter';
 
 interface CalendarViewProps {
   schedule: DailySchedule[];
@@ -15,7 +15,7 @@ interface CalendarViewProps {
 }
 
 const CalendarView: React.FC<CalendarViewProps> = ({ schedule, selectedDate, onDateSelect, viewMode, currentDisplayDate, onNavigatePeriod, highlightedDates = [], today }) => {
-  const displayDateObj = new Date(currentDisplayDate + 'T00:00:00');
+  const displayDateObj = parseDateString(currentDisplayDate);
   const scheduleMap = new Map(schedule.map(day => [day.date, day]));
   const gridRef = useRef<HTMLDivElement>(null);
 
@@ -39,7 +39,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ schedule, selectedDate, onD
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    const currentDate = new Date(selectedDate + 'T00:00:00');
+    const currentDate = parseDateString(selectedDate);
     let newDate = new Date(currentDate);
 
     switch (e.key) {
@@ -102,7 +102,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ schedule, selectedDate, onD
                         data-date={dateStr}
                         role="gridcell"
                         aria-selected={isSelected}
-                        aria-label={`${new Date(dateStr + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}. ${daySchedule ? (daySchedule.isRestDay ? 'Rest Day' : `${Math.round(daySchedule.totalStudyTimeMinutes / 60)} hours assigned.`) : 'No tasks.'}`}
+                        aria-label={`${parseDateString(dateStr).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}. ${daySchedule ? (daySchedule.isRestDay ? 'Rest Day' : `${Math.round(daySchedule.totalStudyTimeMinutes / 60)} hours assigned.`) : 'No tasks.'}`}
                     >
                         <span className={`${isSelected ? 'font-bold' : ''}`}>{dayOfMonth}</span>
                         {domainColor && !isSelected && !daySchedule?.isRestDay && (

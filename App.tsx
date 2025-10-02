@@ -22,7 +22,7 @@ import ConfirmationModal from './components/ConfirmationModal';
 import WelcomeModal from './components/WelcomeModal';
 import TopicOrderManager from './components/TopicOrderManager';
 import ModifyDayTasksModal from './components/ModifyDayTasksModal';
-import { formatDuration, getTodayInNewYork } from './utils/timeFormatter';
+import { formatDuration, getTodayInNewYork, parseDateString } from './utils/timeFormatter';
 
 
 const App: React.FC = () => {
@@ -95,24 +95,24 @@ const App: React.FC = () => {
 
 
   const navigateDate = (direction: 'next' | 'prev') => {
-    const currentDateObj = new Date(selectedDate + 'T00:00:00');
+    const currentDateObj = parseDateString(selectedDate);
     currentDateObj.setDate(currentDateObj.getDate() + (direction === 'next' ? 1 : -1));
     const newDateStr = currentDateObj.toISOString().split('T')[0];
     if (!studyPlan) return;
-    const planStartDate = new Date(studyPlan.startDate + 'T00:00:00');
-    const planEndDate = new Date(studyPlan.endDate + 'T00:00:00');
+    const planStartDate = parseDateString(studyPlan.startDate);
+    const planEndDate = parseDateString(studyPlan.endDate);
     if (currentDateObj >= planStartDate && currentDateObj <= planEndDate) setSelectedDate(newDateStr);
     setHighlightedDates([]);
   };
   
   const navigatePeriod = (direction: 'next' | 'prev', viewMode: 'Weekly' | 'Monthly') => {
-    const currentDateObj = new Date(selectedDate + 'T00:00:00');
+    const currentDateObj = parseDateString(selectedDate);
     if (viewMode === 'Weekly') currentDateObj.setDate(currentDateObj.getDate() + (direction === 'next' ? 7 : -7));
     else if (viewMode === 'Monthly') currentDateObj.setMonth(currentDateObj.getMonth() + (direction === 'next' ? 1 : -1));
     const newDateStr = currentDateObj.toISOString().split('T')[0];
     if (!studyPlan) return;
-    const planStartDate = new Date(studyPlan.startDate + 'T00:00:00');
-    const planEndDate = new Date(studyPlan.endDate + 'T00:00:00');
+    const planStartDate = parseDateString(studyPlan.startDate);
+    const planEndDate = parseDateString(studyPlan.endDate);
     if (currentDateObj >= planStartDate && currentDateObj <= planEndDate) setSelectedDate(newDateStr);
     setHighlightedDates([]);
   };
@@ -456,7 +456,7 @@ const App: React.FC = () => {
                   <div className="text-right">
                     <div className="text-xs text-slate-400">First Pass Ends</div>
                     <div className="text-sm font-medium text-[var(--accent-purple)]">
-                      {new Date(studyPlan.firstPassEndDate + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                      {parseDateString(studyPlan.firstPassEndDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                     </div>
                   </div>
                 )}

@@ -4,6 +4,7 @@ import { Button } from './Button';
 import TimeInputScroller from './TimeInputScroller';
 import FocusTrap from 'focus-trap-react';
 import CustomSelect from '../CustomSelect';
+import { parseDateString } from '../utils/timeFormatter';
 
 const AddTaskModal: React.FC<AddTaskModalProps> = ({ isOpen, onClose, onSave, availableDomains, selectedDate }) => {
   const [title, setTitle] = useState('');
@@ -68,7 +69,7 @@ const AddTaskModal: React.FC<AddTaskModalProps> = ({ isOpen, onClose, onSave, av
               <i className="fas fa-times fa-lg"></i>
             </Button>
           </div>
-          {selectedDate && <p className="text-sm text-[var(--text-secondary)] mb-4">For: {new Date(selectedDate + 'T00:00:00').toLocaleDateString()}</p>}
+          {selectedDate && <p className="text-sm text-[var(--text-secondary)] mb-4">For: {parseDateString(selectedDate).toLocaleDateString()}</p>}
           
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>

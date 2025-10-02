@@ -1,7 +1,7 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { StudyPlan, Domain, ResourceType } from '../types';
 import { ALL_DOMAINS } from '../constants'; 
-import { formatDuration } from '../utils/timeFormatter';
+import { formatDuration, parseDateString } from '../utils/timeFormatter';
 import CustomSelect from '../CustomSelect';
 import { getDomainColorStyle } from '../utils/timeFormatter';
 
@@ -61,7 +61,7 @@ const ProgressDisplay: React.FC<ProgressDisplayProps> = ({ studyPlan }) => {
     const findLastDate = (filterFn: (task: any) => boolean) => {
         for (let i = studyPlan.schedule.length - 1; i >= 0; i--) {
             if (studyPlan.schedule[i].tasks.some(filterFn)) {
-                return new Date(studyPlan.schedule[i].date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                return parseDateString(studyPlan.schedule[i].date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
             }
         }
         return 'N/A';

@@ -6,10 +6,10 @@ import {
     MIN_DURATION_for_SPLIT_PART,
     DEFAULT_TOPIC_ORDER,
 } from '../constants';
-import { getTodayInNewYork, formatDuration } from '../utils/timeFormatter';
+import { getTodayInNewYork, formatDuration, parseDateString } from '../utils/timeFormatter';
 
 const getDayName = (dateStr: string): string => {
-  const date = new Date(dateStr + 'T00:00:00'); 
+  const date = parseDateString(dateStr);
   return date.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 };
 
@@ -248,8 +248,14 @@ const createScheduleShell = (
     );
     
     const schedule: DailySchedule[] = [];
-    const startDate = new Date(startDateStr + 'T00:00:00');
-    const endDate = new Date(endDateStr + 'T00:00:00');
+    const startDate = parseDateString(startDateStr);
+    const endDate = parseDateString(endDateStr);
+
+    if (startDate > endDate) {
+        console.error("Schedule generation failed: Start date is after end date.", { startDate, endDate });
+        return [];
+    }
+    
     let currentDateIter = new Date(startDate);
     
     while (currentDateIter <= endDate) {

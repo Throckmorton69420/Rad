@@ -4,6 +4,7 @@ import { Button } from './Button';
 import TaskItem from './TaskItem';
 import { formatDuration } from '../utils/timeFormatter';
 import TimeInputScroller from './TimeInputScroller';
+import { parseDateString } from '../utils/timeFormatter';
 
 const DailyTaskList: React.FC<DailyTaskListProps> = ({
   dailySchedule,
@@ -28,6 +29,7 @@ const DailyTaskList: React.FC<DailyTaskListProps> = ({
 
   const { date, tasks, totalStudyTimeMinutes, isRestDay, dayName } = dailySchedule;
   const actualTimeSpent = tasks.reduce((acc, task) => acc + (task.actualStudyTimeMinutes || 0), 0);
+  const displayDate = parseDateString(date);
 
   useEffect(() => {
     setEditedTime(totalStudyTimeMinutes);
@@ -68,8 +70,8 @@ const DailyTaskList: React.FC<DailyTaskListProps> = ({
         <div className="flex justify-between items-center mb-1">
           <Button onClick={() => onNavigateDay('prev')} variant="ghost" size="sm" className="!px-2.5" aria-label="Previous Day"><i className="fas fa-chevron-left"></i></Button>
           <div className="text-center">
-            <h2 className="text-xl font-bold text-white">{dayName ? new Date(date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long' }) : '...'}</h2>
-            <p className="text-sm text-[var(--text-secondary)]">{new Date(date + 'T00:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</p>
+            <h2 className="text-xl font-bold text-white">{dayName ? displayDate.toLocaleDateString('en-US', { weekday: 'long' }) : '...'}</h2>
+            <p className="text-sm text-[var(--text-secondary)]">{displayDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</p>
           </div>
           <Button onClick={() => onNavigateDay('next')} variant="ghost" size="sm" className="!px-2.5" aria-label="Next Day"><i className="fas fa-chevron-right"></i></Button>
         </div>
