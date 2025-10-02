@@ -70,6 +70,23 @@ const App: React.FC = () => {
     loadSchedule();
   }, []);
   
+  // Ensures the selectedDate is always valid after the studyPlan loads or changes.
+  useEffect(() => {
+    if (studyPlan) {
+      const { startDate, endDate } = studyPlan;
+      // If the currently selected date is not within the plan's range, adjust it.
+      if (selectedDate < startDate || selectedDate > endDate) {
+        // Prioritize jumping to "today" if it's within the new plan's range.
+        // Otherwise, jump to the start date of the plan.
+        if (todayInNewYork >= startDate && todayInNewYork <= endDate) {
+          setSelectedDate(todayInNewYork);
+        } else {
+          setSelectedDate(startDate);
+        }
+      }
+    }
+  }, [studyPlan?.startDate, studyPlan?.endDate, selectedDate, todayInNewYork]);
+  
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 1024);
     window.addEventListener('resize', handleResize);
