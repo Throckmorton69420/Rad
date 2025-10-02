@@ -96,7 +96,7 @@ const runSchedulingEngine = (
     config: Partial<StudyPlan>,
 ): GeneratedStudyPlanOutcome['notifications'] => {
     
-    const { deadlines, topicOrder = [], isCramModeActive, cramTopicOrder = [], areSpecialTopicsInterleaved = true } = config;
+    const { deadlines, topicOrder = [], isCramModeActive, cramTopicOrder = [] } = config;
     const notifications: GeneratedStudyPlanOutcome['notifications'] = [];
 
     // --- 1. BUDGET ADJUSTMENT PASS based on deadlines ---
@@ -124,11 +124,6 @@ const runSchedulingEngine = (
         }
     }
 
-    // --- 2. TASK SCHEDULING PASS (MULTI-TIER) ---
-    const highPriorityPool = resourcePool.filter(r => r.schedulingPriority === 'high');
-    const mediumPriorityPool = resourcePool.filter(r => r.schedulingPriority === 'medium');
-    const lowPriorityPool = resourcePool.filter(r => r.schedulingPriority === 'low');
-    
     const getSortedPool = (pool: StudyResource[]) => {
         return sortResources(pool).sort((a, b) => {
             const order = isCramModeActive ? cramTopicOrder : topicOrder;
@@ -138,67 +133,54 @@ const runSchedulingEngine = (
             return (a.sequenceOrder ?? Infinity) - (b.sequenceOrder ?? Infinity);
         });
     };
+    
+    const schedulableHigh = getSortedPool(resourcePool.filter(r => r.schedulingPriority === 'high' && r.domain !== Domain.FINAL_REVIEW));
+    const sortedMedium = getSortedPool(resourcePool.filter(r => r.schedulingPriority === 'medium'));
+    const sortedLow = getSortedPool(resourcePool.filter(r => r.schedulingPriority === 'low'));
+    const finalReviewTasks = getSortedPool(resourcePool.filter(r => r.domain === Domain.FINAL_REVIEW));
 
-    const sortedHigh = getSortedPool(highPriorityPool);
-    const sortedMedium = getSortedPool(mediumPriorityPool);
-    const sortedLow = getSortedPool(lowPriorityPool);
+    const schedulePool = (pool: StudyResource[]) => {
+        for (const day of scheduleShell) {
+            if (day.isRestDay || day.dayType === 'final-review') continue;
 
-    const finalReviewTasks = sortedHigh.filter(r => r.domain === Domain.FINAL_REVIEW);
-    const schedulableHigh = sortedHigh.filter(r => r.domain !== Domain.FINAL_REVIEW);
+            const scheduledTime = day.tasks.filter(t => !t.isOptional).reduce((sum, t) => sum + t.durationMinutes, 0);
+            let remainingTime = day.totalStudyTimeMinutes - scheduledTime;
 
-    const scheduleTaskBlock = (day: DailySchedule, taskPool: StudyResource[], timeToFill: number) => {
-        let scheduledTime = 0;
-        while (timeToFill > 0 && taskPool.length > 0) {
-            const taskToSchedule = taskPool[0];
-            if (taskToSchedule.durationMinutes <= timeToFill) {
-                day.tasks.push(mapResourceToTask(taskToSchedule, day.tasks.length));
-                const scheduledDuration = taskToSchedule.durationMinutes;
-                timeToFill -= scheduledDuration;
-                scheduledTime += scheduledDuration;
-                taskPool.shift();
-            } else {
-                if (!taskToSchedule.isSplittable || timeToFill < MIN_DURATION_for_SPLIT_PART) break;
-                const split = splitTask(taskToSchedule, timeToFill);
-                if (split) {
-                    day.tasks.push(mapResourceToTask(split.part1, day.tasks.length));
-                    const scheduledDuration = split.part1.durationMinutes;
-                    timeToFill -= scheduledDuration;
-                    scheduledTime += scheduledDuration;
-                    taskPool[0] = split.part2;
-                } else break;
+            while (remainingTime >= MIN_DURATION_for_SPLIT_PART && pool.length > 0) {
+                // Find the first task that can fit completely
+                const fitIndex = pool.findIndex(task => task.durationMinutes <= remainingTime);
+                
+                if (fitIndex !== -1) {
+                    const taskToSchedule = pool.splice(fitIndex, 1)[0];
+                    day.tasks.push(mapResourceToTask(taskToSchedule, day.tasks.length));
+                    remainingTime -= taskToSchedule.durationMinutes;
+                    continue; // Continue filling the day
+                }
+
+                // If no task fits completely, find the first splittable task to fill the remaining time
+                const splittableIndex = pool.findIndex(task => task.isSplittable);
+                
+                if (splittableIndex !== -1) {
+                    const taskToSplit = pool[splittableIndex];
+                    const split = splitTask(taskToSplit, remainingTime);
+                    if (split) {
+                        day.tasks.push(mapResourceToTask(split.part1, day.tasks.length));
+                        // Replace original with the remainder part for future scheduling
+                        pool[splittableIndex] = split.part2;
+                    }
+                }
+                
+                // Whether we split a task or not, the day is now as full as it can be.
+                break;
             }
         }
-        return scheduledTime;
     };
+    
+    // --- 2. TASK SCHEDULING PASSES (MULTI-TIER) ---
+    schedulePool(schedulableHigh);
+    schedulePool(sortedMedium);
+    schedulePool(sortedLow);
 
-    // PASS 1: SCHEDULE HIGH PRIORITY CONTENT
-    for (const day of scheduleShell) {
-        if (day.isRestDay || day.dayType === 'final-review') continue;
-        let availableTime = day.totalStudyTimeMinutes;
-        if(availableTime > 0) {
-            scheduleTaskBlock(day, schedulableHigh, availableTime);
-        }
-    }
-
-    // PASS 2: FILL WITH MEDIUM PRIORITY CONTENT
-    for (const day of scheduleShell) {
-        if (day.isRestDay || day.dayType === 'final-review') continue;
-        const scheduledTime = day.tasks.filter(t => !t.isOptional).reduce((sum, t) => sum + t.durationMinutes, 0);
-        let remainingTime = day.totalStudyTimeMinutes - scheduledTime;
-        if (remainingTime > 0) {
-            scheduleTaskBlock(day, sortedMedium, remainingTime);
-        }
-    }
-
-    // PASS 3: FILL WITH LOW PRIORITY CONTENT
-    for (const day of scheduleShell) {
-        if (day.isRestDay || day.dayType === 'final-review') continue;
-        const scheduledTime = day.tasks.filter(t => !t.isOptional).reduce((sum, t) => sum + t.durationMinutes, 0);
-        let remainingTime = day.totalStudyTimeMinutes - scheduledTime;
-        if (remainingTime > 0) {
-            scheduleTaskBlock(day, sortedLow, remainingTime);
-        }
-    }
 
     // --- 3. NOTIFICATIONS ---
     if (schedulableHigh.length > 0) {
@@ -228,7 +210,12 @@ const runSchedulingEngine = (
     // --- 4. FINAL REVIEW and CLEANUP ---
     for (const day of scheduleShell) {
         if (day.dayType === 'final-review' && finalReviewTasks.length) {
-            scheduleTaskBlock(day, finalReviewTasks, day.totalStudyTimeMinutes);
+            let remainingTime = day.totalStudyTimeMinutes;
+            while(remainingTime > 0 && finalReviewTasks.length > 0) {
+                const task = finalReviewTasks.shift()!;
+                day.tasks.push(mapResourceToTask(task, day.tasks.length));
+                remainingTime -= task.durationMinutes;
+            }
         }
         day.totalStudyTimeMinutes = day.tasks
             .filter(t => !t.isOptional)
