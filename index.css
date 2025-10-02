@@ -11,13 +11,13 @@
 
   /* --- Glass Materials (FINAL - Matte & Blurred) --- */
   --glass-bg-panel: rgba(40, 40, 42, 0.5);       /* More opaque for matte feel */
-  --glass-bg-chrome: rgba(28, 28, 30, 0.45);    /* More opaque for matte feel */
+  --glass-bg-chrome: rgba(28, 28, 30, 0.7);    /* Increased opacity for more frost */
   --glass-bg-modal: rgba(45, 45, 47, 0.55);      /* More opaque for matte feel */
   --glass-bg-hover: rgba(65, 65, 67, 0.6);      /* Adjusted hover */
   --glass-bg-active: rgba(110, 90, 130, 0.65);  /* Adjusted active */
 
   /* --- Core Liquid Glass Effect (ADDED BLUR) --- */
-  --glass-backdrop-filter: blur(18px) url(#liquid-glass-advanced);
+  --glass-backdrop-filter: blur(24px) url(#liquid-glass-advanced); /* Increased blur for more frost */
 
   /* --- Glass Edges & Depth (FINAL - Brighter & Crisper) --- */
   --glass-border-color: rgba(255, 255, 255, 0.3); /* Brighter border */
