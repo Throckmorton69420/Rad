@@ -70,7 +70,7 @@ const SidebarContent = React.memo(({
     handleToggleSpecialTopicsInterleaving, handleAddOrUpdateException, handleUndo, previousStudyPlan,
     showConfirmation, loadSchedule, handleMasterResetTasks
 }: SidebarContentProps) => (
-    <aside className={`w-80 bg-[var(--background-secondary)] text-[var(--text-secondary)] border-r border-[var(--separator-primary)] flex flex-col h-dvh isolated-scroll`}>
+    <aside className={`w-80 text-[var(--text-secondary)] flex flex-col h-dvh isolated-scroll glass-chrome`}>
         <div className="flex-grow flex flex-col min-h-0">
             <div className="flex-grow overflow-y-auto isolated-scroll sidebar-content-area">
                 <div className="space-y-4">

@@ -10,18 +10,18 @@
   --link-color: hsl(210, 100%, 75%);
 
   /* --- Glass Materials (FINAL - Bright & Translucent) --- */
-  --glass-bg-panel: rgba(45, 45, 47, 0.65);
-  --glass-bg-chrome: rgba(30, 30, 32, 0.6);
-  --glass-bg-modal: rgba(55, 55, 57, 0.7);
-  --glass-bg-hover: rgba(65, 65, 67, 0.7);
-  --glass-bg-active: rgba(110, 90, 130, 0.75);
+  --glass-bg-panel: rgba(45, 45, 47, 0.5);   /* Increased transparency */
+  --glass-bg-chrome: rgba(30, 30, 32, 0.4); /* Increased transparency */
+  --glass-bg-modal: rgba(55, 55, 57, 0.6);  /* Increased transparency */
+  --glass-bg-hover: rgba(65, 65, 67, 0.65);
+  --glass-bg-active: rgba(110, 90, 130, 0.7);
 
   /* --- Core Liquid Glass Effect --- */
   --glass-backdrop-filter: url(#liquid-glass-advanced);
 
-  /* --- Glass Edges & Depth (FINAL - Brighter) --- */
-  --glass-border-color: rgba(255, 255, 255, 0.25);
-  --glass-sheen: inset 0 1.5px 1px 0 rgba(255, 255, 255, 0.3), inset 0 0 0 1px rgba(255, 255, 255, 0.15);
+  /* --- Glass Edges & Depth (FINAL - Brighter & Crisper) --- */
+  --glass-border-color: rgba(255, 255, 255, 0.3); /* Brighter border */
+  --glass-sheen: inset 0 1.5px 1px 0 rgba(255, 255, 255, 0.4), inset 0 0 0 1.5px rgba(255, 255, 255, 0.2); /* Brighter sheen */
   --glass-shadow: 0 16px 50px rgba(0, 0, 0, 0.5);
 
   /* --- Other UI Elements --- */
@@ -42,30 +42,42 @@
   --z-notification: 110;
 }
 
-/* --- Base Body & Multi-Color Aurora Background --- */
+/* --- NEW, DYNAMIC MULTI-COLOR AURORA BACKGROUND --- */
 @keyframes aurora-flow {
-  0% { background-position: 10% 0%, 90% 100%, 20% 80%, 80% 20%; }
-  25% { background-position: 90% 0%, 10% 100%, 80% 80%, 20% 20%; }
-  50% { background-position: 100% 90%, 0% 10%, 90% 10%, 10% 90%; }
-  75% { background-position: 10% 100%, 90% 0%, 20% 20%, 80% 80%; }
-  100% { background-position: 10% 0%, 90% 100%, 20% 80%, 80% 20%; }
+  0% { transform: translate(0, 0) rotate(0deg); }
+  25% { transform: translate(5vw, -10vh) rotate(30deg); }
+  50% { transform: translate(-5vw, 10vh) rotate(-30deg); }
+  75% { transform: translate(10vw, 5vh) rotate(15deg); }
+  100% { transform: translate(0, 0) rotate(0deg); }
 }
 
 body {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   background-color: var(--background-primary);
-  background-image:
-    radial-gradient(ellipse 30% 50% at 10% 10%, hsla(265, 90%, 65%, 0.35), transparent),
-    radial-gradient(ellipse 30% 50% at 90% 20%, hsla(190, 90%, 55%, 0.35), transparent),
-    radial-gradient(ellipse 30% 50% at 20% 90%, hsla(330, 85%, 60%, 0.3), transparent),
-    radial-gradient(ellipse 30% 50% at 80% 80%, hsla(210, 95%, 60%, 0.3), transparent);
-  background-size: 400% 400%;
-  animation: aurora-flow 60s ease-in-out infinite;
   color: var(--text-primary);
   overscroll-behavior: none;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  overflow: hidden; /* Prevent body scroll */
+  position: relative;
 }
+
+body::before {
+  content: '';
+  position: fixed;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  z-index: -1;
+  background-image:
+    radial-gradient(ellipse 40% 60% at 20% 30%, hsla(265, 90%, 65%, 0.45), transparent),
+    radial-gradient(ellipse 40% 60% at 80% 20%, hsla(190, 90%, 55%, 0.45), transparent),
+    radial-gradient(ellipse 40% 60% at 30% 80%, hsla(330, 85%, 60%, 0.4), transparent),
+    radial-gradient(ellipse 40% 60% at 70% 90%, hsla(210, 95%, 60%, 0.4), transparent);
+  animation: aurora-flow 45s ease-in-out infinite;
+}
+
 
 #root {
   height: 100vh;
@@ -75,7 +87,7 @@ body {
 }
 
 /* --- Base Panel Styling (Liquid Glass) --- */
-.glass-panel, .glass-chrome, .modal-panel, .input-base, .button-secondary, .button-ghost, .progress-bar-track, .bg-\[\--background-secondary\] {
+.glass-panel, .glass-chrome, .modal-panel, .input-base, .button-secondary, .button-ghost, .progress-bar-track {
   border: 1px solid var(--glass-border-color);
   box-shadow: var(--glass-sheen), var(--glass-shadow);
   transition: background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
@@ -91,7 +103,7 @@ body {
 
 .glass-panel-interactive:hover:not(.is-pomodoro-active) {
   background-color: var(--glass-bg-hover);
-  border-color: rgba(255, 255, 255, 0.3);
+  border-color: rgba(255, 255, 255, 0.4);
 }
 
 /* --- Glow Effects & Active States --- */
@@ -120,23 +132,24 @@ body {
 .no-scrollbar::-webkit-scrollbar { display: none; }
 .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 
-/* --- UI Chrome --- */
-header.glass-chrome {
-  background-color: var(--glass-bg-chrome) !important;
-  backdrop-filter: var(--glass-backdrop-filter) !important;
-  -webkit-backdrop-filter: var(--glass-backdrop-filter) !important;
+/* --- UI Chrome (FIXED) --- */
+.glass-chrome {
+  border-radius: 0;
+  box-shadow: var(--glass-sheen); /* simplified shadow for chrome */
+  border: none;
+  border-bottom: 1px solid var(--separator-primary);
 }
 
-.bg-\[\--background-secondary\] {
-  background-color: var(--glass-bg-chrome) !important; /* Force override for consistency */
-  border-radius: 0;
-  box-shadow: none;
-  border: none;
-  border-right: 1px solid var(--separator-primary);
-  /* This was the missing piece */
-  backdrop-filter: var(--glass-backdrop-filter) !important;
-  -webkit-backdrop-filter: var(--glass-backdrop-filter) !important;
+header.glass-chrome {
+  border-bottom: 1px solid var(--separator-primary);
 }
+
+/* Specific fix for sidebar border */
+aside.glass-chrome {
+  border-bottom: none;
+  border-right: 1px solid var(--separator-primary);
+}
+
 
 .border-\[\--separator-primary\] { border-color: var(--separator-primary) !important; }
 
