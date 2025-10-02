@@ -53,39 +53,41 @@
   --z-notification: 120;
 }
 
-/* --- 1. Base Setup & Wallpaper Fix --- */
+/* --- 1. Base Setup & THE DEFINITIVE Wallpaper Fix --- */
 html {
   height: 100%;
   background-color: #000; /* Fallback color */
 }
 
+/* Create the background on the highest-level element's pseudo-element */
+html::before {
+  content: '';
+  position: fixed;
+  inset: -20px; /* Overscan to prevent blurry edges */
+  z-index: -1; /* CRITICAL: Send it behind everything */
+  background: url('/light-stream-blue-big-sur-kf.jpg') no-repeat center center;
+  background-size: cover;
+  filter: blur(24px) brightness(0.6);
+  transform: scale(1.1); /* Zoom in to fill overscan area */
+}
+
 body {
   height: 100%;
-  background-color: transparent; /* VERY IMPORTANT */
+  background-color: transparent; /* VERY IMPORTANT: Body must be see-through */
   color: var(--text-primary);
   font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   -webkit-tap-highlight-color: transparent;
   overflow: hidden; /* Prevent body scrolling */
-}
 
-.background-wallpaper {
-  position: fixed;
-  inset: -20px;
-  z-index: 0; /* Place it on the base layer */
-  background: url('/light-stream-blue-big-sur-kf.jpg') no-repeat center center;
-  background-size: cover;
-  filter: blur(24px) brightness(0.6);
-  transform: scale(1.1);
-  overflow: hidden;
+  /* CRITICAL: Create a new stacking context. This ensures nothing inside the body can go behind the html::before pseudo-element. */
+  isolation: isolate;
 }
 
 #root {
   height: 100%;
-  background-color: transparent; /* VERY IMPORTANT */
-  position: relative; /* Needed for z-index to apply */
-  z-index: 1; /* Place the entire app on a layer above the background */
+  background-color: transparent; /* VERY IMPORTANT: React root must also be see-through */
 }
 
 
