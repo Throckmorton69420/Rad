@@ -575,12 +575,14 @@ const App: React.FC = () => {
 
           {systemNotification && (
             <div 
-                className={`flex-shrink-0 p-3 text-sm text-center flex justify-between items-center text-white border-t border-white/10`}
+                className="flex-shrink-0 p-3 text-sm text-center flex justify-between items-center text-white border-t border-white/10 bg-[var(--glass-bg-chrome)]"
+                // Fix: Cast style object to React.CSSProperties to allow custom properties.
                 style={{
-                    backgroundColor: systemNotification.type === 'error' ? 'rgba(255, 69, 58, 0.5)' : 'rgba(191, 90, 242, 0.5)',
-                    backdropFilter: 'var(--glass-backdrop-filter)',
-                    WebkitBackdropFilter: 'var(--glass-backdrop-filter)',
-                }}
+                  '--notification-color': systemNotification.type === 'error' ? 'var(--accent-red)' : 'var(--accent-purple)',
+                  backgroundColor: 'color-mix(in srgb, var(--notification-color) 25%, var(--glass-bg-chrome))',
+                  backdropFilter: 'var(--glass-backdrop-filter)',
+                  WebkitBackdropFilter: 'var(--glass-backdrop-filter)',
+                } as React.CSSProperties}
             >
               <span className="text-left"><i className={`fas ${systemNotification.type === 'error' ? 'fa-exclamation-circle' : 'fa-info-circle'} mr-2`}></i>{systemNotification.message}</span>
               <button onClick={() => setSystemNotification(null)} className="ml-4 font-bold text-xl leading-none" aria-label="Dismiss notification">&times;</button>

@@ -10,16 +10,16 @@
 :root {
   /* High-Fidelity Liquid Glass Palette */
   --background-primary: #000000;
-  --glass-bg-panel: rgba(44, 44, 46, 0.5);   /* More translucent */
-  --glass-bg-chrome: rgba(30, 30, 32, 0.6);  /* More translucent, slightly darker for hierarchy */
-  --glass-bg-hover: rgba(255, 255, 255, 0.08); /* Additive white for hover */
-  --glass-bg-active: rgba(255, 255, 255, 0.12);
+  --glass-bg-panel: rgba(30, 30, 32, 0.75);
+  --glass-bg-chrome: rgba(28, 28, 30, 0.8);
+  --glass-bg-hover: rgba(255, 255, 255, 0.1);
+  --glass-bg-active: rgba(255, 255, 255, 0.15);
 
   --text-primary: #f5f5f7;
   --text-secondary: rgba(235, 235, 245, 0.6); /* Semi-transparent for "vibrancy" effect */
 
-  --separator-primary: rgba(255, 255, 255, 0.15);
-  --separator-secondary: rgba(255, 255, 255, 0.1);
+  --separator-primary: rgba(255, 255, 255, 0.12);
+  --separator-secondary: rgba(255, 255, 255, 0.08);
 
   /* Accent Colors */
   --accent-purple: #bf5af2;
@@ -34,9 +34,9 @@
   --button-secondary-hover-bg: rgba(60, 60, 62, 0.8);
   
   /* Glass Effect Properties */
-  --glass-backdrop-filter: blur(28px) saturate(180%);
-  --glass-border-color: rgba(255, 255, 255, 0.15);
-  --glass-shadow: inset 0 1.5px 1px rgba(255, 255, 255, 0.1), 0 8px 32px rgba(0,0,0,0.3);
+  --glass-backdrop-filter: blur(40px) saturate(180%);
+  --glass-border-color: rgba(255, 255, 255, 0.1);
+  --glass-shadow: inset 0 1.5px 1px rgba(255, 255, 255, 0.1), 0 8px 32px rgba(0,0,0,0.37);
 
   /* Z-Indexes */
   --z-header: 40;
@@ -49,14 +49,14 @@
 body {
   font-family: 'Inter', sans-serif;
   background-color: var(--background-primary);
-  /* Darker, more vibrant aurora effect */
+  /* Darker, more vibrant "streaming" aurora effect */
   background-image: 
-    radial-gradient(at 10% 20%, hsla(270, 90%, 70%, 0.2) 0px, transparent 50%),
-    radial-gradient(at 90% 10%, hsla(190, 80%, 60%, 0.25) 0px, transparent 50%),
-    radial-gradient(at 20% 90%, hsla(210, 90%, 70%, 0.25) 0px, transparent 50%),
-    radial-gradient(at 80% 80%, hsla(330, 90%, 70%, 0.2) 0px, transparent 50%);
-  background-size: 200% 200%;
-  animation: aurora-bg 25s ease infinite;
+    radial-gradient(ellipse 40% 50% at 20% 20%, hsla(270, 90%, 60%, 0.25) 0px, transparent 50%),
+    radial-gradient(ellipse 30% 50% at 80% 25%, hsla(190, 80%, 50%, 0.3) 0px, transparent 50%),
+    radial-gradient(ellipse 40% 50% at 10% 90%, hsla(210, 90%, 60%, 0.2) 0px, transparent 50%),
+    radial-gradient(ellipse 30% 50% at 90% 85%, hsla(330, 80%, 65%, 0.25) 0px, transparent 50%);
+  background-size: 250% 250%;
+  animation: aurora-bg 40s ease infinite;
 
   color: var(--text-primary);
   overscroll-behavior: none;
@@ -78,17 +78,27 @@ body {
   backdrop-filter: var(--glass-backdrop-filter);
   border: 1px solid var(--glass-border-color);
   box-shadow: var(--glass-shadow);
+  transition: background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
-/* Corrected Hover Effect */
-.interactive-glow-border:hover {
-  background-color: color-mix(in srgb, var(--glass-bg-panel), var(--glass-bg-hover));
-  border-color: rgba(255, 255, 255, 0.25);
+.interactive-glow-border:hover:not(.is-pomodoro-active) {
+  background-color: var(--glass-bg-hover);
+  border-color: rgba(255, 255, 255, 0.2);
 }
 
 .modal-panel {
   background-color: var(--glass-bg-chrome);
   border-radius: 12px;
+}
+
+.is-pomodoro-active {
+  background-color: var(--glass-bg-active) !important;
+  border-color: var(--accent-purple) !important;
+  box-shadow: var(--glass-shadow), 0 0 15px -3px var(--accent-purple);
+}
+
+.scroller-highlight-glow {
+  box-shadow: 0 0 15px -5px var(--accent-purple);
 }
 
 /* --- Scrollbar Styling --- */
@@ -128,7 +138,6 @@ body {
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
   user-select: none;
-  box-shadow: 0 1px 2px rgba(0,0,0,0.1);
 }
 .button-primary {
   background-color: var(--accent-purple);

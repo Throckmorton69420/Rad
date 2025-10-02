@@ -12,9 +12,6 @@ const getTypeColorDark = (type: ResourceType): string => {
 
 const TaskItem: React.FC<TaskItemProps> = ({ task, onToggle, isCurrentPomodoroTask, isPulsing, onSetPomodoro }) => {
   const isCompleted = task.status === 'completed';
-  const baseBg = isCurrentPomodoroTask ? 'bg-[var(--glass-background-active)]' : 'bg-[var(--background-tertiary)]';
-  const taskBgColor = isCompleted ? baseBg : `${baseBg} hover:bg-[var(--background-tertiary-hover)]`;
-  const taskOpacity = isCompleted ? 'opacity-60' : 'opacity-100';
   const sourceColorStyle = getSourceColorStyle(task.bookSource || task.videoSource);
   
   const cleanTitleForDisplay = (title: string, taskType: ResourceType) => {
@@ -42,11 +39,19 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, onToggle, isCurrentPomodoroTa
     }
     return null;
   };
+  
+  const containerClasses = [
+    'p-1.5', 'rounded-lg', 'transition-all', 'duration-150', 'relative', 'interactive-glow-border',
+    'overflow-hidden', 'cursor-pointer',
+    isCompleted ? 'opacity-60' : 'opacity-100',
+    isCurrentPomodoroTask ? 'is-pomodoro-active' : ''
+  ].filter(Boolean).join(' ');
+
 
   return (
     <div 
         onClick={() => onToggle(task.id)}
-        className={`p-1.5 rounded-lg shadow-sm transition-all duration-150 relative ${taskBgColor} ${taskOpacity} interactive-glow-border backdrop-blur-lg overflow-hidden cursor-pointer`}
+        className={containerClasses}
         role="group"
         aria-label={`Task: ${displayTitle}. Status is ${isCompleted ? 'completed' : 'pending'}. Click to toggle.`}
     >
