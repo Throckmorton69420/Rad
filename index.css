@@ -75,7 +75,7 @@ body {
 }
 
 /* --- Base Panel Styling (Liquid Glass) --- */
-.glass-panel, .glass-chrome, .modal-panel, .input-base, .button-secondary, .button-ghost, .progress-bar-track {
+.glass-panel, .glass-chrome, .modal-panel, .input-base, .button-secondary, .button-ghost, .progress-bar-track, .bg-\[\--background-secondary\] {
   border: 1px solid var(--glass-border-color);
   box-shadow: var(--glass-sheen), var(--glass-shadow);
   transition: background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
@@ -121,17 +121,21 @@ body {
 .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 
 /* --- UI Chrome --- */
-.bg-\[\--background-secondary\], header.glass-chrome {
-  background-color: var(--glass-bg-chrome) !important; /* Force override for consistency */
-  backdrop-filter: var(--glass-backdrop-filter);
-  -webkit-backdrop-filter: var(--glass-backdrop-filter);
+header.glass-chrome {
+  background-color: var(--glass-bg-chrome) !important;
+  backdrop-filter: var(--glass-backdrop-filter) !important;
+  -webkit-backdrop-filter: var(--glass-backdrop-filter) !important;
 }
 
 .bg-\[\--background-secondary\] {
+  background-color: var(--glass-bg-chrome) !important; /* Force override for consistency */
   border-radius: 0;
   box-shadow: none;
   border: none;
   border-right: 1px solid var(--separator-primary);
+  /* This was the missing piece */
+  backdrop-filter: var(--glass-backdrop-filter) !important;
+  -webkit-backdrop-filter: var(--glass-backdrop-filter) !important;
 }
 
 .border-\[\--separator-primary\] { border-color: var(--separator-primary) !important; }
