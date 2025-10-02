@@ -146,15 +146,6 @@ body {
 .glass-chrome { background-color: var(--glass-bg-chrome); }
 .modal-panel { background-color: var(--glass-bg-modal); border-radius: 16px; }
 
-/* FIX: Specific override for the main content area panel */
-main.glass-panel {
-  background-color: rgba(18, 18, 18, 0.4);
-  border-radius: 0;
-  border: none;
-  box-shadow: none;
-}
-
-
 .glass-panel-interactive:hover:not(.is-pomodoro-active) {
   background-color: var(--glass-bg-hover);
   border-color: rgba(255, 255, 255, 0.4);

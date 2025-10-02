@@ -530,7 +530,7 @@ const App: React.FC = () => {
             </div>
           </header>
           
-          <main className={`flex-1 overflow-y-auto min-h-0 glass-panel ${isMobile && isSidebarOpen ? 'overflow-hidden' : ''}`}>
+          <main className={`flex-1 overflow-y-auto min-h-0 ${isMobile && isSidebarOpen ? 'overflow-hidden' : ''}`}>
               <div className="pt-3 md:pt-6 pl-[calc(0.75rem+env(safe-area-inset-left))] pr-[calc(0.75rem+env(safe-area-inset-right))] flex flex-col">
                 <div className="mb-6 flex-shrink-0 px-3 md:px-6">
                       <div className="inline-flex bg-[var(--background-secondary)] p-1 rounded-lg space-x-1">
