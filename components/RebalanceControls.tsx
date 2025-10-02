@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Domain, AdvancedControlsProps, DeadlineSettings } from '../types';
 import { Button } from './Button';
 import TimeInputScroller from './TimeInputScroller';
+import { parseDateString } from '../utils/timeFormatter';
 
 const DeadlineManager: React.FC<{
     deadlines: DeadlineSettings;
@@ -128,7 +129,7 @@ const AdvancedControls: React.FC<AdvancedControlsProps> = ({
       {showTopicTimeOptions && (
         <div className="p-3 bg-[var(--background-tertiary)] rounded-lg mt-2 space-y-3 animate-fade-in">
            <p className="text-sm font-medium text-[var(--text-primary)]">
-             For Day: <span className="font-bold">{new Date(selectedDate + 'T00:00:00').toLocaleDateString()}</span>
+             For Day: <span className="font-bold">{parseDateString(selectedDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}</span>
            </p>
           <p className="text-sm font-medium text-[var(--text-primary)]">Select up to 4 topics (Not available)</p>
           
@@ -136,7 +137,7 @@ const AdvancedControls: React.FC<AdvancedControlsProps> = ({
             <label className="block text-sm font-medium mb-1 text-[var(--text-primary)]">New Total Study Time for Day:</label>
             <TimeInputScroller valueInMinutes={overallStudyTimeTotalMinutes} onChange={setOverallStudyTimeTotalMinutes} maxHours={12} />
           </div>
-          <Button onClick={handleTopicTimeRebalance} className="w-full" size="sm" disabled={isLoading}>Apply Topic/Time Rebalance</Button>
+          <Button onClick={handleTopicTimeRebalance} className="w-full" size="sm" disabled={isLoading || true}>Apply Topic/Time Rebalance</Button>
         </div>
       )}
 
