@@ -53,10 +53,10 @@
   --z-notification: 120;
 }
 
-/* --- 1. Base Setup & THE DEFINITIVE Wallpaper Fix --- */
+/* --- 1. Base Setup & Wallpaper --- */
 html {
   height: 100%;
-  background-color: #000; /* Fallback background in case image fails */
+  background-color: #000; /* Fallback background color */
 }
 
 body {
@@ -66,41 +66,42 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   -webkit-tap-highlight-color: transparent;
-  overflow: hidden; /* Prevent body scrolling */
-  
-  /* Apply the background image using the CSS variable set from React */
-  background-image: var(--wallpaper-url);
-  background-repeat: no-repeat;
-  background-position: center center;
-  background-attachment: fixed;
-  background-size: cover;
+  overflow: hidden; /* Prevent body from scrolling */
+  /* The background image is now handled by the ::before pseudo-element */
 }
 
-/* Create a pseudo-element overlay for the blur effect */
+/* 
+  This pseudo-element acts as the dedicated background layer.
+  It is fixed to the viewport, displays the wallpaper, and applies a blur effect.
+  The main content in #root sits on top of this layer.
+*/
 body::before {
   content: '';
   position: fixed;
   inset: 0;
-  /* This sits behind the #root content but on top of the body's background */
-  z-index: 0; 
-  /* Use backdrop-filter for a more performant and stable blur effect */
-  -webkit-backdrop-filter: blur(24px) brightness(60%);
-  backdrop-filter: blur(24px) brightness(60%);
+  z-index: 0; /* Sits behind the main content */
+  
+  /* Image is applied here from the variable set in App.tsx */
+  background-image: var(--wallpaper-url);
+  background-position: center center;
+  background-size: cover;
+  
+  /* Blur and dim the image */
+  filter: blur(16px) brightness(60%);
+  
+  /* Slightly scale up to prevent blurred edges from showing */
+  transform: scale(1.05);
 }
 
 #root {
   height: 100%;
-  background-color: transparent; /* VERY IMPORTANT: React root must be see-through */
+  background-color: transparent; /* Must be transparent to see the background layer */
   
-  /* CRITICAL: Create a new stacking context. */
+  /* Creates a stacking context to ensure content is above the ::before pseudo-element */
   position: relative;
   isolation: isolate;
-  /* This must have a higher z-index than the body::before overlay to appear on top. */
   z-index: 1;
 }
-
-/* The old .background-wallpaper class is no longer needed and has been removed. */
-
 
 /* --- 2. Glass Panel System --- */
 .static-glow-border,
