@@ -302,3 +302,16 @@ export interface PlanDataBlob {
   resources: StudyResource[];
   exceptions: ExceptionDateRule[];
 }
+
+export interface MasterResourcePoolViewerProps {
+  resources: StudyResource[];
+  onOpenAddResourceModal: () => void;
+  onEditResource: (resource: StudyResource) => void;
+  onArchiveResource: (resourceId: string) => void;
+  onRestoreResource: (resourceId: string) => void;
+  onPermanentDeleteResource: (resourceId: string) => void;
+  scheduledResourceIds: Set<string>;
+  onGoToDate: (resourceId: string) => void;
+  onHighlightDates: (resourceId: string) => void;
+  onClearHighlights: () => void;
+}

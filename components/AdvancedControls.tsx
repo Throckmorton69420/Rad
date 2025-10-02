@@ -129,7 +129,7 @@ const AdvancedControls: React.FC<AdvancedControlsProps> = ({
       {showTopicTimeOptions && (
         <div className="p-3 bg-[var(--background-tertiary)] rounded-lg mt-2 space-y-3 animate-fade-in">
            <p className="text-sm font-medium text-[var(--text-primary)]">
-             For Day: <span className="font-bold">{parseDateString(selectedDate).toLocaleDateString()}</span>
+             For Day: <span className="font-bold">{parseDateString(selectedDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}</span>
            </p>
           <p className="text-sm font-medium text-[var(--text-primary)]">Select up to 4 topics (Not available)</p>
           

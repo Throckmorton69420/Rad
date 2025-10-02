@@ -22,6 +22,7 @@ import ConfirmationModal from './components/ConfirmationModal';
 import WelcomeModal from './components/WelcomeModal';
 import TopicOrderManager from './components/TopicOrderManager';
 import ModifyDayTasksModal from './components/ModifyDayTasksModal';
+import MasterResourcePoolViewer from './components/MasterResourcePoolViewer';
 import { formatDuration, getTodayInNewYork, parseDateString } from './utils/timeFormatter';
 
 
@@ -62,7 +63,7 @@ const App: React.FC = () => {
     isActive: false, isStudySession: true, timeLeft: POMODORO_DEFAULT_STUDY_MINS * 60,
   });
   const [currentPomodoroTaskId, setCurrentPomodoroTaskId] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'schedule' | 'progress'>('schedule');
+  const [activeTab, setActiveTab] = useState<'schedule' | 'progress' | 'content'>('schedule');
   const [highlightedDates, setHighlightedDates] = useState<string[]>([]);
   const [isPomodoroCollapsed, setIsPomodoroCollapsed] = usePersistentState('radiology_pomodoro_collapsed', true);
 
@@ -294,7 +295,28 @@ const App: React.FC = () => {
 
   const selectedDaySchedule = studyPlan?.schedule.find(day => day.date === selectedDate);
   const currentPomodoroTask = currentPomodoroTaskId ? studyPlan?.schedule.flatMap(d => d.tasks).find(t => t.id === currentPomodoroTaskId) : null;
-  const notificationPortal = typeof document !== 'undefined' ? document.getElementById('notifications') : null;
+  const scheduledResourceIds = useMemo(() => {
+    if (!studyPlan) return new Set<string>();
+    return new Set(studyPlan.schedule.flatMap(day => day.tasks.map(task => task.originalResourceId || task.resourceId)));
+  }, [studyPlan?.schedule]);
+
+  const handleHighlightDatesForResource = useCallback((resourceId: string) => {
+      if (!studyPlan) return;
+      const dates = studyPlan.schedule
+          .filter(day => day.tasks.some(task => (task.originalResourceId || task.resourceId) === resourceId))
+          .map(day => day.date);
+      setHighlightedDates(dates);
+  }, [studyPlan]);
+
+  const handleGoToDateForResource = useCallback((resourceId: string) => {
+    if (!studyPlan) return;
+    const firstDay = studyPlan.schedule.find(day => day.tasks.some(task => (task.originalResourceId || task.resourceId) === resourceId));
+    if (firstDay) {
+        setSelectedDate(firstDay.date);
+        setActiveTab('schedule');
+        if (isMobile) setIsSidebarOpen(false);
+    }
+  }, [studyPlan, isMobile]);
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -465,14 +487,6 @@ const App: React.FC = () => {
           </div>
         </header>
         
-        {systemNotification && notificationPortal && ReactDOM.createPortal(
-          <div className={`p-3 text-sm text-center flex justify-between items-center ${systemNotification.type === 'error' ? 'bg-red-700 text-red-100' : 'bg-purple-600 text-purple-100'}`}>
-            <span><i className={`fas ${systemNotification.type === 'error' ? 'fa-exclamation-circle' : 'fa-info-circle'} mr-2`}></i>{systemNotification.message}</span>
-            <button onClick={() => setSystemNotification(null)} className="ml-4 font-bold" aria-label="Dismiss notification">&times;</button>
-          </div>,
-          notificationPortal
-        )}
-
         <main className={`flex-1 overflow-y-auto min-h-0 ${isMobile && isSidebarOpen ? 'overflow-hidden' : ''}`}>
             <div className="pt-3 md:pt-6 pl-[calc(0.75rem+env(safe-area-inset-left))] pr-[calc(0.75rem+env(safe-area-inset-right))] flex flex-col">
               <div className="mb-6 flex-shrink-0 px-3 md:px-6">
@@ -482,6 +496,9 @@ const App: React.FC = () => {
                         </button>
                         <button onClick={() => setActiveTab('progress')} className={`py-1.5 px-4 font-semibold text-sm rounded-md flex-1 transition-colors ${activeTab === 'progress' ? 'bg-[var(--background-tertiary-hover)] shadow text-[var(--text-primary)]' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}>
                             <i className="fa-solid fa-chart-pie mr-2"></i> Progress
+                        </button>
+                        <button onClick={() => setActiveTab('content')} className={`py-1.5 px-4 font-semibold text-sm rounded-md flex-1 transition-colors ${activeTab === 'content' ? 'bg-[var(--background-tertiary-hover)] shadow text-[var(--text-primary)]' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}>
+                            <i className="fa-solid fa-book-bookmark mr-2"></i> Content
                         </button>
                     </div>
                 </div>
@@ -513,9 +530,31 @@ const App: React.FC = () => {
                     )}
                     
                     {!isLoading && activeTab === 'progress' && studyPlan && <ProgressDisplay studyPlan={studyPlan} />}
+
+                    {!isLoading && activeTab === 'content' && studyPlan && (
+                        <MasterResourcePoolViewer 
+                            resources={globalMasterResourcePool}
+                            onOpenAddResourceModal={() => openResourceEditor(null)}
+                            onEditResource={openResourceEditor}
+                            onArchiveResource={handleRequestArchive}
+                            onRestoreResource={handleRestoreResource}
+                            onPermanentDeleteResource={handlePermanentDelete}
+                            scheduledResourceIds={scheduledResourceIds}
+                            onGoToDate={handleGoToDateForResource}
+                            onHighlightDates={handleHighlightDatesForResource}
+                            onClearHighlights={() => setHighlightedDates([])}
+                        />
+                    )}
                 </div>
             </div>
         </main>
+
+        {systemNotification && (
+          <div className={`flex-shrink-0 p-3 text-sm text-center flex justify-between items-center ${systemNotification.type === 'error' ? 'bg-red-800/90 text-red-100' : 'bg-purple-800/90 text-purple-100'} backdrop-blur-sm border-t border-white/10`}>
+            <span className="text-left"><i className={`fas ${systemNotification.type === 'error' ? 'fa-exclamation-circle' : 'fa-info-circle'} mr-2`}></i>{systemNotification.message}</span>
+            <button onClick={() => setSystemNotification(null)} className="ml-4 font-bold text-xl leading-none" aria-label="Dismiss notification">&times;</button>
+          </div>
+        )}
       </div>
       
       {modalStates.isWelcomeModalOpen && <WelcomeModal isOpen={modalStates.isWelcomeModalOpen} onClose={closeWelcomeModal} />}

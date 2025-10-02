@@ -1,5 +1,3 @@
-
-
 import { StudyResource, ResourceType, Domain } from '../types';
 
 export const addResourceToGlobalPool = (
@@ -33,7 +31,7 @@ const durationToMinutes = (durationStr: string): number => {
 };
 
 const readingDuration = (pages: number | undefined): number => {
-    return pages ? Math.round(pages * 1.5) : 0;
+    return pages ? Math.round(pages * 1.0) : 0;
 };
 
 
@@ -787,7 +785,7 @@ const discordVideoResources: StudyResource[] = discordVideos.flatMap((vid: any, 
         title: `${vid.title}`,
         domain: getDiscordDomain(vid.category, vid.title),
         type: ResourceType.VIDEO_LECTURE,
-        durationMinutes: durationToMinutes(vid.duration),
+        durationMinutes: Math.round(durationToMinutes(vid.duration) / 1.25),
         videoSource: 'Discord Review Sessions',
         sequenceOrder: 3000 + i,
         isPrimaryMaterial: false,
@@ -797,6 +795,48 @@ const discordVideoResources: StudyResource[] = discordVideos.flatMap((vid: any, 
         // No priority for optional tasks
     }];
 });
+
+const caseCompanionResources: StudyResource[] = [
+    // Part 1: Aunt Minnie's
+    { id: 'cc_am_neuro', title: "Case Companion - Aunt Minnie's: Neuro", domain: Domain.NEURORADIOLOGY, type: ResourceType.CASES, durationMinutes: 19, caseCount: 19 },
+    { id: 'cc_am_msk', title: "Case Companion - Aunt Minnie's: MSK", domain: Domain.MUSCULOSKELETAL_IMAGING, type: ResourceType.CASES, durationMinutes: 24, caseCount: 24 },
+    { id: 'cc_am_cardiac', title: "Case Companion - Aunt Minnie's: Cardiac", domain: Domain.CARDIOVASCULAR_IMAGING, type: ResourceType.CASES, durationMinutes: 10, caseCount: 10 },
+    { id: 'cc_am_thoracic', title: "Case Companion - Aunt Minnie's: Thoracic", domain: Domain.THORACIC_IMAGING, type: ResourceType.CASES, durationMinutes: 6, caseCount: 6 },
+    { id: 'cc_am_gi', title: "Case Companion - Aunt Minnie's: GI", domain: Domain.GASTROINTESTINAL_IMAGING, type: ResourceType.CASES, durationMinutes: 11, caseCount: 11 },
+    { id: 'cc_am_gu', title: "Case Companion - Aunt Minnie's: GU/Gyn/Repro", domain: Domain.GENITOURINARY_IMAGING, type: ResourceType.CASES, durationMinutes: 14, caseCount: 14 },
+    { id: 'cc_am_nukes', title: "Case Companion - Aunt Minnie's: Nukes", domain: Domain.NUCLEAR_MEDICINE, type: ResourceType.CASES, durationMinutes: 4, caseCount: 4 },
+    { id: 'cc_am_peds', title: "Case Companion - Aunt Minnie's: Peds", domain: Domain.PEDIATRIC_RADIOLOGY, type: ResourceType.CASES, durationMinutes: 10, caseCount: 10 },
+    { id: 'cc_am_mammo', title: "Case Companion - Aunt Minnie's: Mammo", domain: Domain.BREAST_IMAGING, type: ResourceType.CASES, durationMinutes: 3, caseCount: 3 },
+    { id: 'cc_am_ir', title: "Case Companion - Aunt Minnie's: Vascular/IR", domain: Domain.INTERVENTIONAL_RADIOLOGY, type: ResourceType.CASES, durationMinutes: 5, caseCount: 5 },
+    { id: 'cc_am_physics', title: "Case Companion - Aunt Minnie's: Physics", domain: Domain.PHYSICS, type: ResourceType.CASES, durationMinutes: 17, caseCount: 17 },
+    { id: 'cc_am_nis', title: "Case Companion - Aunt Minnie's: NIS", domain: Domain.NIS, type: ResourceType.CASES, durationMinutes: 5, caseCount: 5 },
+    // Part 2: This vs That
+    { id: 'cc_tvt_neuro', title: 'Case Companion - This vs That: Neuro', domain: Domain.NEURORADIOLOGY, type: ResourceType.CASES, durationMinutes: 12, caseCount: 12 },
+    { id: 'cc_tvt_msk', title: 'Case Companion - This vs That: MSK', domain: Domain.MUSCULOSKELETAL_IMAGING, type: ResourceType.CASES, durationMinutes: 3, caseCount: 3 },
+    { id: 'cc_tvt_thoracic', title: 'Case Companion - This vs That: Thoracic', domain: Domain.THORACIC_IMAGING, type: ResourceType.CASES, durationMinutes: 4, caseCount: 4 },
+    { id: 'cc_tvt_gi', title: 'Case Companion - This vs That: GI', domain: Domain.GASTROINTESTINAL_IMAGING, type: ResourceType.CASES, durationMinutes: 5, caseCount: 5 },
+    { id: 'cc_tvt_gu', title: 'Case Companion - This vs That: GYN/Repro', domain: Domain.GENITOURINARY_IMAGING, type: ResourceType.CASES, durationMinutes: 2, caseCount: 2 },
+    { id: 'cc_tvt_peds', title: 'Case Companion - This vs That: Peds', domain: Domain.PEDIATRIC_RADIOLOGY, type: ResourceType.CASES, durationMinutes: 6, caseCount: 6 },
+    { id: 'cc_tvt_nukes', title: 'Case Companion - This vs That: Nukes', domain: Domain.NUCLEAR_MEDICINE, type: ResourceType.CASES, durationMinutes: 9, caseCount: 9 },
+    { id: 'cc_tvt_mammo', title: 'Case Companion - This vs That: Mammo', domain: Domain.BREAST_IMAGING, type: ResourceType.CASES, durationMinutes: 3, caseCount: 3 },
+    { id: 'cc_tvt_ir', title: 'Case Companion - This vs That: Vascular/IR', domain: Domain.INTERVENTIONAL_RADIOLOGY, type: ResourceType.CASES, durationMinutes: 5, caseCount: 5 },
+    // Part 3: Anatomy
+    { id: 'cc_ana_neuro', title: 'Case Companion - Anatomy: Neuro', domain: Domain.NEURORADIOLOGY, type: ResourceType.CASES, durationMinutes: 11, caseCount: 11 },
+    { id: 'cc_ana_ir', title: 'Case Companion - Anatomy: Vascular/Angio', domain: Domain.INTERVENTIONAL_RADIOLOGY, type: ResourceType.CASES, durationMinutes: 8, caseCount: 8 },
+    { id: 'cc_ana_cardiac', title: 'Case Companion - Anatomy: Cardiac', domain: Domain.CARDIOVASCULAR_IMAGING, type: ResourceType.CASES, durationMinutes: 2, caseCount: 2 },
+    { id: 'cc_ana_gu_us', title: 'Case Companion - Anatomy: Abd US/Prostate', domain: Domain.GENITOURINARY_IMAGING, type: ResourceType.CASES, durationMinutes: 2, caseCount: 2 },
+    { id: 'cc_ana_msk', title: 'Case Companion - Anatomy: MSK', domain: Domain.MUSCULOSKELETAL_IMAGING, type: ResourceType.CASES, durationMinutes: 4, caseCount: 4 },
+    { id: 'cc_ana_nukes', title: 'Case Companion - Anatomy: Nukes Mystery', domain: Domain.NUCLEAR_MEDICINE, type: ResourceType.CASES, durationMinutes: 3, caseCount: 3 },
+].map((res, index) => ({
+    ...res,
+    bookSource: 'Crack the Core Case Companion',
+    sequenceOrder: 1050 + index, // Place them after main textbook/video content
+    isPrimaryMaterial: true,
+    isSplittable: false,
+    isArchived: false,
+    isOptional: false,
+    schedulingPriority: 'high',
+} as StudyResource));
 
 export let masterResourcePool: StudyResource[] = [
     ...[
@@ -821,10 +861,10 @@ export let masterResourcePool: StudyResource[] = [
         },
         {
             id: `phys_wm_ch${String(i + 1).padStart(2, '0')}_vid`, title: `Crack the Core - Titan Radiology Videos - Physics – ${chapter.title}`,
-            domain: chapter.domainOverride || Domain.PHYSICS, type: ResourceType.VIDEO_LECTURE, durationMinutes: Math.round(chapter.duration + 15),
+            domain: chapter.domainOverride || Domain.PHYSICS, type: ResourceType.VIDEO_LECTURE, durationMinutes: Math.round(chapter.duration / 1.25),
             videoSource: 'Crack the Core - Titan Radiology Videos', sequenceOrder: i * 4 + 2, isPrimaryMaterial: true,
             pairedResourceIds: [`phys_wm_ch${String(i + 1).padStart(2, '0')}_read`],
-            isSplittable: (chapter.duration + 15) > 75, isArchived: false, isOptional: false, schedulingPriority: 'high',
+            isSplittable: chapter.duration > 75, isArchived: false, isOptional: false, schedulingPriority: 'high',
         }
     ]),
     ...[
@@ -846,11 +886,11 @@ export let masterResourcePool: StudyResource[] = [
         },
         {
             id: `phys_huda_ch${String(i + 1).padStart(2, '0')}_vid`, title: `Physics Review Lecture - ${chapter.title}`,
-            domain: chapter.domainOverride || Domain.PHYSICS, type: ResourceType.VIDEO_LECTURE, durationMinutes: 60,
+            domain: chapter.domainOverride || Domain.PHYSICS, type: ResourceType.VIDEO_LECTURE, durationMinutes: 48,
             videoSource: 'Physics Review Lectures (Question Banks.docx)',
             sequenceOrder: 100 + i * 3 + 2, isPrimaryMaterial: false,
             pairedResourceIds: [`phys_huda_ch${String(i + 1).padStart(2, '0')}_read`],
-            isSplittable: 60 > 75, isArchived: false, isOptional: false, schedulingPriority: 'medium',
+            isSplittable: false, isArchived: false, isOptional: false, schedulingPriority: 'medium',
         }
     ]),
     ...[
@@ -861,11 +901,10 @@ export let masterResourcePool: StudyResource[] = [
         {title: "Breast Ultrasound Techniques", pages: 15, duration: 23}, {title: "Breast MRI Contrast Protocols", pages: 18, duration: 27},
         {title: "Breast Cancer Staging", pages: 21, duration: 32},
     ].flatMap((chapter, i): StudyResource[] => {
-        const readId = `ctc1_breast_ch${String(i + 1).padStart(2, '0')}_read`; const vidId = `ctc1_breast_ch${String(i + 1).padStart(2, '0')}_vid`; const caseId = `ctc_casecomp_breast_ch${String(i + 1).padStart(2, '0')}`;
+        const readId = `ctc1_breast_ch${String(i + 1).padStart(2, '0')}_read`; const vidId = `ctc1_breast_ch${String(i + 1).padStart(2, '0')}_vid`;
         return [
-            { id: readId, title: `Crack the Core Exam (Vol 1) - Breast - ${chapter.title}`, domain: Domain.BREAST_IMAGING, type: ResourceType.READING_TEXTBOOK, durationMinutes: chapter.duration, pages: chapter.pages, bookSource: 'Crack the Core Volume 1', chapterNumber: i + 1, sequenceOrder: 200 + i * 4 + 1, isPrimaryMaterial: true, pairedResourceIds: [vidId, caseId], isSplittable: chapter.duration > 75, isArchived: false, isOptional: false, schedulingPriority: 'high' },
-            { id: vidId, title: `Crack the Core - Titan Radiology Videos - Breast - ${chapter.title}`, domain: Domain.BREAST_IMAGING, type: ResourceType.VIDEO_LECTURE, durationMinutes: 45, videoSource: 'Crack the Core - Titan Radiology Videos', sequenceOrder: 200 + i * 4 + 2, isPrimaryMaterial: true, pairedResourceIds: [readId, caseId], isSplittable: false, isArchived: false, isOptional: false, schedulingPriority: 'high' },
-            { id: caseId, title: `Crack the Core Case Companion - Breast - ${chapter.title}`, domain: Domain.BREAST_IMAGING, type: ResourceType.CASES, durationMinutes: 60, videoSource: 'Crack the Core Case Companion', sequenceOrder: 200 + i * 4 + 3, isPrimaryMaterial: true, pairedResourceIds: [readId, vidId], isSplittable: false, isArchived: false, isOptional: false, schedulingPriority: 'high' }
+            { id: readId, title: `Crack the Core Exam (Vol 1) - Breast - ${chapter.title}`, domain: Domain.BREAST_IMAGING, type: ResourceType.READING_TEXTBOOK, durationMinutes: chapter.duration, pages: chapter.pages, bookSource: 'Crack the Core Volume 1', chapterNumber: i + 1, sequenceOrder: 200 + i * 4 + 1, isPrimaryMaterial: true, pairedResourceIds: [vidId], isSplittable: chapter.duration > 75, isArchived: false, isOptional: false, schedulingPriority: 'high' },
+            { id: vidId, title: `Crack the Core - Titan Radiology Videos - Breast - ${chapter.title}`, domain: Domain.BREAST_IMAGING, type: ResourceType.VIDEO_LECTURE, durationMinutes: 36, videoSource: 'Crack the Core - Titan Radiology Videos', sequenceOrder: 200 + i * 4 + 2, isPrimaryMaterial: true, pairedResourceIds: [readId], isSplittable: false, isArchived: false, isOptional: false, schedulingPriority: 'high' },
         ];
     }),
     ...[
@@ -876,11 +915,10 @@ export let masterResourcePool: StudyResource[] = [
         { title: "Pulmonary Vascular Disease", pages: 24, duration: 36 }, { title: "Cardiac CT Techniques", pages: 30, duration: 45 },
         { title: "Cardiac MRI Protocols", pages: 33, duration: 50 },
     ].flatMap((chapter, i): StudyResource[] => {
-        const readId = `ctc1_cv_ch${String(i + 1).padStart(2, '0')}_read`; const vidId = `ctc1_cv_ch${String(i + 1).padStart(2, '0')}_vid`; const caseId = `ctc_casecomp_cv_ch${String(i + 1).padStart(2, '0')}`;
+        const readId = `ctc1_cv_ch${String(i + 1).padStart(2, '0')}_read`; const vidId = `ctc1_cv_ch${String(i + 1).padStart(2, '0')}_vid`;
         return [
-            { id: readId, title: `Crack the Core Exam (Vol 1) - Cardiovascular - ${chapter.title}`, domain: Domain.CARDIOVASCULAR_IMAGING, type: ResourceType.READING_TEXTBOOK, durationMinutes: chapter.duration, pages: chapter.pages, bookSource: 'Crack the Core Volume 1', chapterNumber: i + 1, sequenceOrder: 300 + i * 4 + 1, isPrimaryMaterial: true, pairedResourceIds: [vidId, caseId], isSplittable: chapter.duration > 75, isArchived: false, isOptional: false, schedulingPriority: 'high' },
-            { id: vidId, title: `Crack the Core - Titan Radiology Videos - Cardiovascular - ${chapter.title}`, domain: Domain.CARDIOVASCULAR_IMAGING, type: ResourceType.VIDEO_LECTURE, durationMinutes: 45, videoSource: 'Crack the Core - Titan Radiology Videos', sequenceOrder: 300 + i * 4 + 2, isPrimaryMaterial: true, pairedResourceIds: [readId, caseId], isSplittable: false, isArchived: false, isOptional: false, schedulingPriority: 'high' },
-            { id: caseId, title: `Crack the Core Case Companion - Cardiovascular - ${chapter.title}`, domain: Domain.CARDIOVASCULAR_IMAGING, type: ResourceType.CASES, durationMinutes: 60, videoSource: 'Crack the Core Case Companion', sequenceOrder: 300 + i * 4 + 3, isPrimaryMaterial: true, pairedResourceIds: [readId, vidId], isSplittable: false, isArchived: false, isOptional: false, schedulingPriority: 'high' }
+            { id: readId, title: `Crack the Core Exam (Vol 1) - Cardiovascular - ${chapter.title}`, domain: Domain.CARDIOVASCULAR_IMAGING, type: ResourceType.READING_TEXTBOOK, durationMinutes: chapter.duration, pages: chapter.pages, bookSource: 'Crack the Core Volume 1', chapterNumber: i + 1, sequenceOrder: 300 + i * 4 + 1, isPrimaryMaterial: true, pairedResourceIds: [vidId], isSplittable: chapter.duration > 75, isArchived: false, isOptional: false, schedulingPriority: 'high' },
+            { id: vidId, title: `Crack the Core - Titan Radiology Videos - Cardiovascular - ${chapter.title}`, domain: Domain.CARDIOVASCULAR_IMAGING, type: ResourceType.VIDEO_LECTURE, durationMinutes: 36, videoSource: 'Crack the Core - Titan Radiology Videos', sequenceOrder: 300 + i * 4 + 2, isPrimaryMaterial: true, pairedResourceIds: [readId], isSplittable: false, isArchived: false, isOptional: false, schedulingPriority: 'high' },
         ];
     }),
     ...[
@@ -891,11 +929,10 @@ export let masterResourcePool: StudyResource[] = [
         { title: "Inflammatory Bowel Disease", pages: 24, duration: 36 }, { title: "GI Emergencies", pages: 21, duration: 32 },
         { title: "Abdominal Wall and Peritoneum", pages: 18, duration: 27 },
     ].flatMap((chapter, i): StudyResource[] => {
-        const readId = `ctc1_gi_ch${String(i + 1).padStart(2, '0')}_read`; const vidId = `ctc1_gi_ch${String(i + 1).padStart(2, '0')}_vid`; const caseId = `ctc_casecomp_gi_ch${String(i + 1).padStart(2, '0')}`;
+        const readId = `ctc1_gi_ch${String(i + 1).padStart(2, '0')}_read`; const vidId = `ctc1_gi_ch${String(i + 1).padStart(2, '0')}_vid`;
         return [
-            { id: readId, title: `Crack the Core Exam (Vol 1) - GI - ${chapter.title}`, domain: Domain.GASTROINTESTINAL_IMAGING, type: ResourceType.READING_TEXTBOOK, durationMinutes: chapter.duration, pages: chapter.pages, bookSource: 'Crack the Core Volume 1', chapterNumber: i + 1, sequenceOrder: 400 + i * 4 + 1, isPrimaryMaterial: true, pairedResourceIds: [vidId, caseId], isSplittable: chapter.duration > 75, isArchived: false, isOptional: false, schedulingPriority: 'high' },
-            { id: vidId, title: `Crack the Core - Titan Radiology Videos - GI - ${chapter.title}`, domain: Domain.GASTROINTESTINAL_IMAGING, type: ResourceType.VIDEO_LECTURE, durationMinutes: 45, videoSource: 'Crack the Core - Titan Radiology Videos', sequenceOrder: 400 + i * 4 + 2, isPrimaryMaterial: true, pairedResourceIds: [readId, caseId], isSplittable: false, isArchived: false, isOptional: false, schedulingPriority: 'high' },
-            { id: caseId, title: `Crack the Core Case Companion - GI - ${chapter.title}`, domain: Domain.GASTROINTESTINAL_IMAGING, type: ResourceType.CASES, durationMinutes: 60, videoSource: 'Crack the Core Case Companion', sequenceOrder: 400 + i * 4 + 3, isPrimaryMaterial: true, pairedResourceIds: [readId, vidId], isSplittable: false, isArchived: false, isOptional: false, schedulingPriority: 'high' }
+            { id: readId, title: `Crack the Core Exam (Vol 1) - GI - ${chapter.title}`, domain: Domain.GASTROINTESTINAL_IMAGING, type: ResourceType.READING_TEXTBOOK, durationMinutes: chapter.duration, pages: chapter.pages, bookSource: 'Crack the Core Volume 1', chapterNumber: i + 1, sequenceOrder: 400 + i * 4 + 1, isPrimaryMaterial: true, pairedResourceIds: [vidId], isSplittable: chapter.duration > 75, isArchived: false, isOptional: false, schedulingPriority: 'high' },
+            { id: vidId, title: `Crack the Core - Titan Radiology Videos - GI - ${chapter.title}`, domain: Domain.GASTROINTESTINAL_IMAGING, type: ResourceType.VIDEO_LECTURE, durationMinutes: 36, videoSource: 'Crack the Core - Titan Radiology Videos', sequenceOrder: 400 + i * 4 + 2, isPrimaryMaterial: true, pairedResourceIds: [readId], isSplittable: false, isArchived: false, isOptional: false, schedulingPriority: 'high' },
         ];
     }),
     ...[
@@ -906,22 +943,20 @@ export let masterResourcePool: StudyResource[] = [
         { title: "Urinary Tract Infections", pages: 18, duration: 27 }, { title: "GU Emergencies", pages: 21, duration: 32 },
         { title: "GU Interventions", pages: 24, duration: 36 },
     ].flatMap((chapter, i): StudyResource[] => {
-        const readId = `ctc1_gu_ch${String(i + 1).padStart(2, '0')}_read`; const vidId = `ctc1_gu_ch${String(i + 1).padStart(2, '0')}_vid`; const caseId = `ctc_casecomp_gu_ch${String(i + 1).padStart(2, '0')}`;
+        const readId = `ctc1_gu_ch${String(i + 1).padStart(2, '0')}_read`; const vidId = `ctc1_gu_ch${String(i + 1).padStart(2, '0')}_vid`;
         return [
-            { id: readId, title: `Crack the Core Exam (Vol 1) - GU - ${chapter.title}`, domain: Domain.GENITOURINARY_IMAGING, type: ResourceType.READING_TEXTBOOK, durationMinutes: chapter.duration, pages: chapter.pages, bookSource: 'Crack the Core Volume 1', chapterNumber: i + 1, sequenceOrder: 500 + i * 4 + 1, isPrimaryMaterial: true, pairedResourceIds: [vidId, caseId], isSplittable: chapter.duration > 75, isArchived: false, isOptional: false, schedulingPriority: 'high' },
-            { id: vidId, title: `Crack the Core - Titan Radiology Videos - GU - ${chapter.title}`, domain: Domain.GENITOURINARY_IMAGING, type: ResourceType.VIDEO_LECTURE, durationMinutes: 45, videoSource: 'Crack the Core - Titan Radiology Videos', sequenceOrder: 500 + i * 4 + 2, isPrimaryMaterial: true, pairedResourceIds: [readId, caseId], isSplittable: false, isArchived: false, isOptional: false, schedulingPriority: 'high' },
-            { id: caseId, title: `Crack the Core Case Companion - GU - ${chapter.title}`, domain: Domain.GENITOURINARY_IMAGING, type: ResourceType.CASES, durationMinutes: 60, videoSource: 'Crack the Core Case Companion', sequenceOrder: 500 + i * 4 + 3, isPrimaryMaterial: true, pairedResourceIds: [readId, vidId], isSplittable: false, isArchived: false, isOptional: false, schedulingPriority: 'high' }
+            { id: readId, title: `Crack the Core Exam (Vol 1) - GU - ${chapter.title}`, domain: Domain.GENITOURINARY_IMAGING, type: ResourceType.READING_TEXTBOOK, durationMinutes: chapter.duration, pages: chapter.pages, bookSource: 'Crack the Core Volume 1', chapterNumber: i + 1, sequenceOrder: 500 + i * 4 + 1, isPrimaryMaterial: true, pairedResourceIds: [vidId], isSplittable: chapter.duration > 75, isArchived: false, isOptional: false, schedulingPriority: 'high' },
+            { id: vidId, title: `Crack the Core - Titan Radiology Videos - GU - ${chapter.title}`, domain: Domain.GENITOURINARY_IMAGING, type: ResourceType.VIDEO_LECTURE, durationMinutes: 36, videoSource: 'Crack the Core - Titan Radiology Videos', sequenceOrder: 500 + i * 4 + 2, isPrimaryMaterial: true, pairedResourceIds: [readId], isSplittable: false, isArchived: false, isOptional: false, schedulingPriority: 'high' },
         ];
     }),
     ...[
         { title: "IR Fundamentals and Safety", pages: 36, duration: 54 }, { title: "Vascular Access and Techniques", pages: 42, duration: 63 },
         { title: "Embolization Procedures", pages: 48, duration: 72 },
     ].flatMap((chapter, i): StudyResource[] => {
-        const readId = `ctc2_ir_ch${String(i + 1).padStart(2, '0')}_read`; const vidId = `ctc2_ir_ch${String(i + 1).padStart(2, '0')}_vid`; const caseId = `ctc_casecomp_ir_ch${String(i + 1).padStart(2, '0')}`;
+        const readId = `ctc2_ir_ch${String(i + 1).padStart(2, '0')}_read`; const vidId = `ctc2_ir_ch${String(i + 1).padStart(2, '0')}_vid`;
         return [
-            { id: readId, title: `Crack the Core Exam (Vol 2) - IR - ${chapter.title}`, domain: Domain.INTERVENTIONAL_RADIOLOGY, type: ResourceType.READING_TEXTBOOK, durationMinutes: chapter.duration, pages: chapter.pages, bookSource: 'Crack the Core Volume 2', chapterNumber: i + 1, sequenceOrder: 554 + i * 4 + 1, isPrimaryMaterial: true, pairedResourceIds: [vidId, caseId], isSplittable: chapter.duration > 75, isArchived: false, isOptional: false, schedulingPriority: 'high' },
-            { id: vidId, title: `Crack the Core - Titan Radiology Videos - IR - ${chapter.title}`, domain: Domain.INTERVENTIONAL_RADIOLOGY, type: ResourceType.VIDEO_LECTURE, durationMinutes: 60, videoSource: 'Crack the Core - Titan Radiology Videos', sequenceOrder: 554 + i * 4 + 2, isPrimaryMaterial: true, pairedResourceIds: [readId, caseId], isSplittable: false, isArchived: false, isOptional: false, schedulingPriority: 'high' },
-            { id: caseId, title: `Crack the Core Case Companion - IR - ${chapter.title}`, domain: Domain.INTERVENTIONAL_RADIOLOGY, type: ResourceType.CASES, durationMinutes: 60, videoSource: 'Crack the Core Case Companion', sequenceOrder: 554 + i * 4 + 3, isPrimaryMaterial: true, pairedResourceIds: [readId, vidId], isSplittable: false, isArchived: false, isOptional: false, schedulingPriority: 'high' }
+            { id: readId, title: `Crack the Core Exam (Vol 2) - IR - ${chapter.title}`, domain: Domain.INTERVENTIONAL_RADIOLOGY, type: ResourceType.READING_TEXTBOOK, durationMinutes: chapter.duration, pages: chapter.pages, bookSource: 'Crack the Core Volume 2', chapterNumber: i + 1, sequenceOrder: 554 + i * 4 + 1, isPrimaryMaterial: true, pairedResourceIds: [vidId], isSplittable: chapter.duration > 75, isArchived: false, isOptional: false, schedulingPriority: 'high' },
+            { id: vidId, title: `Crack the Core - Titan Radiology Videos - IR - ${chapter.title}`, domain: Domain.INTERVENTIONAL_RADIOLOGY, type: ResourceType.VIDEO_LECTURE, durationMinutes: 48, videoSource: 'Crack the Core - Titan Radiology Videos', sequenceOrder: 554 + i * 4 + 2, isPrimaryMaterial: true, pairedResourceIds: [readId], isSplittable: false, isArchived: false, isOptional: false, schedulingPriority: 'high' },
         ];
     }),
     ...[
@@ -932,11 +967,10 @@ export let masterResourcePool: StudyResource[] = [
         { title: "Bone Tumors and Masses", pages: 36, duration: 54 }, { title: "Metabolic Bone Disease", pages: 21, duration: 32 },
         { title: "MSK Infections and Inflammation", pages: 27, duration: 40 },
     ].flatMap((chapter, i): StudyResource[] => {
-        const readId = `ctc2_msk_ch${String(i + 1).padStart(2, '0')}_read`; const vidId = `ctc2_msk_ch${String(i + 1).padStart(2, '0')}_vid`; const caseId = `ctc_casecomp_msk_ch${String(i + 1).padStart(2, '0')}`;
+        const readId = `ctc2_msk_ch${String(i + 1).padStart(2, '0')}_read`; const vidId = `ctc2_msk_ch${String(i + 1).padStart(2, '0')}_vid`;
         return [
-            { id: readId, title: `Crack the Core Exam (Vol 2) - MSK - ${chapter.title}`, domain: Domain.MUSCULOSKELETAL_IMAGING, type: ResourceType.READING_TEXTBOOK, durationMinutes: chapter.duration, pages: chapter.pages, bookSource: 'Crack the Core Volume 2', chapterNumber: i + 1, sequenceOrder: 612 + i * 4 + 1, isPrimaryMaterial: true, pairedResourceIds: [vidId, caseId], isSplittable: chapter.duration > 75, isArchived: false, isOptional: false, schedulingPriority: 'high' },
-            { id: vidId, title: `Crack the Core - Titan Radiology Videos - MSK - ${chapter.title}`, domain: Domain.MUSCULOSKELETAL_IMAGING, type: ResourceType.VIDEO_LECTURE, durationMinutes: 45, videoSource: 'Crack the Core - Titan Radiology Videos', sequenceOrder: 612 + i * 4 + 2, isPrimaryMaterial: true, pairedResourceIds: [readId, caseId], isSplittable: false, isArchived: false, isOptional: false, schedulingPriority: 'high' },
-            { id: caseId, title: `Crack the Core Case Companion - MSK - ${chapter.title}`, domain: Domain.MUSCULOSKELETAL_IMAGING, type: ResourceType.CASES, durationMinutes: 60, videoSource: 'Crack the Core Case Companion', sequenceOrder: 612 + i * 4 + 3, isPrimaryMaterial: true, pairedResourceIds: [readId, vidId], isSplittable: false, isArchived: false, isOptional: false, schedulingPriority: 'high' }
+            { id: readId, title: `Crack the Core Exam (Vol 2) - MSK - ${chapter.title}`, domain: Domain.MUSCULOSKELETAL_IMAGING, type: ResourceType.READING_TEXTBOOK, durationMinutes: chapter.duration, pages: chapter.pages, bookSource: 'Crack the Core Volume 2', chapterNumber: i + 1, sequenceOrder: 612 + i * 4 + 1, isPrimaryMaterial: true, pairedResourceIds: [vidId], isSplittable: chapter.duration > 75, isArchived: false, isOptional: false, schedulingPriority: 'high' },
+            { id: vidId, title: `Crack the Core - Titan Radiology Videos - MSK - ${chapter.title}`, domain: Domain.MUSCULOSKELETAL_IMAGING, type: ResourceType.VIDEO_LECTURE, durationMinutes: 36, videoSource: 'Crack the Core - Titan Radiology Videos', sequenceOrder: 612 + i * 4 + 2, isPrimaryMaterial: true, pairedResourceIds: [readId], isSplittable: false, isArchived: false, isOptional: false, schedulingPriority: 'high' },
         ];
     }),
     ...[
@@ -947,11 +981,10 @@ export let masterResourcePool: StudyResource[] = [
         { title: "Head and Neck Imaging", pages: 30, duration: 45 }, { title: "Pediatric Neuroradiology", pages: 27, duration: 40 },
         { title: "Advanced Neuro Techniques", pages: 24, duration: 36 },
     ].flatMap((chapter, i): StudyResource[] => {
-        const readId = `ctc2_neuro_ch${String(i + 1).padStart(2, '0')}_read`; const vidId = `ctc2_neuro_ch${String(i + 1).padStart(2, '0')}_vid`; const caseId = `ctc_casecomp_neuro_ch${String(i + 1).padStart(2, '0')}`;
+        const readId = `ctc2_neuro_ch${String(i + 1).padStart(2, '0')}_read`; const vidId = `ctc2_neuro_ch${String(i + 1).padStart(2, '0')}_vid`;
         return [
-            { id: readId, title: `Crack the Core Exam (Vol 2) - Neuro - ${chapter.title}`, domain: Domain.NEURORADIOLOGY, type: ResourceType.READING_TEXTBOOK, durationMinutes: chapter.duration, pages: chapter.pages, bookSource: 'Crack the Core Volume 2', chapterNumber: i + 1, sequenceOrder: 703 + i * 4 + 1, isPrimaryMaterial: true, pairedResourceIds: [vidId, caseId], isSplittable: chapter.duration > 75, isArchived: false, isOptional: false, schedulingPriority: 'high' },
-            { id: vidId, title: `Crack the Core - Titan Radiology Videos - Neuro - ${chapter.title}`, domain: Domain.NEURORADIOLOGY, type: ResourceType.VIDEO_LECTURE, durationMinutes: 50, videoSource: 'Crack the Core - Titan Radiology Videos', sequenceOrder: 703 + i * 4 + 2, isPrimaryMaterial: true, pairedResourceIds: [readId, caseId], isSplittable: false, isArchived: false, isOptional: false, schedulingPriority: 'high' },
-            { id: caseId, title: `Crack the Core Case Companion - Neuro - ${chapter.title}`, domain: Domain.NEURORADIOLOGY, type: ResourceType.CASES, durationMinutes: 75, videoSource: 'Crack the Core Case Companion', sequenceOrder: 703 + i * 4 + 3, isPrimaryMaterial: true, pairedResourceIds: [readId, vidId], isSplittable: false, isArchived: false, isOptional: false, schedulingPriority: 'high' }
+            { id: readId, title: `Crack the Core Exam (Vol 2) - Neuro - ${chapter.title}`, domain: Domain.NEURORADIOLOGY, type: ResourceType.READING_TEXTBOOK, durationMinutes: chapter.duration, pages: chapter.pages, bookSource: 'Crack the Core Volume 2', chapterNumber: i + 1, sequenceOrder: 703 + i * 4 + 1, isPrimaryMaterial: true, pairedResourceIds: [vidId], isSplittable: chapter.duration > 75, isArchived: false, isOptional: false, schedulingPriority: 'high' },
+            { id: vidId, title: `Crack the Core - Titan Radiology Videos - Neuro - ${chapter.title}`, domain: Domain.NEURORADIOLOGY, type: ResourceType.VIDEO_LECTURE, durationMinutes: 40, videoSource: 'Crack the Core - Titan Radiology Videos', sequenceOrder: 703 + i * 4 + 2, isPrimaryMaterial: true, pairedResourceIds: [readId], isSplittable: false, isArchived: false, isOptional: false, schedulingPriority: 'high' },
         ];
     }),
     ...[
@@ -966,7 +999,7 @@ export let masterResourcePool: StudyResource[] = [
         const readId = `ctc2_nucs_ch${String(i + 1).padStart(2, '0')}_read`; const vidId = `ctc2_nucs_ch${String(i + 1).padStart(2, '0')}_vid`;
         return [
             { id: readId, title: `Crack the Core Exam (Vol 2) - Nuclear - ${chapter.title}`, domain: Domain.NUCLEAR_MEDICINE, type: ResourceType.READING_TEXTBOOK, durationMinutes: chapter.duration, pages: chapter.pages, bookSource: 'Crack the Core Volume 2', chapterNumber: i + 1, sequenceOrder: 806 + i * 3 + 1, isPrimaryMaterial: true, pairedResourceIds: [vidId], isSplittable: chapter.duration > 75, isArchived: false, isOptional: false, schedulingPriority: 'high' },
-            { id: vidId, title: `Crack the Core - Titan Radiology Videos - Nuclear - ${chapter.title}`, domain: Domain.NUCLEAR_MEDICINE, type: ResourceType.VIDEO_LECTURE, durationMinutes: 40, videoSource: 'Crack the Core - Titan Radiology Videos', sequenceOrder: 806 + i * 3 + 2, isPrimaryMaterial: true, pairedResourceIds: [readId], isSplittable: false, isArchived: false, isOptional: false, schedulingPriority: 'high' },
+            { id: vidId, title: `Crack the Core - Titan Radiology Videos - Nuclear - ${chapter.title}`, domain: Domain.NUCLEAR_MEDICINE, type: ResourceType.VIDEO_LECTURE, durationMinutes: 32, videoSource: 'Crack the Core - Titan Radiology Videos', sequenceOrder: 806 + i * 3 + 2, isPrimaryMaterial: true, pairedResourceIds: [readId], isSplittable: false, isArchived: false, isOptional: false, schedulingPriority: 'high' },
         ];
     }),
     ...[
@@ -979,7 +1012,7 @@ export let masterResourcePool: StudyResource[] = [
         const readId = `ctc2_peds_ch${String(i + 1).padStart(2, '0')}_read`; const vidId = `ctc2_peds_ch${String(i + 1).padStart(2, '0')}_vid`;
         return [
             { id: readId, title: `Crack the Core Exam (Vol 2) - Pediatric - ${chapter.title}`, domain: Domain.PEDIATRIC_RADIOLOGY, type: ResourceType.READING_TEXTBOOK, durationMinutes: chapter.duration, pages: chapter.pages, bookSource: 'Crack the Core Volume 2', chapterNumber: i + 1, sequenceOrder: 872 + i * 3 + 1, isPrimaryMaterial: true, pairedResourceIds: [vidId], isSplittable: chapter.duration > 75, isArchived: false, isOptional: false, schedulingPriority: 'high' },
-            { id: vidId, title: `Crack the Core - Titan Radiology Videos - Pediatric - ${chapter.title}`, domain: Domain.PEDIATRIC_RADIOLOGY, type: ResourceType.VIDEO_LECTURE, durationMinutes: 45, videoSource: 'Crack the Core - Titan Radiology Videos', sequenceOrder: 872 + i * 3 + 2, isPrimaryMaterial: true, pairedResourceIds: [readId], isSplittable: false, isArchived: false, isOptional: false, schedulingPriority: 'high' },
+            { id: vidId, title: `Crack the Core - Titan Radiology Videos - Pediatric - ${chapter.title}`, domain: Domain.PEDIATRIC_RADIOLOGY, type: ResourceType.VIDEO_LECTURE, durationMinutes: 36, videoSource: 'Crack the Core - Titan Radiology Videos', sequenceOrder: 872 + i * 3 + 2, isPrimaryMaterial: true, pairedResourceIds: [readId], isSplittable: false, isArchived: false, isOptional: false, schedulingPriority: 'high' },
         ];
     }),
     ...[
@@ -990,24 +1023,23 @@ export let masterResourcePool: StudyResource[] = [
         { title: "Lung Cancer Staging", pages: 33, duration: 50 }, { title: "Chest Infections", pages: 24, duration: 36 },
         { title: "High-Resolution CT Chest", pages: 27, duration: 40 },
     ].flatMap((chapter, i): StudyResource[] => {
-        const readId = `ctc1_thoracic_ch${String(i + 1).padStart(2, '0')}_read`; const vidId = `ctc1_thoracic_ch${String(i + 1).padStart(2, '0')}_vid`; const caseId = `ctc_casecomp_thoracic_ch${String(i + 1).padStart(2, '0')}`;
+        const readId = `ctc1_thoracic_ch${String(i + 1).padStart(2, '0')}_read`; const vidId = `ctc1_thoracic_ch${String(i + 1).padStart(2, '0')}_vid`;
         return [
-            { id: readId, title: `Crack the Core Exam (Vol 1) - Thoracic - ${chapter.title}`, domain: Domain.THORACIC_IMAGING, type: ResourceType.READING_TEXTBOOK, durationMinutes: chapter.duration, pages: chapter.pages, bookSource: 'Crack the Core Volume 1', chapterNumber: i + 1, sequenceOrder: 958 + i * 4 + 1, isPrimaryMaterial: true, pairedResourceIds: [vidId, caseId], isSplittable: chapter.duration > 75, isArchived: false, isOptional: false, schedulingPriority: 'high' },
-            { id: vidId, title: `Crack the Core - Titan Radiology Videos - Thoracic - ${chapter.title}`, domain: Domain.THORACIC_IMAGING, type: ResourceType.VIDEO_LECTURE, durationMinutes: 45, videoSource: 'Crack the Core - Titan Radiology Videos', sequenceOrder: 958 + i * 4 + 2, isPrimaryMaterial: true, pairedResourceIds: [readId, caseId], isSplittable: false, isArchived: false, isOptional: false, schedulingPriority: 'high' },
-            { id: caseId, title: `Crack the Core Case Companion - Thoracic - ${chapter.title}`, domain: Domain.THORACIC_IMAGING, type: ResourceType.CASES, durationMinutes: 60, videoSource: 'Crack the Core Case Companion', sequenceOrder: 958 + i * 4 + 3, isPrimaryMaterial: true, pairedResourceIds: [readId, vidId], isSplittable: false, isArchived: false, isOptional: false, schedulingPriority: 'high' }
+            { id: readId, title: `Crack the Core Exam (Vol 1) - Thoracic - ${chapter.title}`, domain: Domain.THORACIC_IMAGING, type: ResourceType.READING_TEXTBOOK, durationMinutes: chapter.duration, pages: chapter.pages, bookSource: 'Crack the Core Volume 1', chapterNumber: i + 1, sequenceOrder: 958 + i * 4 + 1, isPrimaryMaterial: true, pairedResourceIds: [vidId], isSplittable: chapter.duration > 75, isArchived: false, isOptional: false, schedulingPriority: 'high' },
+            { id: vidId, title: `Crack the Core - Titan Radiology Videos - Thoracic - ${chapter.title}`, domain: Domain.THORACIC_IMAGING, type: ResourceType.VIDEO_LECTURE, durationMinutes: 36, videoSource: 'Crack the Core - Titan Radiology Videos', sequenceOrder: 958 + i * 4 + 2, isPrimaryMaterial: true, pairedResourceIds: [readId], isSplittable: false, isArchived: false, isOptional: false, schedulingPriority: 'high' },
         ];
     }),
     ...[
         { title: "Ultrasound Physics and Techniques", pages: 42, duration: 63 }, { title: "Abdominal Ultrasound", pages: 48, duration: 72 },
         { title: "Vascular Ultrasound", pages: 45, duration: 68 },
     ].flatMap((chapter, i): StudyResource[] => {
-        const readId = `ctc2_us_ch${String(i + 1).padStart(2, '0')}_read`; const vidId = `ctc2_us_ch${String(i + 1).padStart(2, '0')}_vid`; const caseId = `ctc_casecomp_us_ch${String(i + 1).padStart(2, '0')}`;
+        const readId = `ctc2_us_ch${String(i + 1).padStart(2, '0')}_read`; const vidId = `ctc2_us_ch${String(i + 1).padStart(2, '0')}_vid`;
         return [
-            { id: readId, title: `Crack the Core Exam (Vol 2) - Ultrasound - ${chapter.title}`, domain: Domain.ULTRASOUND_IMAGING, type: ResourceType.READING_TEXTBOOK, durationMinutes: chapter.duration, pages: chapter.pages, bookSource: 'Crack the Core Volume 2', chapterNumber: i + 1, sequenceOrder: 1037 + i * 4 + 1, isPrimaryMaterial: true, pairedResourceIds: [vidId, caseId], isSplittable: chapter.duration > 75, isArchived: false, isOptional: false, schedulingPriority: 'high' },
-            { id: vidId, title: `Crack the Core - Titan Radiology Videos - Ultrasound - ${chapter.title}`, domain: Domain.ULTRASOUND_IMAGING, type: ResourceType.VIDEO_LECTURE, durationMinutes: 60, videoSource: 'Crack the Core - Titan Radiology Videos', sequenceOrder: 1037 + i * 4 + 2, isPrimaryMaterial: true, pairedResourceIds: [readId, caseId], isSplittable: false, isArchived: false, isOptional: false, schedulingPriority: 'high' },
-            { id: caseId, title: `Crack the Core Case Companion - Ultrasound - ${chapter.title}`, domain: Domain.ULTRASOUND_IMAGING, type: ResourceType.CASES, durationMinutes: 60, videoSource: 'Crack the Core Case Companion', sequenceOrder: 1037 + i * 4 + 3, isPrimaryMaterial: true, pairedResourceIds: [readId, vidId], isSplittable: false, isArchived: false, isOptional: false, schedulingPriority: 'high' }
+            { id: readId, title: `Crack the Core Exam (Vol 2) - Ultrasound - ${chapter.title}`, domain: Domain.ULTRASOUND_IMAGING, type: ResourceType.READING_TEXTBOOK, durationMinutes: chapter.duration, pages: chapter.pages, bookSource: 'Crack the Core Volume 2', chapterNumber: i + 1, sequenceOrder: 1037 + i * 4 + 1, isPrimaryMaterial: true, pairedResourceIds: [vidId], isSplittable: chapter.duration > 75, isArchived: false, isOptional: false, schedulingPriority: 'high' },
+            { id: vidId, title: `Crack the Core - Titan Radiology Videos - Ultrasound - ${chapter.title}`, domain: Domain.ULTRASOUND_IMAGING, type: ResourceType.VIDEO_LECTURE, durationMinutes: 48, videoSource: 'Crack the Core - Titan Radiology Videos', sequenceOrder: 1037 + i * 4 + 2, isPrimaryMaterial: true, pairedResourceIds: [readId], isSplittable: false, isArchived: false, isOptional: false, schedulingPriority: 'high' },
         ];
     }),
+    ...caseCompanionResources,
     { id: 'guide_abr_physics', title: 'ABR Physics Study Guide', domain: Domain.PHYSICS, type: ResourceType.READING_GUIDE, pages: 15, durationMinutes: readingDuration(15), bookSource: 'ABR Physics Study Guide', sequenceOrder: 1100, isPrimaryMaterial: true, isSplittable: false, isArchived: false, isOptional: false, schedulingPriority: 'high' },
     { id: 'guide_risc_2025', title: 'RISC Study Guide 2025', domain: Domain.RISC, type: ResourceType.READING_GUIDE, pages: 57, durationMinutes: readingDuration(57), bookSource: 'RISC-Study-Guide-2025.pdf', sequenceOrder: 1101, isPrimaryMaterial: true, isSplittable: (readingDuration(57) || 0) > 90, isArchived: false, isOptional: false, schedulingPriority: 'high' },
     ...createQBankChunks('qevlar_peds', 'QEVLAR - Peds', Domain.PEDIATRIC_RADIOLOGY, 321, 'QEVLAR', 2000, 'low'),
