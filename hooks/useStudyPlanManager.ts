@@ -324,9 +324,8 @@ export const useStudyPlanManager = () => {
         updatePreviousStudyPlan(studyPlan);
         const reorderedTasks = updatedTasks.map((task, index) => ({ ...task, order: index }));
         
-        const newTotalTime = reorderedTasks
-            .filter(t => !t.isOptional)
-            .reduce((sum, t) => sum + t.durationMinutes, 0);
+        // Bug Fix: Sum all tasks user manually places on the day, including optional.
+        const newTotalTime = reorderedTasks.reduce((sum, t) => sum + t.durationMinutes, 0);
 
         const newSchedule = studyPlan.schedule.map(day => {
             if (day.date === selectedDate) {

@@ -28,9 +28,9 @@ const DailyTaskList: React.FC<DailyTaskListProps> = ({
   const displayDate = parseDateString(date);
 
   useEffect(() => {
-    setEditedTime(totalStudyTimeMinutes);
+    setEditedTime(dailySchedule.totalStudyTimeMinutes);
     setIsTimeEditorOpen(false);
-  }, [date, totalStudyTimeMinutes]);
+  }, [date]); // Bug Fix: Removed totalStudyTimeMinutes to prevent unexpected closing
 
   const handleSetPomodoro = (task: ScheduledTask) => {
     onPomodoroTaskSelect(task.id);

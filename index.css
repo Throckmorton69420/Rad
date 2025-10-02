@@ -54,41 +54,35 @@
 }
 
 /* --- 1. Base Setup & THE DEFINITIVE Wallpaper Fix --- */
-html {
+html, body {
   height: 100%;
-  background-color: transparent; /* CRITICAL: Must be transparent to see the pseudo-element behind it. */
-}
-
-/* Create the background on the highest-level element's pseudo-element */
-html::before {
-  content: '';
-  position: fixed;
-  inset: -20px; /* Overscan to prevent blurry edges */
-  z-index: -1; /* CRITICAL: Send it behind the html element */
-  /* CRITICAL: Set fallback color AND image in the same property */
-  background: #000 url('/light-stream-blue-big-sur-kf.jpg') no-repeat center center;
-  background-size: cover;
-  filter: blur(24px) brightness(0.6);
-  transform: scale(1.1); /* Zoom in to fill overscan area */
-}
-
-body {
-  height: 100%;
-  background-color: transparent; /* VERY IMPORTANT: Body must be see-through */
+  background-color: #000; /* Fallback background */
   color: var(--text-primary);
   font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   -webkit-tap-highlight-color: transparent;
   overflow: hidden; /* Prevent body scrolling */
-
-  /* CRITICAL: Create a new stacking context. This ensures nothing inside the body can go behind the html::before pseudo-element. */
-  isolation: isolate;
 }
 
 #root {
   height: 100%;
-  background-color: transparent; /* VERY IMPORTANT: React root must also be see-through */
+  background-color: transparent; /* VERY IMPORTANT: React root must be see-through */
+  
+  /* CRITICAL: Create a new stacking context. This ensures the background div with z-index: -1 stays behind other content within #root. */
+  position: relative;
+  isolation: isolate;
+  z-index: 0;
+}
+
+.background-wallpaper {
+  position: fixed;
+  inset: -20px; /* Overscan to prevent blurry edges on some screens */
+  z-index: -1; /* CRITICAL: Send it behind its siblings inside the #root stacking context */
+  background: url('/light-stream-blue-big-sur-kf.jpg') no-repeat center center;
+  background-size: cover;
+  filter: blur(24px) brightness(0.6);
+  transform: scale(1.1); /* Zoom in slightly to fill overscan area */
 }
 
 

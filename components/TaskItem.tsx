@@ -48,21 +48,23 @@ const TaskItem: React.FC<PatchedTaskItemProps> = ({ task, onToggle, isCurrentPom
 
   return (
     <div 
-        className={`p-1.5 rounded-lg shadow-sm transition-all duration-150 relative ${taskBgColor} ${taskOpacity} interactive-glow-border backdrop-blur-lg overflow-hidden`}
+        onClick={() => onToggle(task.id)}
+        className={`p-1.5 rounded-lg shadow-sm transition-all duration-150 relative ${taskBgColor} ${taskOpacity} interactive-glow-border backdrop-blur-lg overflow-hidden cursor-pointer`}
         role="group"
+        aria-label={`Task: ${displayTitle}. Status is ${isCompleted ? 'completed' : 'pending'}. Click to toggle.`}
     >
       <div className="absolute left-0 top-0 bottom-0 w-1.5" style={{ backgroundColor: sourceColorStyle.backgroundColor }} title={task.bookSource || task.videoSource || 'Custom Task'}></div>
       <div className="ml-2">
         <div className="flex items-start">
           <button 
-            onClick={() => onToggle(task.id)} 
+            onClick={(e) => { e.stopPropagation(); onToggle(task.id); }} 
             className="mr-2 ml-1 flex-shrink-0 cursor-pointer h-6 w-6 rounded-full flex items-center justify-center mt-1"
             aria-label={isCompleted ? "Mark task as pending" : "Mark task as complete"}
           >
             {isCompleted ? <i className="fas fa-check-circle text-[var(--accent-green)] text-2xl"></i> : <i className="far fa-circle text-[var(--text-secondary)] hover:text-[var(--text-primary)] text-2xl"></i>}
           </button>
 
-          <div className="flex-grow min-w-0 cursor-pointer flex flex-col items-start" onClick={() => !isCompleted && onToggle(task.id)} role="button" tabIndex={0} onKeyDown={e => { if (e.key === ' ' || e.key === 'Enter') onToggle(task.id)}}>
+          <div className="flex-grow min-w-0 flex flex-col items-start">
             <h4 className={`text-base font-semibold ${titleColor} ${isCompleted ? 'line-through' : ''} leading-snug`} title={displayTitle}>
               {displayTitle}
             </h4>
