@@ -106,7 +106,7 @@ const ResourceEditorModal: React.FC<ResourceEditorModalProps> = ({
   return (
     <FocusTrap active={isOpen}>
       <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-[var(--z-modal)]" role="dialog" aria-modal="true" aria-labelledby="resource-editor-title">
-        <div className="modal-panel static-glow-border p-6 w-full max-w-lg text-[var(--text-primary)] max-h-[90vh] overflow-y-auto">
+        <div className="modal-panel p-6 w-full max-w-lg text-[var(--text-primary)] max-h-[90vh] overflow-y-auto">
           <div className="flex justify-between items-center mb-4">
             <h2 id="resource-editor-title" className="text-xl font-semibold text-[var(--text-primary)]">
               {isEditMode ? 'Edit Resource' : 'Add New Resource'}

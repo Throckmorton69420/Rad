@@ -84,7 +84,7 @@ const TimeInputScroller: React.FC<TimeInputScrollerProps> = ({
     }, 150);
   };
 
-  const containerClasses = `flex justify-center items-center h-40 bg-[var(--background-tertiary)] rounded-lg overflow-hidden relative static-glow-border ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`;
+  const containerClasses = `flex justify-center items-center h-40 glass-panel rounded-lg overflow-hidden relative ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`;
   const highlightClasses = "absolute top-1/2 -translate-y-1/2 h-8 w-full bg-white/10 border-y border-[var(--accent-purple)] rounded-lg pointer-events-none scroller-highlight-glow";
   
   const scrollContainerClasses = "w-1/2 h-full overflow-y-scroll snap-y snap-mandatory no-scrollbar";

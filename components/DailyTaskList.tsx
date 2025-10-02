@@ -54,7 +54,7 @@ const DailyTaskList: React.FC<DailyTaskListProps> = ({
           <Button onClick={() => onNavigateDay('next')} variant="ghost" size="sm" className="!px-2.5" aria-label="Next Day"><i className="fas fa-chevron-right"></i></Button>
         </div>
         
-        <div className="mt-4 mb-4 p-3 bg-[var(--background-tertiary)] rounded-lg interactive-glow-border">
+        <div className="mt-4 mb-4 p-3 glass-panel rounded-lg">
           <div className="flex justify-between items-center">
             <div>
               <p className="text-xs text-[var(--text-secondary)]">Total Planned Time</p>
@@ -81,14 +81,14 @@ const DailyTaskList: React.FC<DailyTaskListProps> = ({
       <div className="flex-grow">
         <div className="flex-grow min-h-[200px] transition-colors p-1 rounded-lg pb-32">
           {isRestDay ? (
-            <div className="h-full flex flex-col justify-center items-center text-center p-6 bg-[var(--background-tertiary)] rounded-lg interactive-glow-border">
+            <div className="h-full flex flex-col justify-center items-center text-center p-6 glass-panel rounded-lg">
               <i className="fas fa-coffee fa-2x text-[var(--text-secondary)] mb-3"></i>
               <p className="text-lg font-semibold">Rest Day</p>
               <p className="text-sm text-[var(--text-secondary)] mb-4">Take a well-deserved break!</p>
               <Button onClick={() => onToggleRestDay(true)} variant="secondary" size="sm">Make it a Study Day</Button>
             </div>
           ) : tasks.length === 0 ? (
-            <div className="h-full flex flex-col justify-center items-center text-center p-6 bg-[var(--background-tertiary)] rounded-lg interactive-glow-border">
+            <div className="h-full flex flex-col justify-center items-center text-center p-6 glass-panel rounded-lg">
               <i className="fas fa-calendar-check fa-2x text-[var(--text-secondary)] mb-3"></i>
               <p className="text-lg font-semibold">No Tasks Scheduled</p>
               <p className="text-sm text-[var(--text-secondary)] mb-4">You can add optional tasks or rebalance your schedule.</p>

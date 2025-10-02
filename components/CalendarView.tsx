@@ -86,8 +86,8 @@ const CalendarView: React.FC<CalendarViewProps> = ({ schedule, selectedDate, onD
 
                 const buttonClasses = [
                     'p-1.5', 'rounded-md', 'text-xs', 'text-center', 'focus:outline-none', 'focus-visible:ring-2', 'focus-visible:ring-[var(--accent-purple)]',
-                    'h-14 md:h-16', 'flex', 'flex-col', 'justify-between', 'items-center', 'relative', 'transition-all',
-                    isSelected ? 'bg-[var(--accent-purple)] text-white static-glow-border' : 'bg-[var(--background-tertiary)] hover:bg-[var(--background-tertiary-hover)] text-[var(--text-primary)] interactive-glow-border',
+                    'h-14 md:h-16', 'flex', 'flex-col', 'justify-between', 'items-center', 'relative', 'transition-all', 'glass-panel', 'glass-panel-interactive',
+                    isSelected ? 'bg-[var(--accent-purple)] text-white' : 'text-[var(--text-primary)]',
                     isToday && !isSelected ? 'ring-1 ring-[var(--text-secondary)]' : '',
                     isHighlighted ? 'is-highlighted' : '',
                     daySchedule?.isRestDay && !isSelected ? 'opacity-50' : '',
@@ -110,7 +110,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ schedule, selectedDate, onD
                         )}
                         {daySchedule?.isManuallyModified && !isSelected && <i className="fas fa-hand-paper text-xxs text-[var(--accent-yellow)] absolute top-1 right-1" title="Manually Modified"></i>}
                         {daySchedule && !daySchedule.isRestDay && daySchedule.totalStudyTimeMinutes > 0 && (
-                            <span className={`mt-auto text-xxs px-1 py-0.5 rounded ${isSelected ? 'bg-black/30' : 'bg-[var(--background-secondary)]'}`}>
+                            <span className={`mt-auto text-xxs px-1 py-0.5 rounded ${isSelected ? 'bg-black/30' : 'bg-black/50'}`}>
                                 {Math.round(daySchedule.totalStudyTimeMinutes / 60)}h
                             </span>
                         )}
@@ -178,7 +178,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ schedule, selectedDate, onD
   }
 
   return (
-    <div className="p-3 md:p-4 rounded-lg bg-[var(--background-tertiary)] interactive-glow-border">
+    <div className="p-3 md:p-4 glass-panel rounded-lg">
       <div className="flex justify-between items-center mb-3 gap-2">
         <Button onClick={() => onNavigatePeriod('prev')} variant="ghost" size="sm" className="!px-2" aria-label="Previous Period"><i className="fas fa-chevron-left"></i></Button>
         <h3 className="text-sm font-semibold text-[var(--text-primary)] text-center flex-grow" aria-live="polite">

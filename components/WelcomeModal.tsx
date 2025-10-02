@@ -13,7 +13,7 @@ const WelcomeModal: React.FC<WelcomeModalProps> = ({ isOpen, onClose }) => {
   return (
     <FocusTrap active={isOpen}>
       <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-[150]" role="dialog" aria-modal="true" aria-labelledby="welcome-title">
-        <div className="modal-panel static-glow-border p-6 w-full max-w-lg text-[var(--text-primary)]" role="dialog" aria-modal="true" aria-labelledby="welcome-title">
+        <div className="modal-panel p-6 w-full max-w-lg text-[var(--text-primary)]" role="dialog" aria-modal="true" aria-labelledby="welcome-title">
           <div className="flex justify-between items-center mb-4">
             <h2 id="welcome-title" className="text-2xl font-bold text-[var(--text-primary)] flex items-center">
                 <i className="fas fa-brain mr-3 text-[var(--accent-purple)]"></i> Welcome to the Planner!

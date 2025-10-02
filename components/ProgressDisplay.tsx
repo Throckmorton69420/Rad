@@ -11,12 +11,12 @@ interface ProgressDisplayProps {
 }
 
 const ProgressItem: React.FC<{label: string; percentage: number; completed: number; total: number; color?: string;}> = ({ label, percentage, completed, total, color }) => (
-  <div className="p-3 rounded-lg static-glow-border bg-[var(--background-tertiary)]">
+  <div className="p-3 rounded-lg glass-panel">
     <div className="flex justify-between items-baseline mb-3">
       <p className="text-sm font-medium text-[var(--text-primary)]">{label}</p>
       <p className="text-xs font-semibold text-[var(--text-secondary)]">{Math.round(percentage)}%</p>
     </div>
-    <div className="w-full bg-black/30 rounded-full h-2.5 progress-bar-track static-glow-border">
+    <div className="w-full bg-black/30 rounded-full h-2.5 progress-bar-track">
       <div className="progress-bar-fill" style={{ width: `${percentage}%`, backgroundImage: color ? 'none' : undefined, backgroundColor: color }}></div>
     </div>
     <p className="text-xs text-[var(--text-secondary)] mt-1 text-right">
@@ -198,12 +198,12 @@ const ProgressDisplay: React.FC<ProgressDisplayProps> = ({ studyPlan }) => {
       <div className="mt-8">
         <div>
           <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-2">Overall Progress</h3>
-          <div className='mt-2 p-4 static-glow-border rounded-lg bg-[var(--background-tertiary)]'>
+          <div className='mt-2 p-4 glass-panel rounded-lg'>
               <div className="flex justify-between items-baseline mb-3">
                   <span className="text-sm font-medium text-[var(--text-secondary)]">Total Completion</span>
                   <span className="text-sm font-bold text-[var(--text-primary)]">{Math.round(overallProgressPercentage)}%</span>
               </div>
-              <div className="w-full bg-black/40 rounded-full h-4 progress-bar-track static-glow-border mt-2">
+              <div className="w-full bg-black/40 rounded-full h-4 progress-bar-track mt-2">
                   <div className="progress-bar-fill" style={{ width: `${overallProgressPercentage}%` }}></div>
               </div>
               <p className="text-sm text-[var(--text-secondary)] mt-1 text-right">{formatDuration(totalCompletedMinutes)} / {formatDuration(totalScheduledMinutes)} completed</p>
@@ -211,7 +211,7 @@ const ProgressDisplay: React.FC<ProgressDisplayProps> = ({ studyPlan }) => {
         </div>
 
         <h3 className="text-lg font-semibold text-[var(--text-primary)] mt-8">Deadlines & Projections</h3>
-        <div className="mt-2 p-4 static-glow-border rounded-lg bg-[var(--background-tertiary)]">
+        <div className="mt-2 p-4 glass-panel rounded-lg">
             <DeadlineItem label="All Content" deadline={deadlines.allContent} projected={projectedDates.allContent} onTrack={isOnTrack(deadlines.allContent, projectedDates.allContent)} />
             <DeadlineItem label="Physics" deadline={deadlines.physicsContent} projected={projectedDates.physics} onTrack={isOnTrack(deadlines.physicsContent, projectedDates.physics)} />
             <DeadlineItem label="Nuclear Medicine" deadline={deadlines.nucMedContent} projected={projectedDates.nucMed} onTrack={isOnTrack(deadlines.nucMedContent, projectedDates.nucMed)} />

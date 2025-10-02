@@ -41,8 +41,8 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, onToggle, isCurrentPomodoroTa
   };
   
   const containerClasses = [
-    'p-1.5', 'rounded-lg', 'transition-all', 'duration-150', 'relative', 'interactive-glow-border',
-    'overflow-hidden', 'cursor-pointer',
+    'p-1.5', 'rounded-lg', 'transition-all', 'duration-150', 'relative',
+    'overflow-hidden', 'cursor-pointer', 'glass-panel', 'glass-panel-interactive',
     isCompleted ? 'opacity-60' : 'opacity-100',
     isCurrentPomodoroTask ? 'is-pomodoro-active' : ''
   ].filter(Boolean).join(' ');

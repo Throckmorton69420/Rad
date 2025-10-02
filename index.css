@@ -1,62 +1,14 @@
-/* Import from Google Fonts */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-
-@keyframes aurora-bg {
-  0% { background-position: 0% 50%; }
-  50% { background-position: 100% 50%; }
-  100% { background-position: 0% 50%; }
-}
-
-:root {
-  /* High-Fidelity Liquid Glass Palette */
-  --background-primary: #000000;
-  --glass-bg-panel: rgba(30, 30, 32, 0.75);
-  --glass-bg-chrome: rgba(28, 28, 30, 0.8);
-  --glass-bg-hover: rgba(255, 255, 255, 0.1);
-  --glass-bg-active: rgba(255, 255, 255, 0.15);
-
-  --text-primary: #f5f5f7;
-  --text-secondary: rgba(235, 235, 245, 0.6); /* Semi-transparent for "vibrancy" effect */
-
-  --separator-primary: rgba(255, 255, 255, 0.12);
-  --separator-secondary: rgba(255, 255, 255, 0.08);
-
-  /* Accent Colors */
-  --accent-purple: #bf5af2;
-  --accent-green: #32d74b;
-  --accent-yellow: #ffd60a;
-  --accent-red: #ff453a;
-
-  /* UI Element Specific */
-  --input-bg: rgba(22, 22, 24, 0.7);
-  --input-border: rgba(255, 255, 255, 0.15);
-  --button-secondary-bg: rgba(44, 44, 46, 0.7);
-  --button-secondary-hover-bg: rgba(60, 60, 62, 0.8);
-  
-  /* Glass Effect Properties */
-  --glass-backdrop-filter: blur(40px) saturate(180%);
-  --glass-border-color: rgba(255, 255, 255, 0.1);
-  --glass-shadow: inset 0 1.5px 1px rgba(255, 255, 255, 0.1), 0 8px 32px rgba(0,0,0,0.37);
-
-  /* Z-Indexes */
-  --z-header: 40;
-  --z-sidebar-mobile-backdrop: 49;
-  --z-sidebar-mobile: 50;
-  --z-modal: 100;
-  --z-notification: 150;
-}
-
 body {
   font-family: 'Inter', sans-serif;
   background-color: var(--background-primary);
-  /* Darker, more vibrant "streaming" aurora effect */
+  /* Darker, slower, more vibrant "streaming" aurora effect */
   background-image: 
-    radial-gradient(ellipse 40% 50% at 20% 20%, hsla(270, 90%, 60%, 0.25) 0px, transparent 50%),
-    radial-gradient(ellipse 30% 50% at 80% 25%, hsla(190, 80%, 50%, 0.3) 0px, transparent 50%),
-    radial-gradient(ellipse 40% 50% at 10% 90%, hsla(210, 90%, 60%, 0.2) 0px, transparent 50%),
-    radial-gradient(ellipse 30% 50% at 90% 85%, hsla(330, 80%, 65%, 0.25) 0px, transparent 50%);
-  background-size: 250% 250%;
-  animation: aurora-bg 40s ease infinite;
+    radial-gradient(ellipse 50% 70% at 20% 40%, hsla(270, 90%, 60%, 0.18) 0px, transparent 50%),
+    radial-gradient(ellipse 40% 60% at 80% 30%, hsla(190, 80%, 50%, 0.22) 0px, transparent 50%),
+    radial-gradient(ellipse 50% 70% at 10% 90%, hsla(210, 90%, 60%, 0.15) 0px, transparent 50%),
+    radial-gradient(ellipse 40% 60% at 90% 80%, hsla(330, 80%, 65%, 0.2) 0px, transparent 50%);
+  background-size: 400% 400%;
+  animation: aurora-bg 60s ease infinite;
 
   color: var(--text-primary);
   overscroll-behavior: none;
@@ -71,30 +23,36 @@ body {
   overflow: hidden;
 }
 
+
 /* --- Base Panel Styling (Liquid Glass) --- */
-.interactive-glow-border, .static-glow-border, .modal-panel {
+.glass-panel, .glass-chrome, .modal-panel, .interactive-glow-border, .static-glow-border {
   background-color: var(--glass-bg-panel);
   -webkit-backdrop-filter: var(--glass-backdrop-filter);
   backdrop-filter: var(--glass-backdrop-filter);
   border: 1px solid var(--glass-border-color);
-  box-shadow: var(--glass-shadow);
+  box-shadow: var(--glass-sheen), var(--glass-shadow);
   transition: background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+  border-radius: 12px;
 }
 
-.interactive-glow-border:hover:not(.is-pomodoro-active) {
+/* Modifier for interactive panels to handle hover */
+.glass-panel-interactive:hover:not(.is-pomodoro-active) {
   background-color: var(--glass-bg-hover);
-  border-color: rgba(255, 255, 255, 0.2);
+  border-color: rgba(255, 255, 255, 0.25);
+}
+
+.glass-chrome, .modal-panel {
+  background-color: var(--glass-bg-chrome);
 }
 
 .modal-panel {
-  background-color: var(--glass-bg-chrome);
-  border-radius: 12px;
+  border-radius: 16px; /* Modals often have a slightly larger radius */
 }
 
 .is-pomodoro-active {
   background-color: var(--glass-bg-active) !important;
   border-color: var(--accent-purple) !important;
-  box-shadow: var(--glass-shadow), 0 0 15px -3px var(--accent-purple);
+  box-shadow: var(--glass-sheen), var(--glass-shadow), 0 0 15px -3px var(--accent-purple);
 }
 
 .scroller-highlight-glow {
@@ -119,6 +77,8 @@ body {
   background-color: var(--glass-bg-chrome) !important;
   -webkit-backdrop-filter: var(--glass-backdrop-filter);
   backdrop-filter: var(--glass-backdrop-filter);
+  border-radius: 0;
+  box-shadow: none;
 }
 .border-\[\--separator-primary\] {
   border-color: var(--separator-primary) !important;
@@ -157,7 +117,7 @@ body {
 }
 .button-danger:hover:not(:disabled) { background-color: color-mix(in srgb, var(--accent-red), #fff 15%); }
 
-.button-ghost { background-color: transparent; box-shadow: none; }
+.button-ghost { background-color: transparent; box-shadow: none; border: none; }
 .button-ghost:hover:not(:disabled) { background-color: rgba(191, 90, 242, 0.15); }
 
 /* --- Inputs & Selects --- */
@@ -175,10 +135,6 @@ body {
   border-color: var(--accent-purple);
   box-shadow: 0 0 0 2px rgba(191, 90, 242, 0.3);
 }
-.custom-select-button {
-  border: 1px solid var(--input-border);
-  background-color: var(--input-bg);
-}
 
 /* --- Task Item & Resource Lists --- */
 .topic-list-item.is-dragging {
@@ -194,7 +150,7 @@ body {
 }
 
 /* --- Progress Bar --- */
-.progress-bar-track { background-color: rgba(0,0,0,0.3); }
+.progress-bar-track { background-color: rgba(0,0,0,0.3); border-radius: 999px;}
 .progress-bar-fill {
   height: 100%;
   border-radius: inherit;

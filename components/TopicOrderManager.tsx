@@ -114,7 +114,7 @@ const TopicOrderManager: React.FC<TopicOrderManagerProps> = ({
   const isDirty = JSON.stringify(localOrder) !== JSON.stringify(isCramModeActive ? cramTopicOrder : topicOrder);
 
   return (
-    <div className="p-4 rounded-lg space-y-3 bg-[var(--background-tertiary)] interactive-glow-border">
+    <div className="p-4 rounded-lg space-y-3 glass-panel">
       <h3 className="text-md font-semibold mb-1 text-[var(--text-primary)]">
         {isCramModeActive ? 'Cram Mode Topic Order' : 'Topic Order Manager'}
       </h3>
@@ -141,7 +141,7 @@ const TopicOrderManager: React.FC<TopicOrderManagerProps> = ({
             <li
               key={domain}
               data-domain={domain}
-              className={`topic-list-item flex items-center p-1.5 rounded-md backdrop-blur-lg relative interactive-glow-border ${isDraggable ? 'bg-[var(--background-tertiary)]' : 'bg-black/20 opacity-70'} ${isDragging ? 'is-dragging' : ''}`}
+              className={`topic-list-item flex items-center p-1.5 rounded-md glass-panel glass-panel-interactive relative ${isDraggable ? '' : 'opacity-70'} ${isDragging ? 'is-dragging' : ''}`}
               onDragOver={(e) => isDraggable && handleDragOver(e)}
             >
               <div 

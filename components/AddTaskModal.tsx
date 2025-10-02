@@ -62,7 +62,7 @@ const AddTaskModal: React.FC<AddTaskModalProps> = ({ isOpen, onClose, onSave, av
   return (
     <FocusTrap active={isOpen}>
       <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-[var(--z-modal)]" role="dialog" aria-modal="true" aria-labelledby="add-task-title">
-        <div className="modal-panel static-glow-border p-6 w-full max-w-lg text-[var(--text-primary)] max-h-[90vh] overflow-y-auto">
+        <div className="modal-panel p-6 w-full max-w-lg text-[var(--text-primary)] max-h-[90vh] overflow-y-auto">
           <div className="flex justify-between items-center mb-4">
             <h2 id="add-task-title" className="text-xl font-semibold text-[var(--text-primary)]">Add Optional Task</h2>
             <Button onClick={onClose} ref={closeButtonRef} variant="ghost" size="sm" className="!p-1 !text-[var(--text-secondary)] hover:!text-[var(--text-primary)]" aria-label="Close add task modal">

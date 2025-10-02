@@ -41,7 +41,7 @@ const DeadlineManager: React.FC<{
     );
 
     return (
-        <div className="p-3 bg-[var(--background-tertiary)] rounded-lg mt-2 space-y-3 animate-fade-in">
+        <div className="p-3 glass-panel rounded-lg mt-2 space-y-3 animate-fade-in">
             <h4 className="text-md font-semibold text-[var(--text-primary)]">Deadline Manager</h4>
             <p className="text-xxs text-[var(--text-secondary)] -mt-2">Set target completion dates for primary content. The scheduler will adjust daily hours to meet these goals.</p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -106,7 +106,7 @@ const AdvancedControls: React.FC<AdvancedControlsProps> = ({
 };
 
   return (
-    <div className="p-4 rounded-lg space-y-3 bg-[var(--background-tertiary)] interactive-glow-border">
+    <div className="p-4 rounded-lg space-y-3 glass-panel">
       <h2 className="text-lg font-semibold mb-2 border-b border-[var(--separator-primary)] pb-2 text-[var(--text-primary)]">Advanced Controls</h2>
       
       <div className="p-3 bg-yellow-900/20 rounded-md space-y-2 border border-yellow-800/50">
@@ -141,7 +141,7 @@ const AdvancedControls: React.FC<AdvancedControlsProps> = ({
 
 
       {showTopicTimeOptions && (
-        <div className="p-3 bg-[var(--background-tertiary)] rounded-lg mt-2 space-y-3 animate-fade-in">
+        <div className="p-3 glass-panel rounded-lg mt-2 space-y-3 animate-fade-in">
            <p className="text-sm font-medium text-[var(--text-primary)]">
              For Day: <span className="font-bold">{parseDateString(selectedDate).toLocaleDateString('en-US', { timeZone: 'UTC', month: 'long', day: 'numeric' })}</span>
            </p>

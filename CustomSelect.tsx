@@ -49,7 +49,7 @@ const CustomSelect: React.FC<CustomSelectProps> = ({ options, value, onChange, i
       <button
         id={id}
         type="button"
-        className="input-base custom-select-button !py-1.5 !text-sm text-left flex items-center justify-between !rounded-lg w-full"
+        className="input-base !py-1.5 !text-sm text-left flex items-center justify-between !rounded-lg w-full"
         onClick={handleToggle}
         aria-haspopup="listbox"
         aria-expanded={isOpen}
@@ -60,7 +60,7 @@ const CustomSelect: React.FC<CustomSelectProps> = ({ options, value, onChange, i
 
       {isOpen && (
         <div 
-          className="absolute z-10 mt-1 w-full max-h-60 overflow-auto p-1.5 modal-panel static-glow-border"
+          className="absolute z-10 mt-1 w-full max-h-60 overflow-auto p-1.5 modal-panel"
           role="listbox"
         >
           {options.map(option => (

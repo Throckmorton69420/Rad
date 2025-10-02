@@ -61,7 +61,7 @@ const AddExceptionDay: React.FC<AddExceptionDayProps> = ({ onAddException, isLoa
   ];
 
   return (
-    <div className="p-4 rounded-lg space-y-3 bg-[var(--background-tertiary)] interactive-glow-border">
+    <div className="p-4 rounded-lg space-y-3 glass-panel">
         <h2 className="text-lg font-semibold mb-2 border-b border-[var(--separator-primary)] pb-2 text-[var(--text-primary)]">Add Exception Day</h2>
         <div>
             <label htmlFor="exception-date" className="block text-sm font-medium text-[var(--text-secondary)] mb-1">Date:</label>

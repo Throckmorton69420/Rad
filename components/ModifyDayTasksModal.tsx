@@ -24,8 +24,8 @@ const ResourceCard = React.memo(({
 }) => {
     const cardClasses = [
         'p-1.5', 'md:p-2', 'rounded-lg', 'transition-all', 'duration-150', 'select-none',
-        'resource-card', 'interactive-glow-border',
-        isSelected ? 'is-selected' : 'border-transparent bg-[var(--background-tertiary)]',
+        'resource-card', 'glass-panel', 'glass-panel-interactive',
+        isSelected ? 'is-selected' : '',
         isHighlighted && !isSelected ? 'is-highlighted' : '',
     ].filter(Boolean).join(' ');
 
@@ -211,8 +211,8 @@ const ModifyDayTasksModal: React.FC<ModifyDayTasksModalProps> = ({
     return (
         <FocusTrap active={isOpen}>
             <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-2 md:p-4 z-[var(--z-modal)]" role="dialog" aria-modal="true" aria-labelledby="modify-day-title">
-                <div className="modal-panel static-glow-border w-full max-w-6xl text-[var(--text-primary)] flex flex-col max-h-[90vh]">
-                    <header className="flex justify-between items-center p-3 md:p-4 flex-shrink-0 translucent-header">
+                <div className="modal-panel w-full max-w-6xl text-[var(--text-primary)] flex flex-col max-h-[90vh]">
+                    <header className="flex justify-between items-center p-3 md:p-4 flex-shrink-0 glass-chrome border-b border-[var(--glass-border-color)]">
                         <h2 id="modify-day-title" className="text-lg md:text-xl font-semibold">Modify Day: {parseDateString(selectedDate).toLocaleDateString()}</h2>
                         <Button onClick={onClose} variant="ghost" size="sm" className="!p-1 !text-[var(--text-secondary)] hover:!text-[var(--text-primary)]" aria-label="Close">
                             <i className="fas fa-times fa-lg"></i>
@@ -232,7 +232,7 @@ const ModifyDayTasksModal: React.FC<ModifyDayTasksModalProps> = ({
                             </div>
                             <div className={`flex-grow overflow-y-auto space-y-2 pr-1 md:pr-2 -mr-1 md:-mr-2 min-h-0 ${isScheduledVisible ? 'block' : 'hidden'} md:block`}>
                                 {stagedTasks.length > 0 ? stagedTasks.map(task => (
-                                    <div key={task.id} className={`flex items-center p-1.5 md:p-2 rounded-lg bg-[var(--background-tertiary)] interactive-glow-border ${draggedTaskId === task.id ? 'opacity-50' : ''}`}
+                                    <div key={task.id} className={`flex items-center p-1.5 md:p-2 rounded-lg glass-panel glass-panel-interactive ${draggedTaskId === task.id ? 'opacity-50' : ''}`}
                                         draggable onDragStart={(e) => handleStagedTaskDragStart(e, task)} onDragOver={handleStagedTaskDragOver} onDrop={(e) => handleStagedTaskDrop(e, task)} onDragEnd={handleStagedTaskDragEnd}>
                                         <i className="fas fa-grip-vertical text-[var(--text-secondary)] mr-2 md:mr-3 cursor-grab"></i>
                                         <div className="flex-grow min-w-0">
@@ -286,7 +286,7 @@ const ModifyDayTasksModal: React.FC<ModifyDayTasksModalProps> = ({
                         </div>
                     </div>
                     
-                    <footer className="flex-shrink-0 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 p-3 border-t border-[var(--separator-primary)]">
+                    <footer className="flex-shrink-0 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 p-3 border-t border-[var(--glass-border-color)] glass-chrome">
                         <p className="text-xxs md:text-xs text-[var(--text-secondary)] text-center md:text-left flex-grow">
                            <strong>Select:</strong> Double-tap (Mobile) / Click (Desktop). <strong>Multi-Select:</strong> Long-press (Mobile) / Drag (Desktop).
                         </p>

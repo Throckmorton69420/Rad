@@ -19,7 +19,7 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
   return (
     <FocusTrap active={isOpen}>
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-[var(--z-notification)]" role="dialog" aria-modal="true" aria-labelledby="confirmation-title">
-            <div className="modal-panel static-glow-border p-6 w-full max-w-md text-[var(--text-primary)]">
+            <div className="modal-panel p-6 w-full max-w-md text-[var(--text-primary)]">
                 <div className="flex justify-between items-center mb-4">
                 <h2 id="confirmation-title" className="text-xl font-semibold text-[var(--text-primary)]">{title}</h2>
                 <Button onClick={onClose} variant="ghost" size="sm" className="!p-1 !text-[var(--text-secondary)] hover:!text-[var(--text-primary)]" aria-label="Close confirmation dialog">

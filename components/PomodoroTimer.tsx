@@ -82,7 +82,7 @@ const PomodoroTimer: React.FC<PomodoroTimerProps> = ({ settings, setSettings, on
   };
 
   return (
-    <div className="p-4 rounded-lg text-center text-[var(--text-primary)] bg-[var(--background-tertiary)] static-glow-border">
+    <div className="p-4 rounded-lg text-center text-[var(--text-primary)] glass-panel">
       <div className="text-3xl font-mono mb-2 text-white">
         {formatTime(settings.timeLeft)}
       </div>
