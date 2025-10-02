@@ -340,18 +340,18 @@ export const rebalanceSchedule = (
         .filter(day => day.date < rebalanceStartDate)
         .map(day => ({...day})); 
 
-    const uncompletedFutureTaskResources = new Set<string>();
-    currentPlan.schedule
-        .filter(day => day.date >= rebalanceStartDate)
-        .flatMap(day => day.tasks)
-        .forEach(task => {
-            if (task.status !== 'completed') {
-                uncompletedFutureTaskResources.add(task.originalResourceId || task.resourceId);
-            }
-        });
-    
+    // **FIXED LOGIC**: Determine the pool of tasks to be rescheduled based on completion status, not future placement.
+    // 1. Find all original resource IDs that have been completed anywhere in the plan.
+    const completedOriginalResourceIds = new Set<string>();
+    currentPlan.schedule.flatMap(day => day.tasks).forEach(task => {
+        if (task.status === 'completed') {
+            completedOriginalResourceIds.add(task.originalResourceId || task.resourceId);
+        }
+    });
+
+    // 2. The new scheduling pool is all active resources that are NOT completed.
     const schedulingPool = JSON.parse(JSON.stringify(
-        activeResources.filter(r => uncompletedFutureTaskResources.has(r.id))
+        activeResources.filter(r => !completedOriginalResourceIds.has(r.id))
     ));
     
     const futureScheduleShell = createScheduleShell(rebalanceStartDate, currentPlan.endDate, userAddedExceptions);

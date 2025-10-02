@@ -74,7 +74,13 @@ export const useStudyPlanManager = () => {
                 setGlobalMasterResourcePool(updatedPool);
             }
             
-            const outcome: GeneratedStudyPlanOutcome = generateInitialSchedule(poolForGeneration, userExceptions, studyPlan?.topicOrder, { allContent: '2025-11-03' });
+            // **FIXED LOGIC**: For a true regeneration, always use an empty set of exceptions.
+            const exceptionsForGeneration = regenerate ? [] : userExceptions;
+            if (regenerate) {
+              setUserExceptions([]); // Also reset the state for the new plan
+            }
+            
+            const outcome: GeneratedStudyPlanOutcome = generateInitialSchedule(poolForGeneration, exceptionsForGeneration, studyPlan?.topicOrder, { allContent: '2025-11-03' });
             
             setStudyPlan(outcome.plan);
             if (!regenerate) {
@@ -305,7 +311,11 @@ export const useStudyPlanManager = () => {
         if (!studyPlan) return;
         updatePreviousStudyPlan(studyPlan);
         const reorderedTasks = updatedTasks.map((task, index) => ({ ...task, order: index }));
-        const newTotalTime = reorderedTasks.reduce((sum, t) => sum + t.durationMinutes, 0);
+        
+        // **FIXED LOGIC**: Correctly calculate total time by excluding optional tasks.
+        const newTotalTime = reorderedTasks
+            .filter(t => !t.isOptional)
+            .reduce((sum, t) => sum + t.durationMinutes, 0);
 
         const newSchedule = studyPlan.schedule.map(day => {
             if (day.date === selectedDate) {
