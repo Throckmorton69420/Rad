@@ -19,7 +19,7 @@ const ScheduleReport: React.FC<ScheduleReportProps> = ({ studyPlan }) => {
         <div className="mt-4">
           <h1 className="text-3xl font-bold">Radiology Core Exam - Study Schedule Report</h1>
           <p className="text-lg text-gray-600">
-            {parseDateString(studyPlan.startDate).toLocaleDateString()} - {parseDateString(studyPlan.endDate).toLocaleDateString()}
+            {parseDateString(studyPlan.startDate).toLocaleDateString('en-US', { timeZone: 'UTC' })} - {parseDateString(studyPlan.endDate).toLocaleDateString('en-US', { timeZone: 'UTC' })}
           </p>
           <p className="text-md text-gray-500 mt-1">Total Planned Study Time: {formatDuration(totalPlannedMinutes)}</p>
         </div>
@@ -33,7 +33,7 @@ const ScheduleReport: React.FC<ScheduleReportProps> = ({ studyPlan }) => {
             return (
               <div key={day.date} className={`schedule-report-day ${isFirstDayOfWeek && index > 0 ? 'new-week-page-break' : ''}`}>
                 <h2 className="text-xl font-semibold mb-3 border-b pb-2">
-                  {parseDateString(day.date).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+                  {parseDateString(day.date).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' })}
                 </h2>
                 {day.isRestDay ? (
                   <p className="text-gray-500 italic">Rest Day</p>

@@ -37,7 +37,7 @@ const CountdownTimer: React.FC<CountdownTimerProps> = ({ examDate }) => {
   };
 
   const [timeLeft, setTimeLeft] = useState(calculateTimeLeft());
-  const formattedExamDate = parseDateString(examDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  const formattedExamDate = parseDateString(examDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
 
   useEffect(() => {
     const timer = setTimeout(() => {

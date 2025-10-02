@@ -113,3 +113,33 @@ export const getDomainColorStyle = (domain: Domain): { backgroundColor: string; 
   const colors = domainColorMap[domain] || domainColorMap[Domain.MIXED_REVIEW];
   return { backgroundColor: colors.bg, color: colors.text };
 };
+
+const sourceColorMap: Record<string, string> = {
+  'Titan Radiology': 'hsl(160, 60%, 45%)', // Teal - Must be before 'Crack the Core'
+  'Crack the Core': 'hsl(210, 60%, 55%)', // Blue
+  'Core Radiology': 'hsl(265, 60%, 65%)', // Purple
+  'War Machine': 'hsl(10, 85%, 60%)', // Red-Orange
+  'Huda': 'hsl(25, 80%, 50%)', // Brown-Orange
+  'Physics Review': 'hsl(35, 100%, 60%)', // Orange
+  'QEVLAR': 'hsl(55, 100%, 65%)', // Yellow
+  'Board Vitals': 'hsl(200, 70%, 60%)', // Cyan-Blue
+  'NucApp': 'hsl(100, 50%, 55%)', // Green
+  'Case Companion': 'hsl(180, 30%, 50%)', // Muted Teal
+  'Discord': 'hsl(240, 80%, 70%)', // Blurple-ish
+  'Guide': 'hsl(0, 0%, 55%)', // Gray
+  'Qbank': 'hsl(220, 15%, 65%)', // Slate Gray
+};
+
+const defaultSourceColor = 'hsl(0, 0%, 30%)'; // A dark grey for unknown/custom sources
+
+export const getSourceColor = (source: string | undefined): string => {
+  if (!source) {
+    return defaultSourceColor;
+  }
+  for (const key in sourceColorMap) {
+    if (source.includes(key)) {
+      return sourceColorMap[key];
+    }
+  }
+  return defaultSourceColor;
+};

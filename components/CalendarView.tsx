@@ -102,7 +102,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ schedule, selectedDate, onD
                         data-date={dateStr}
                         role="gridcell"
                         aria-selected={isSelected}
-                        aria-label={`${parseDateString(dateStr).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}. ${daySchedule ? (daySchedule.isRestDay ? 'Rest Day' : `${Math.round(daySchedule.totalStudyTimeMinutes / 60)} hours assigned.`) : 'No tasks.'}`}
+                        aria-label={`${parseDateString(dateStr).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', timeZone: 'UTC' })}. ${daySchedule ? (daySchedule.isRestDay ? 'Rest Day' : `${Math.round(daySchedule.totalStudyTimeMinutes / 60)} hours assigned.`) : 'No tasks.'}`}
                     >
                         <span className={`${isSelected ? 'font-bold' : ''}`}>{dayOfMonth}</span>
                         {domainColor && !isSelected && !daySchedule?.isRestDay && (
@@ -183,8 +183,8 @@ const CalendarView: React.FC<CalendarViewProps> = ({ schedule, selectedDate, onD
         <Button onClick={() => onNavigatePeriod('prev')} variant="ghost" size="sm" className="!px-2" aria-label="Previous Period"><i className="fas fa-chevron-left"></i></Button>
         <h3 className="text-sm font-semibold text-[var(--text-primary)] text-center flex-grow" aria-live="polite">
           {viewMode === ViewMode.MONTHLY 
-            ? displayDateObj.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
-            : `Week of ${displayDateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`}
+            ? displayDateObj.toLocaleDateString('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' })
+            : `Week of ${displayDateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' })}`}
         </h3>
         <Button 
             onClick={() => onDateSelect(today)} 

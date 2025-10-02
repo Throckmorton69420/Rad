@@ -49,8 +49,8 @@ const DailyTaskList: React.FC<DailyTaskListProps> = ({
         <div className="flex justify-between items-center mb-1">
           <Button onClick={() => onNavigateDay('prev')} variant="ghost" size="sm" className="!px-2.5" aria-label="Previous Day"><i className="fas fa-chevron-left"></i></Button>
           <div className="text-center">
-            <h2 className="text-xl font-bold text-white">{dayName ? displayDate.toLocaleDateString('en-US', { weekday: 'long' }) : '...'}</h2>
-            <p className="text-sm text-[var(--text-secondary)]">{displayDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</p>
+            <h2 className="text-xl font-bold text-white">{dayName ? displayDate.toLocaleDateString('en-US', { weekday: 'long', timeZone: 'UTC' }) : '...'}</h2>
+            <p className="text-sm text-[var(--text-secondary)]">{displayDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric', timeZone: 'UTC' })}</p>
           </div>
           <Button onClick={() => onNavigateDay('next')} variant="ghost" size="sm" className="!px-2.5" aria-label="Next Day"><i className="fas fa-chevron-right"></i></Button>
         </div>

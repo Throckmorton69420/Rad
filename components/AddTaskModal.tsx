@@ -69,7 +69,7 @@ const AddTaskModal: React.FC<AddTaskModalProps> = ({ isOpen, onClose, onSave, av
               <i className="fas fa-times fa-lg"></i>
             </Button>
           </div>
-          {selectedDate && <p className="text-sm text-[var(--text-secondary)] mb-4">For: {parseDateString(selectedDate).toLocaleDateString()}</p>}
+          {selectedDate && <p className="text-sm text-[var(--text-secondary)] mb-4">For: {parseDateString(selectedDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric', timeZone: 'UTC' })}</p>}
           
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>

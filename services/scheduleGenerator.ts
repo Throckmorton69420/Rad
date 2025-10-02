@@ -15,7 +15,7 @@ const HARD_CAP_MINUTES = 14 * 60; // 14 hours
 
 const getDayName = (dateStr: string): string => {
   const date = parseDateString(dateStr);
-  return date.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+  return date.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' });
 };
 
 const mapResourceToTask = (resource: StudyResource, order: number, status: 'pending' | 'completed' = 'pending'): ScheduledTask => {
