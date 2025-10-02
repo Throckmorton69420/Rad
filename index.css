@@ -87,18 +87,18 @@ body::before {
   inset: 0;
   z-index: 0;
   
-  /* A complex layered gradient to mimic the desired abstract image */
+  /* Darker, higher-contrast gradient for a "dark mode" aurora effect */
   background-image: 
-    radial-gradient(at 20% 20%, hsla(217, 100%, 50%, 0.3) 0px, transparent 50%),
-    radial-gradient(at 80% 20%, hsla(180, 100%, 40%, 0.3) 0px, transparent 50%),
-    radial-gradient(at 50% 50%, hsla(340, 90%, 50%, 0.2) 0px, transparent 50%),
-    radial-gradient(at 80% 80%, hsla(40, 100%, 50%, 0.3) 0px, transparent 50%),
-    radial-gradient(at 20% 80%, hsla(260, 100%, 60%, 0.4) 0px, transparent 50%);
+    radial-gradient(at 20% 20%, hsla(220, 90%, 40%, 0.25) 0px, transparent 50%),
+    radial-gradient(at 80% 20%, hsla(180, 80%, 30%, 0.25) 0px, transparent 50%),
+    radial-gradient(at 50% 50%, hsla(340, 80%, 45%, 0.2) 0px, transparent 50%),
+    radial-gradient(at 80% 80%, hsla(30, 90%, 40%, 0.25) 0px, transparent 50%),
+    radial-gradient(at 20% 80%, hsla(265, 85%, 45%, 0.3) 0px, transparent 50%);
   
   background-size: 200% 200%; /* Make background larger than viewport for animation */
   
-  /* Blur and dim the image */
-  filter: blur(80px) brightness(1);
+  /* Blur and dim the effect for a darker feel */
+  filter: blur(80px) brightness(0.7);
   
   /* Animate the background position for a slow, flowing effect */
   animation: moveGradients 30s ease infinite;
