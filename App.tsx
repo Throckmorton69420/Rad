@@ -554,7 +554,6 @@ const App: React.FC = () => {
   
   return (
     <>
-      <div className="background-wallpaper" aria-hidden="true"></div>
       {MainAppContent}
       <div className="hidden print:block">
         {studyPlan && <ScheduleReport studyPlan={studyPlan} />}

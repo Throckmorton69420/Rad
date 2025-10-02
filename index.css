@@ -61,7 +61,7 @@ html {
 
 body {
   height: 100%;
-  background-color: transparent;
+  background-color: transparent; /* VERY IMPORTANT */
   color: var(--text-primary);
   font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
@@ -70,22 +70,22 @@ body {
   overflow: hidden; /* Prevent body scrolling */
 }
 
-#root {
-  height: 100%;
-  background-color: transparent;
-  position: relative; /* Create stacking context */
-  isolation: isolate; /* A modern way to create a stacking context */
-}
-
 .background-wallpaper {
-  position: absolute; /* Position relative to #root */
-  inset: -20px; /* Overscan to prevent blurry edges */
-  z-index: -1; /* Place it behind all other content inside #root */
+  position: fixed;
+  inset: -20px;
+  z-index: 0; /* Place it on the base layer */
   background: url('/light-stream-blue-big-sur-kf.jpg') no-repeat center center;
   background-size: cover;
   filter: blur(24px) brightness(0.6);
-  transform: scale(1.1); /* Also helps hide edges */
-  overflow: hidden; /* Prevent overscaled image from creating scrollbars */
+  transform: scale(1.1);
+  overflow: hidden;
+}
+
+#root {
+  height: 100%;
+  background-color: transparent; /* VERY IMPORTANT */
+  position: relative; /* Needed for z-index to apply */
+  z-index: 1; /* Place the entire app on a layer above the background */
 }
 
 
