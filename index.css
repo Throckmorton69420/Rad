@@ -10,44 +10,42 @@
   --link-color: hsl(210, 100%, 75%);
 
   /* --- Glass Materials --- */
-  /* Panel for primary content like tasks, calendar days */
   --glass-bg-panel: rgba(36, 36, 38, 0.65);
-  /* Chrome for sidebars, headers, footers */
   --glass-bg-chrome: rgba(28, 28, 30, 0.70);
-  /* Modals are slightly brighter to stand out */
   --glass-bg-modal: rgba(44, 44, 46, 0.75);
-  
-  /* Interactive States */
   --glass-bg-hover: rgba(68, 68, 70, 0.8);
-  --glass-bg-active: rgba(90, 70, 110, 0.85); /* Purple-tinted active state */
+  --glass-bg-active: rgba(90, 70, 110, 0.85);
 
-  /* The core of the Liquid Glass effect */
+  /* --- Core Liquid Glass Effect --- */
   --glass-backdrop-filter: blur(40px) saturate(180%);
 
   /* --- Glass Edges & Depth --- */
   --glass-border-color: rgba(255, 255, 255, 0.12);
-  --glass-sheen: inset 0 1.5px 1px 0 rgba(255, 255, 255, 0.08); /* Inner top highlight */
+  --glass-sheen: inset 0 1.5px 1px 0 rgba(255, 255, 255, 0.08);
   --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
 
   /* --- Other UI Elements --- */
   --separator-primary: rgba(255, 255, 255, 0.12);
   --separator-secondary: rgba(255, 255, 255, 0.08);
-  
   --button-primary-bg: var(--accent-purple);
   --button-secondary-bg: rgba(80, 80, 80, 0.5);
   --button-secondary-hover-bg: rgba(100, 100, 100, 0.6);
   --button-danger-bg: var(--accent-red);
-
   --input-bg: rgba(30, 30, 30, 0.6);
   --input-border: rgba(255, 255, 255, 0.1);
-}
 
+  /* --- Z-Indexes --- */
+  --z-header: 40;
+  --z-sidebar-mobile: 50;
+  --z-sidebar-mobile-backdrop: 49;
+  --z-modal: 100;
+  --z-notification: 110;
+}
 
 /* --- Base Body & Aurora Background --- */
 body {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   background-color: var(--background-primary);
-  /* Slower, "streaming", high-contrast aurora effect */
   background-image: 
     radial-gradient(ellipse 80% 50% at 50% -20%, hsla(270, 90%, 60%, 0.3) 0px, transparent 50%),
     radial-gradient(ellipse 60% 40% at 20% 40%, hsla(190, 80%, 50%, 0.35) 0px, transparent 50%),
@@ -83,15 +81,12 @@ body {
   transition: background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
   border-radius: 12px;
 }
-
 .glass-panel { background-color: var(--glass-bg-panel); }
 .glass-chrome { background-color: var(--glass-bg-chrome); }
 .modal-panel { 
   background-color: var(--glass-bg-modal);
   border-radius: 16px; 
 }
-
-/* Modifier for interactive panels to handle hover */
 .glass-panel-interactive:hover:not(.is-pomodoro-active) {
   background-color: var(--glass-bg-hover);
   border-color: rgba(255, 255, 255, 0.25);
@@ -103,11 +98,9 @@ body {
   box-shadow: var(--glass-sheen), var(--glass-shadow), 0 0 15px -3px var(--accent-purple);
   border-color: var(--accent-purple) !important;
 }
-
 .is-pomodoro-active {
   background-color: var(--glass-bg-active) !important;
 }
-
 .scroller-highlight-glow {
   box-shadow: 0 0 15px -5px var(--accent-purple);
 }
@@ -125,8 +118,8 @@ body {
 .no-scrollbar::-webkit-scrollbar { display: none; }
 .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 
-/* --- Sidebar, Header, and other UI Chrome --- */
-.bg-\[\--background-secondary\] { /* Overriding Tailwind class */
+/* --- UI Chrome --- */
+.bg-\[\--background-secondary\] {
   background-color: var(--glass-bg-chrome) !important;
   -webkit-backdrop-filter: var(--glass-backdrop-filter);
   backdrop-filter: var(--glass-backdrop-filter);
@@ -135,7 +128,6 @@ body {
 }
 .border-\[\--separator-primary\] { border-color: var(--separator-primary) !important; }
 
-/* --- Sidebar Specifics --- */
 .sidebar-content-area {
   padding: 1rem 1.25rem;
   padding-left: calc(1rem + env(safe-area-inset-left));
@@ -145,19 +137,16 @@ body {
 
 /* --- Buttons --- */
 .button-base { border: none; cursor: pointer; -webkit-tap-highlight-color: transparent; user-select: none; }
-.button-primary { background-color: var(--button-primary-bg); color: #fff; }
+.button-primary { background-color: var(--button-primary-bg); }
 .button-primary:hover:not(:disabled) { background-color: color-mix(in srgb, var(--button-primary-bg), #fff 15%); }
-
 .button-secondary { background-color: var(--button-secondary-bg); border: 1px solid var(--glass-border-color); }
 .button-secondary:hover:not(:disabled) { background-color: var(--button-secondary-hover-bg); }
-
-.button-danger { background-color: var(--button-danger-bg); color: #fff; }
+.button-danger { background-color: var(--button-danger-bg); }
 .button-danger:hover:not(:disabled) { background-color: color-mix(in srgb, var(--button-danger-bg), #fff 15%); }
-
 .button-ghost { background-color: transparent; box-shadow: none; border: none; }
 .button-ghost:hover:not(:disabled) { background-color: rgba(191, 90, 242, 0.15); }
 
-/* --- Inputs & Selects --- */
+/* --- Inputs & Selections --- */
 .input-base {
   width: 100%; padding: 0.5rem 0.75rem; background-color: var(--input-bg);
   border: 1px solid var(--input-border); border-radius: 0.5rem; color: var(--text-primary);
@@ -174,9 +163,8 @@ body {
 .resource-card.is-highlighted { background-color: color-mix(in srgb, var(--accent-yellow), transparent 85%); }
 
 /* --- Progress Bar --- */
-.progress-bar-track { background-color: rgba(0,0,0,0.3); border-radius: 999px;}
+.progress-bar-track { background-color: rgba(0,0,0,0.3); }
 .progress-bar-fill {
-  height: 100%; border-radius: inherit;
   background-image: linear-gradient(45deg, var(--accent-purple), color-mix(in srgb, var(--accent-purple), #fff 30%));
 }
 

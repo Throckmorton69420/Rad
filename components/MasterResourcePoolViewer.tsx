@@ -114,7 +114,7 @@ const MasterResourcePoolViewer: React.FC<MasterResourcePoolViewerProps> = ({
       <div className="flex-grow overflow-y-auto pr-2 -mr-2 mt-4 space-y-2 isolated-scroll" onMouseLeave={onClearHighlights}>
         {filteredAndSortedResources.map((resource) => (
           <div key={resource.id} 
-               className={`p-2 rounded-lg transition-colors duration-150 ${resource.isArchived ? 'bg-black/50 opacity-60' : 'bg-[var(--background-tertiary)]'} interactive-glow-border`}
+               className={`p-2 rounded-lg transition-colors duration-150 glass-panel interactive-glow-border ${resource.isArchived ? 'bg-black/50 opacity-60' : ''}`}
                onMouseEnter={() => onHighlightDates(resource.id)}
           >
             <div className="flex justify-between items-start gap-2">
