@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { parseDateString } from '../utils/timeFormatter';
 
 interface CountdownTimerProps {
   examDate: string; // YYYY-MM-DD
@@ -6,7 +7,9 @@ interface CountdownTimerProps {
 
 const CountdownTimer: React.FC<CountdownTimerProps> = ({ examDate }) => {
   const calculateTimeLeft = () => {
-    const difference = +new Date(examDate) - +new Date();
+    const targetDate = parseDateString(examDate); // Safely parse as UTC midnight
+    const difference = +targetDate - +new Date(); // Difference from now (local) to target
+
     let timeLeft = {
       days: 0,
       hours: 0,
@@ -17,18 +20,18 @@ const CountdownTimer: React.FC<CountdownTimerProps> = ({ examDate }) => {
     };
 
     if (difference > 0) {
-      timeLeft = {
-        days: Math.floor(difference / (1000 * 60 * 60 * 24)),
-        hours: Math.floor((difference / (1000 * 60 * 60)) % 24),
-        minutes: Math.floor((difference / 1000 / 60) % 60),
-        seconds: Math.floor((difference / 1000) % 60),
-        months: 0, // More complex calculation needed for accurate months/weeks
-        weeks: 0,
-      };
-      // Approximate months and weeks
-      timeLeft.months = Math.floor(timeLeft.days / 30.44); // Average days in a month
-      timeLeft.weeks = Math.floor((timeLeft.days % 30.44) / 7);
-      timeLeft.days = Math.floor(timeLeft.days % 7); // Remaining days after weeks
+      const totalDays = Math.floor(difference / (1000 * 60 * 60 * 24));
+      
+      // Approximate breakdown for display
+      timeLeft.months = Math.floor(totalDays / 30.44);
+      const remainingDaysAfterMonths = totalDays - Math.floor(timeLeft.months * 30.44);
+      timeLeft.weeks = Math.floor(remainingDaysAfterMonths / 7);
+      timeLeft.days = remainingDaysAfterMonths % 7;
+      
+      // Exact time part
+      timeLeft.hours = Math.floor((difference / (1000 * 60 * 60)) % 24);
+      timeLeft.minutes = Math.floor((difference / 1000 / 60) % 60);
+      timeLeft.seconds = Math.floor((difference / 1000) % 60);
     }
     return timeLeft;
   };
