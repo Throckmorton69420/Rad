@@ -17,12 +17,15 @@
   --glass-bg-active: rgba(90, 70, 110, 0.85);
 
   /* --- Core Liquid Glass Effect --- */
-  --glass-backdrop-filter: blur(40px) saturate(180%);
+  /* Applies a base blur and saturation, then a URL-referenced SVG filter for refraction. */
+  /* Browsers that don't support url() in backdrop-filter will gracefully fall back to the blur. */
+  --glass-backdrop-filter: blur(12px) saturate(150%) url(#liquid-glass-filter);
 
   /* --- Glass Edges & Depth --- */
   --glass-border-color: rgba(255, 255, 255, 0.12);
   --glass-sheen: inset 0 1.5px 1px 0 rgba(255, 255, 255, 0.08);
-  --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
+  /* Enhanced shadow for more depth and a "floating" feel. */
+  --glass-shadow: 0 12px 48px rgba(0, 0, 0, 0.45);
 
   /* --- Other UI Elements --- */
   --separator-primary: rgba(255, 255, 255, 0.12);
