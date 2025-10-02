@@ -49,7 +49,7 @@ const CustomSelect: React.FC<CustomSelectProps> = ({ options, value, onChange, i
       <button
         id={id}
         type="button"
-        className="input-base !py-1.5 !text-sm text-left flex items-center justify-between static-glow-border !rounded-lg"
+        className="input-base custom-select-button !py-1.5 !text-sm text-left flex items-center justify-between !rounded-lg w-full"
         onClick={handleToggle}
         aria-haspopup="listbox"
         aria-expanded={isOpen}
@@ -66,7 +66,7 @@ const CustomSelect: React.FC<CustomSelectProps> = ({ options, value, onChange, i
           {options.map(option => (
             <div
               key={option.value}
-              className={`p-2 text-sm rounded-md cursor-pointer interactive-glow-border ${value === option.value ? 'bg-white/20' : 'bg-transparent'}`}
+              className={`p-2 text-sm rounded-md cursor-pointer hover:bg-white/10 ${value === option.value ? 'bg-white/20' : 'bg-transparent'}`}
               onClick={() => handleSelect(option.value)}
               onKeyPress={e => { if (e.key === 'Enter') handleSelect(option.value); }}
               role="option"

@@ -1,4 +1,4 @@
-/* Liquid Glass visionOS Theme - 3.0 */
+/* Liquid Glass visionOS Theme - 4.0 (Corrected & Refined) */
 :root {
   /* Core Palette */
   --text-primary: #f5f5f7;
@@ -6,39 +6,41 @@
   --text-placeholder: rgba(235, 235, 245, 0.4);
 
   /* Accents */
-  --accent-purple: #c084fc; /* Tailwind Purple 400 */
+  --accent-purple: #c084fc; 
   --accent-purple-glow: hsla(262, 92%, 77%, 0.4);
-  --accent-purple-glow-intense: hsla(262, 92%, 77%, 0.6);
   --accent-green: #32D74B;
   --accent-red: #FF453A;
   --accent-yellow: #FFD60A;
-  --accent-cyan: #22D3EE;
-  --accent-cyan-glow: hsla(188, 83%, 50%, 0.6);
   
-  /* Glass UI System */
-  --glass-panel-background: rgba(30, 30, 30, 0.65);
-  --glass-panel-background-hover: rgba(45, 45, 45, 0.75);
-  --glass-sidebar-background: rgba(18, 18, 18, 0.7);
-  --glass-button-background: hsla(262, 92%, 77%, 0.2);
-  --glass-button-background-hover: hsla(262, 92%, 77%, 0.35);
+  /* --- Corrected Glass UI System --- */
+  /* Main panels like task lists, progress cards */
+  --glass-bg-panel: rgba(30, 30, 30, 0.75);
+  /* Hover state for main panels */
+  --glass-bg-panel-hover: rgba(45, 45, 45, 0.8);
+  /* Sidebar and Header for hierarchy */
+  --glass-bg-chrome: rgba(18, 18, 18, 0.8);
+  /* Buttons */
+  --glass-bg-button-primary: hsla(262, 92%, 77%, 0.25);
+  --glass-bg-button-primary-hover: hsla(262, 92%, 77%, 0.4);
+  --glass-bg-button-secondary: rgba(80, 80, 80, 0.5);
+  --glass-bg-button-secondary-hover: rgba(100, 100, 100, 0.6);
   
   --glass-backdrop-blur: blur(24px) saturate(180%);
-  --glass-border: rgba(255, 255, 255, 0.1);
-  --glass-border-hover: rgba(255, 255, 255, 0.25);
-  --glass-inner-shadow: inset 0 0 1px 1px rgba(255, 255, 255, 0.05);
+  --glass-border-color: rgba(255, 255, 255, 0.1);
+  --glass-border-color-hover: rgba(255, 255, 255, 0.25);
+  --glass-inner-highlight: inset 0 1px 1px 0 rgba(255, 255, 255, 0.05);
+
+  /* Mappings for components */
+  --background-secondary: var(--glass-bg-chrome);
+  --background-tertiary: var(--glass-bg-panel);
+  --background-tertiary-hover: var(--glass-bg-panel-hover);
+  --glass-background-panel: var(--glass-bg-panel);
+  --glass-background-button: var(--glass-bg-button-primary);
+  --glass-background-button-hover: var(--glass-bg-button-primary-hover);
 
   /* Separators */
   --separator-primary: rgba(84, 84, 88, 0.65);
   --separator-secondary: rgba(84, 84, 88, 0.4);
-
-  /* Component Overrides (linking to system) */
-  --background-secondary: var(--glass-sidebar-background);
-  --background-tertiary: var(--glass-panel-background);
-  --background-tertiary-hover: var(--glass-panel-background-hover);
-  --glass-background-panel: var(--glass-panel-background);
-  --glass-background-button: var(--glass-button-background);
-  --glass-background-button-hover: var(--glass-button-background-hover);
-  --border-glass: var(--glass-border);
 
   /* Sizing & Z-Index */
   --border-radius-sm: 10px;
@@ -50,10 +52,9 @@
   --z-sidebar-mobile: 100;
   --z-modal: 110;
   --z-notification: 120;
-  --z-table-header: 10;
 }
 
-/* --- 1. Base Setup & Background --- */
+/* --- 1. Base Setup & Wallpaper Fix --- */
 html {
   height: 100%;
   background-color: #000; /* Fallback color */
@@ -62,106 +63,130 @@ html {
 body {
   min-height: 100vh;
   min-height: 100dvh;
-  background-color: transparent;
+  background-color: transparent; /* CRITICAL: Allows wallpaper to show through */
   color: var(--text-primary);
   font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   -webkit-tap-highlight-color: transparent;
+  position: relative; /* Stacking context */
+}
+
+/* The Wallpaper Layer */
+body::before {
+  content: '';
+  position: fixed; /* Covers viewport, doesn't scroll */
+  inset: -10px; /* Overlap edges to prevent gaps from blur */
+  z-index: -1; /* Sits behind ALL content */
+  background: url('light-stream-blue-big-sur-kf.jpg') no-repeat center center;
+  background-size: cover;
+  filter: blur(24px) brightness(0.6);
 }
 
 #root {
   height: 100%;
-  position: relative;
-  isolation: isolate; /* Creates a stacking context for the ::before pseudo-element */
-}
-
-#root::before {
-  content: '';
-  position: fixed; /* Ensures it covers the viewport and doesn't scroll */
-  left: -5%;
-  top: -5%;
-  width: 110%;
-  height: 110%;
-  z-index: -1;
-  background: url('light-stream-blue-big-sur-kf.jpg') no-repeat center center;
-  background-size: cover;
-  filter: blur(24px) brightness(0.7); /* Soft blur and slight dimming for readability */
+  background-color: transparent; /* CRITICAL: Allows body's wallpaper to show through */
 }
 
 /* --- 2. Glass Panel System --- */
-.glass-panel,
 .static-glow-border,
 .interactive-glow-border,
 .modal-panel,
 .input-base,
-input[type="text"],
-input[type="number"],
-input[type="date"],
-select,
-header,
-aside {
-  background-color: var(--glass-panel-background);
+.custom-select-button {
+  background-color: var(--glass-bg-panel);
   -webkit-backdrop-filter: var(--glass-backdrop-blur);
   backdrop-filter: var(--glass-backdrop-blur);
-  border: 1px solid var(--glass-border);
-  box-shadow: var(--glass-inner-shadow);
-  transition: box-shadow 0.3s ease, transform 0.2s ease, border-color 0.3s ease, background-color 0.3s ease;
+  border: 1px solid var(--glass-border-color);
+  box-shadow: var(--glass-inner-highlight);
+  transition: box-shadow 0.3s ease, border-color 0.3s ease, background-color 0.3s ease;
 }
 
-header, aside {
-  background-color: var(--glass-sidebar-background);
-}
-
-.interactive-glow-border:hover,
-.interactive-glow-border:focus-visible {
-  background-color: var(--glass-panel-background-hover);
-  border-color: var(--glass-border-hover);
-  box-shadow: var(--glass-inner-shadow), 0 0 12px var(--accent-purple-glow);
-  transform: translateY(-1px);
+.interactive-glow-border:hover {
+  background-color: var(--glass-bg-panel-hover);
+  border-color: var(--glass-border-color-hover);
+  box-shadow: var(--glass-inner-highlight), 0 0 12px var(--accent-purple-glow);
 }
 
 /* --- 3. Component-Specific Styling --- */
-h1, h2 {
-  text-shadow: 0 0 12px var(--accent-purple-glow);
+
+/* App Chrome: Header & Sidebar */
+header, aside {
+  background-color: var(--glass-bg-chrome);
+  -webkit-backdrop-filter: var(--glass-backdrop-blur);
+  backdrop-filter: var(--glass-backdrop-blur);
+  border-color: var(--glass-border-color); /* Uses border-right/bottom */
 }
 
+/* Buttons */
+.button-base {
+  border: 1px solid var(--glass-border-color);
+  -webkit-backdrop-filter: var(--glass-backdrop-blur);
+  backdrop-filter: var(--glass-backdrop-blur);
+  box-shadow: var(--glass-inner-highlight);
+}
+.button-primary {
+  background-color: var(--glass-bg-button-primary);
+}
+.button-primary:hover {
+  background-color: var(--glass-bg-button-primary-hover);
+  border-color: var(--glass-border-color-hover);
+}
+.button-secondary {
+  background-color: var(--glass-bg-button-secondary);
+}
+.button-secondary:hover {
+  background-color: var(--glass-bg-button-secondary-hover);
+  border-color: var(--glass-border-color-hover);
+}
+.button-danger {
+  background-color: hsla(4, 80%, 50%, 0.5);
+  border-color: hsla(4, 80%, 60%, 0.5);
+}
+.button-danger:hover {
+  background-color: hsla(4, 80%, 50%, 0.7);
+  border-color: hsla(4, 80%, 60%, 0.7);
+}
+.button-ghost {
+  background-color: transparent;
+  border-color: transparent;
+  box-shadow: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+.button-ghost:hover {
+  background-color: hsla(262, 92%, 77%, 0.15);
+}
+
+/* Modals */
 .modal-panel {
   box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
 }
 
-.input-base, input, select {
-  border-radius: var(--border-radius-md);
-  padding: 10px 14px;
-  width: 100%;
+/* Forms */
+.input-base {
+  color: var(--text-primary);
 }
-.input-base::placeholder, input::placeholder { color: var(--text-placeholder); }
-.input-base:focus, input:focus, select:focus { outline: none; }
-.input-base:focus-visible, input:focus-visible, select:focus-visible {
+.input-base::placeholder { color: var(--text-placeholder); }
+.input-base:focus, .input-base:focus-visible {
+  outline: none;
   border-color: var(--accent-purple);
-  box-shadow: 0 0 12px var(--accent-purple-glow), var(--glass-inner-shadow);
+  box-shadow: 0 0 12px var(--accent-purple-glow), var(--glass-inner-highlight);
 }
 
 /* --- 4. Utilities & Overrides --- */
+.text-xxs { font-size: 0.65rem; line-height: 0.9rem; }
+.rounded-lg { border-radius: var(--border-radius-lg); }
+.rounded-md { border-radius: var(--border-radius-md); }
+.rounded-sm { border-radius: var(--border-radius-sm); }
+.isolated-scroll { overscroll-behavior: contain; }
+
 ::-webkit-scrollbar { width: 8px; height: 8px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background-color: rgba(255, 255, 255, 0.2); border-radius: 4px; }
 ::-webkit-scrollbar-thumb:hover { background-color: rgba(255, 255, 255, 0.3); }
 
-.rounded-lg { border-radius: var(--border-radius-lg); }
-.rounded-md { border-radius: var(--border-radius-md); }
-.rounded-sm { border-radius: var(--border-radius-sm); }
-
-.text-xxs {
-  font-size: 0.65rem;
-  line-height: 0.9rem;
-}
-
-.isolated-scroll {
-  overscroll-behavior: contain;
-}
-
-/* Sidebar safe area padding */
+/* Safe Area Paddings */
 .sidebar-content-area {
     padding: 0.75rem;
     padding-left: calc(0.75rem + env(safe-area-inset-left));
@@ -170,61 +195,29 @@ h1, h2 {
     padding-bottom: calc(3rem + env(safe-area-inset-bottom));
 }
 
-/* Dragging state */
-html.is-dragging-item,
-body.is-dragging-item {
-  overflow: hidden !important;
-  overscroll-behavior: none !important;
-  touch-action: none !important;
-  -webkit-touch-callout: none !important;
-  user-select: none !important;
-}
-.topic-list-item.is-dragging {
-  opacity: 0.95;
-  transform: scale(1.03);
-  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3);
-  background-color: var(--glass-panel-background-hover);
-  z-index: 10;
-  position: relative;
-}
-.drag-handle {
-  padding: 12px 10px; margin: -12px -10px; margin-right: 12px;
-  touch-action: none;
-}
-
-/* --- Animation & Focus --- */
-.animate-fade-in { animation: fadeIn 0.3s ease-in-out; }
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(-10px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
+/* Focus Rings */
 *:focus-visible {
     outline: none;
-    box-shadow: 0 0 0 2px var(--glass-sidebar-background), 0 0 0 4px var(--accent-purple), 0 0 12px 4px var(--accent-purple-glow-intense);
+    box-shadow: 0 0 0 2px var(--glass-bg-chrome), 0 0 0 4px var(--accent-purple);
 }
 /* Disable focus ring for elements that have their own focus styles */
-.input-base:focus-visible, input:focus-visible, .modal-panel *:focus-visible, .btn:focus-visible, [role="button"]:focus-visible, button:focus-visible {
+.input-base:focus-visible, 
+button:focus-visible,
+[role="button"]:focus-visible,
+.custom-select-button:focus-visible {
     box-shadow: none;
 }
+.interactive-glow-border:focus-visible {
+  border-color: var(--accent-purple);
+  box-shadow: 0 0 12px var(--accent-purple-glow), var(--glass-inner-highlight);
+}
 
-/* --- Print Styles --- */
+
+/* Print Styles */
 @media print {
-  @page {
-    size: A4 portrait;
-    margin: 0.75in;
-  }
-  html, body {
-    background: #fff !important;
-    color: #000 !important;
-  }
-  .schedule-report-day {
-    break-inside: avoid;
-    padding: 1rem;
-    border: 1px solid #d1d5db;
-    border-radius: 0.5rem;
-  }
-  .new-week-page-break {
-    break-before: page;
-  }
+  @page { size: A4 portrait; margin: 0.75in; }
+  html, body { background: #fff !important; color: #000 !important; }
+  body::before { display: none; }
+  .schedule-report-day { break-inside: avoid; padding: 1rem; border: 1px solid #d1d5db; border-radius: 0.5rem; }
+  .new-week-page-break { break-before: page; }
 }

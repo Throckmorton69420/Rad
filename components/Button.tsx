@@ -16,13 +16,13 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(({
   className = '',
   ...props
 }, ref) => {
-  const baseStyles = 'font-semibold rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--background-secondary)] transition-all duration-150 flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed interactive-glow-border';
+  const baseStyles = 'button-base font-semibold rounded-lg focus:outline-none transition-all duration-150 flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed';
 
   const variantStyles = {
-    primary: 'text-white focus-visible:ring-[var(--accent-purple)] bg-[var(--glass-background-button)] hover:bg-[var(--glass-background-button-hover)] border-none backdrop-blur-lg',
-    secondary: 'text-[var(--text-primary)] bg-[var(--glass-background-panel)] hover:bg-white/20 focus-visible:ring-[var(--text-secondary)] border-none backdrop-blur-lg',
-    danger: 'bg-[var(--accent-red)] text-white hover:bg-red-500 focus-visible:ring-[var(--accent-red)]',
-    ghost: 'bg-transparent text-[var(--accent-purple)] hover:bg-[var(--accent-purple)]/20 focus-visible:ring-[var(--accent-purple)]',
+    primary: 'button-primary text-white',
+    secondary: 'button-secondary text-[var(--text-primary)]',
+    danger: 'button-danger text-white',
+    ghost: 'button-ghost text-[var(--accent-purple)]',
   };
 
   const sizeStyles = {
