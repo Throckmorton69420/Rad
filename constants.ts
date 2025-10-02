@@ -5,7 +5,7 @@ export const EXAM_DATE_START = "2025-11-11";
 
 // Use today's date for planning, correctly handled for timezone.
 const ACTUAL_TODAY_FOR_PLANNING = getTodayInNewYork();
-const CONFIGURED_STUDY_START_DATE = "2025-06-13"; 
+const CONFIGURED_STUDY_START_DATE = "2025-10-02"; 
 
 // The schedule starts from today if today is after the original configured start date.
 const effectiveStartDate = ACTUAL_TODAY_FOR_PLANNING > CONFIGURED_STUDY_START_DATE

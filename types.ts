@@ -66,6 +66,8 @@ export interface StudyResource {
   partNumber?: number; 
   totalParts?: number;
   isArchived: boolean;
+  isOptional?: boolean;
+  schedulingPriority?: 'high' | 'medium' | 'low';
 }
 
 export interface ScheduledTask {
@@ -93,6 +95,7 @@ export interface ScheduledTask {
   isPrimaryMaterial?: boolean;
   bookSource?: string;
   videoSource?: string;
+  schedulingPriority?: 'high' | 'medium' | 'low';
 }
 
 export interface DailySchedule {
@@ -238,7 +241,7 @@ export interface DailyStats {
 
 export interface GeneratedStudyPlanOutcome {
   plan: StudyPlan;
-  notifications?: { type: 'warning' | 'info', message: string }[];
+  notifications?: { type: 'warning' | 'info' | 'error', message: string }[];
 }
 
 

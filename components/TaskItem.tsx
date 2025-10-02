@@ -29,10 +29,7 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, onToggle, isCurrentPomodoroTa
   if (task.chapterNumber) {
     displayTitle = `Ch. ${task.chapterNumber}: ${displayTitle}`;
   }
-  if (task.isSplitPart && task.partNumber && task.totalParts) {
-    displayTitle += ` (Part ${task.partNumber}/${task.totalParts})`;
-  }
-  
+
   const titleColor = 'text-[var(--text-primary)]';
 
   const PageReferenceText: React.FC = () => {
@@ -110,6 +107,11 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, onToggle, isCurrentPomodoroTa
           >
               {task.type}
           </span>
+          {task.isOptional && (
+              <span className="text-xxs px-2 py-0.5 rounded-full font-semibold" style={{ backgroundColor: 'var(--separator-primary)', color: 'var(--text-primary)'}}>
+                  OPTIONAL
+              </span>
+          )}
            {(task.pages || 0) > 0 && 
               <span className="flex items-center text-xxs text-[var(--text-secondary)]"><PageReferenceText /></span>
            }
