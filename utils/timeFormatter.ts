@@ -2,7 +2,7 @@
 import { Domain } from '../types';
 
 /**
- * Robustly parses a 'YYYY-MM-DD' string into a Date object at midnight local time.
+ * Robustly parses a 'YYYY-MM-DD' string into a Date object at midnight UTC.
  * This avoids timezone issues and parsing inconsistencies across browsers.
  * @param dateStr The date string to parse.
  * @returns A Date object.
@@ -10,7 +10,8 @@ import { Domain } from '../types';
 export const parseDateString = (dateStr: string): Date => {
     const [year, month, day] = dateStr.split('-').map(Number);
     // Month is 0-indexed in JS Date constructor (e.g., January is 0)
-    return new Date(year, month - 1, day);
+    // Using Date.UTC ensures the date is parsed as UTC, avoiding timezone shifts.
+    return new Date(Date.UTC(year, month - 1, day));
 };
 
 

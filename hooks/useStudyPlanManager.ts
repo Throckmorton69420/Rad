@@ -62,22 +62,22 @@ export const useStudyPlanManager = () => {
                 }
             }
             
-            let poolForGeneration = regenerate ? globalMasterResourcePool : initialMasterResourcePool;
-            
-            if (regenerate) {
-                const updatedPool = JSON.parse(JSON.stringify(globalMasterResourcePool)).map((resource: StudyResource) => {
+            // For a regeneration, ensure all resources have up-to-date durations from their source properties (e.g., question counts)
+            let poolForGeneration = regenerate ? 
+                JSON.parse(JSON.stringify(globalMasterResourcePool)).map((resource: StudyResource) => {
                     if (resource.type === ResourceType.QUESTIONS && resource.questionCount) resource.durationMinutes = Math.round(resource.questionCount * 1.1);
                     else if (resource.type === ResourceType.QUESTION_REVIEW && resource.questionCount) resource.durationMinutes = Math.round(resource.questionCount * 0.6);
                     return resource;
-                });
-                poolForGeneration = updatedPool;
-                setGlobalMasterResourcePool(updatedPool);
+                }) 
+                : initialMasterResourcePool;
+
+            if (regenerate) {
+              setGlobalMasterResourcePool(poolForGeneration);
             }
             
-            // **FIXED LOGIC**: For a true regeneration, always use an empty set of exceptions.
             const exceptionsForGeneration = regenerate ? [] : userExceptions;
             if (regenerate) {
-              setUserExceptions([]); // Also reset the state for the new plan
+              setUserExceptions([]); 
             }
             
             const outcome: GeneratedStudyPlanOutcome = generateInitialSchedule(poolForGeneration, exceptionsForGeneration, studyPlan?.topicOrder, { allContent: '2025-11-03' });
@@ -312,7 +312,6 @@ export const useStudyPlanManager = () => {
         updatePreviousStudyPlan(studyPlan);
         const reorderedTasks = updatedTasks.map((task, index) => ({ ...task, order: index }));
         
-        // **FIXED LOGIC**: Correctly calculate total time by excluding optional tasks.
         const newTotalTime = reorderedTasks
             .filter(t => !t.isOptional)
             .reduce((sum, t) => sum + t.durationMinutes, 0);
