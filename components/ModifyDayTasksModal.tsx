@@ -220,6 +220,7 @@ const ModifyDayTasksModal: React.FC<ModifyDayTasksModalProps> = ({
                     </header>
                     
                     <div className="flex-grow flex flex-col md:flex-row min-h-0">
+                        {/* --- SCHEDULED TASKS (Left Column on Desktop, Top on Mobile) --- */}
                         <div className="w-full md:w-1/2 p-2 md:p-3 flex flex-col border-b md:border-b-0 md:border-r border-[var(--separator-primary)] min-h-0">
                              <button className="flex items-center justify-between py-1 flex-shrink-0 md:hidden" onClick={() => setIsScheduledVisible(v => !v)}>
                                 <h3 className="text-base font-semibold text-[var(--text-primary)]">Scheduled ({formatDuration(totalStagedTime)})</h3>
@@ -244,7 +245,8 @@ const ModifyDayTasksModal: React.FC<ModifyDayTasksModalProps> = ({
                                 )) : <div className="text-center p-8 text-gray-500 bg-black/20 rounded-lg">Add resources from the right</div>}
                             </div>
                         </div>
-
+                        
+                        {/* --- AVAILABLE RESOURCES (Right Column on Desktop, Bottom on Mobile) --- */}
                         <div className="w-full md:w-1/2 p-2 md:p-3 flex flex-col min-h-0">
                             <button className="flex items-center justify-between py-1 flex-shrink-0 md:hidden" onClick={() => setIsAvailableVisible(v => !v)}>
                                 <h3 className="text-base font-semibold text-[var(--text-primary)]">Available Resources</h3>

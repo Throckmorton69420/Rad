@@ -1,4 +1,4 @@
-/* Liquid Glass visionOS Theme - 2.0 */
+/* Liquid Glass visionOS Theme - 2.1 Mobile First */
 :root {
   --background-primary: transparent;
   
@@ -305,4 +305,18 @@ aside {
 
 .isolated-scroll {
   overscroll-behavior: contain;
+}
+
+/* Specific class for sidebar to handle safe area on mobile */
+.sidebar-content-area {
+    padding: 0.75rem;
+    padding-left: calc(0.75rem + env(safe-area-inset-left));
+    padding-right: calc(0.75rem + env(safe-area-inset-right));
+    padding-top: calc(0.75rem + env(safe-area-inset-top));
+    padding-bottom: calc(3rem + env(safe-area-inset-bottom));
+}
+
+.text-xxs {
+  font-size: 0.65rem;
+  line-height: 0.9rem;
 }

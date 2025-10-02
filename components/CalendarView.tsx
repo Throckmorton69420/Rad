@@ -86,7 +86,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ schedule, selectedDate, onD
 
                 const buttonClasses = [
                     'p-1.5', 'rounded-md', 'text-xs', 'text-center', 'focus:outline-none', 'focus-visible:ring-2', 'focus-visible:ring-[var(--accent-purple)]',
-                    'h-16', 'flex', 'flex-col', 'justify-between', 'items-center', 'relative', 'transition-all',
+                    'h-14 md:h-16', 'flex', 'flex-col', 'justify-between', 'items-center', 'relative', 'transition-all',
                     isSelected ? 'bg-[var(--accent-purple)] text-white static-glow-border' : 'bg-[var(--background-tertiary)] hover:bg-[var(--background-tertiary-hover)] text-[var(--text-primary)] interactive-glow-border',
                     isToday && !isSelected ? 'ring-1 ring-[var(--text-secondary)]' : '',
                     isHighlighted ? 'is-highlighted' : '',
@@ -178,7 +178,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ schedule, selectedDate, onD
   }
 
   return (
-    <div className="p-4 rounded-lg bg-[var(--background-tertiary)] interactive-glow-border">
+    <div className="p-3 md:p-4 rounded-lg bg-[var(--background-tertiary)] interactive-glow-border">
       <div className="flex justify-between items-center mb-3 gap-2">
         <Button onClick={() => onNavigatePeriod('prev')} variant="ghost" size="sm" className="!px-2" aria-label="Previous Period"><i className="fas fa-chevron-left"></i></Button>
         <h3 className="text-sm font-semibold text-[var(--text-primary)] text-center flex-grow" aria-live="polite">

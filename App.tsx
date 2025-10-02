@@ -268,7 +268,7 @@ const App: React.FC = () => {
   const onTaskDragStart = (e: React.DragEvent<HTMLDivElement>, taskId: string) => {
      showConfirmation({
         title: "Modify Schedule?",
-        message: "To move tasks, please use the 'Modify Schedule & Resources' button. This provides a dedicated interface for dragging tasks on or off the schedule.",
+        message: "To move tasks, please use the 'Modify Schedule' button. This provides a dedicated interface for dragging tasks on or off the schedule.",
         onConfirm: () => openModal('isModifyDayTasksModalOpen'),
         confirmText: "Open Modifier",
      });
@@ -310,7 +310,7 @@ const App: React.FC = () => {
   const SidebarContent = (
       <aside className={`w-80 bg-[var(--background-secondary)] text-[var(--text-secondary)] border-r border-[var(--separator-primary)] flex flex-col h-dvh isolated-scroll`}>
         <div className="flex-grow flex flex-col min-h-0">
-          <div className="flex-grow overflow-y-auto isolated-scroll pr-5 pl-[calc(0.75rem+env(safe-area-inset-left))] pt-[calc(0.75rem+env(safe-area-inset-top))] pb-[calc(3rem+env(safe-area-inset-bottom))]">
+          <div className="flex-grow overflow-y-auto isolated-scroll sidebar-content-area pr-5">
             <div className="space-y-4">
               <div className="flex justify-end -mr-2 -mt-2 lg:hidden">
                   <button onClick={() => setIsSidebarOpen(false)} className="p-2 text-[var(--text-primary)] hover:text-white" aria-label="Close menu">
@@ -336,7 +336,7 @@ const App: React.FC = () => {
                 <CalendarView 
                     schedule={studyPlan.schedule} 
                     selectedDate={selectedDate} 
-                    onDateSelect={(d) => {setSelectedDate(d); setIsSidebarOpen(false);}} 
+                    onDateSelect={(d) => {setSelectedDate(d); if (isMobile) setIsSidebarOpen(false);}} 
                     viewMode={ViewMode.MONTHLY}
                     currentDisplayDate={selectedDate} 
                     onNavigatePeriod={(dir) => navigatePeriod(dir, 'Monthly')} 
@@ -416,14 +416,17 @@ const App: React.FC = () => {
               <button className="lg:hidden p-2 -ml-2 mr-2 text-[var(--text-primary)] hover:bg-[var(--background-tertiary)] rounded-full" onClick={() => setIsSidebarOpen(p => !p)} aria-label="Toggle menu">
                   <i className="fas fa-bars fa-lg"></i>
               </button>
-              <h1 className="text-lg md:text-xl font-bold flex items-center"><i className="fas fa-brain mr-2 text-[var(--accent-purple)]"></i> {APP_TITLE}</h1>
+              <h1 className="text-base sm:text-lg md:text-xl font-bold flex items-center"><i className="fas fa-brain mr-2 text-[var(--accent-purple)]"></i> {APP_TITLE}</h1>
           </div>
           
           {pomodoroSettings.isActive && (
               <div className="absolute left-1/2 -translate-x-1/2 flex items-center flex-col pointer-events-none">
-                  <div className={`text-xs uppercase tracking-wider ${pomodoroSettings.isStudySession ? 'text-[var(--accent-purple)]' : 'text-[var(--accent-green)]'}`}>{pomodoroSettings.isStudySession ? 'Study Time' : 'Break Time'}</div>
-                  <div className="text-2xl font-mono font-bold text-white">
+                  <div className={`hidden sm:block text-xs uppercase tracking-wider ${pomodoroSettings.isStudySession ? 'text-[var(--accent-purple)]' : 'text-[var(--accent-green)]'}`}>{pomodoroSettings.isStudySession ? 'Study Time' : 'Break Time'}</div>
+                  <div className="text-2xl font-mono font-bold text-white hidden sm:block">
                       {formatTime(pomodoroSettings.timeLeft)}
+                  </div>
+                  <div className={`sm:hidden h-8 w-8 rounded-full flex items-center justify-center text-xs ${pomodoroSettings.isStudySession ? 'bg-[var(--accent-purple)] text-white' : 'bg-[var(--accent-green)] text-black'}`}>
+                      <i className="fas fa-stopwatch"></i>
                   </div>
               </div>
           )}
