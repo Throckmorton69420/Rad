@@ -477,9 +477,9 @@ const App: React.FC = () => {
         </div>
 
         <div className="flex-grow lg:pl-80 flex flex-col min-h-0">
-          <header className="flex-shrink-0 bg-[var(--background-secondary)] text-white px-3 md:px-4 pb-3 md:pb-4 border-b border-[var(--separator-primary)] flex justify-between items-center sticky top-0 z-[var(--z-header)] pt-[calc(0.75rem+env(safe-area-inset-top))] md:pt-[calc(1rem+env(safe-area-inset-top))] pl-[calc(0.75rem+env(safe-area-inset-left))] pr-[calc(0.75rem+env(safe-area-inset-right))]">
+          <header className="flex-shrink-0 bg-[var(--background-secondary)] text-[var(--text-primary)] px-3 md:px-4 pb-3 md:pb-4 border-b border-[var(--separator-primary)] flex justify-between items-center sticky top-0 z-[var(--z-header)] pt-[calc(0.75rem+env(safe-area-inset-top))] md:pt-[calc(1rem+env(safe-area-inset-top))] pl-[calc(0.75rem+env(safe-area-inset-left))] pr-[calc(0.75rem+env(safe-area-inset-right))]">
             <div className="flex items-center">
-                <button className="lg:hidden p-2 -ml-2 mr-2 text-[var(--text-primary)] hover:bg-[var(--background-tertiary)] rounded-full" onClick={() => setIsSidebarOpen(p => !p)} aria-label="Toggle menu">
+                <button className="lg:hidden p-2 -ml-2 mr-2 text-[var(--text-primary)] hover:bg-[var(--background-tertiary-hover)] rounded-full" onClick={() => setIsSidebarOpen(p => !p)} aria-label="Toggle menu">
                     <i className="fas fa-bars fa-lg"></i>
                 </button>
                 <h1 className="text-base sm:text-lg md:text-xl font-bold flex items-center"><i className="fas fa-brain mr-2 text-[var(--accent-purple)]"></i> {APP_TITLE}</h1>
@@ -488,7 +488,7 @@ const App: React.FC = () => {
             {pomodoroSettings.isActive && (
                 <div className="absolute left-1/2 -translate-x-1/2 flex items-center flex-col pointer-events-none">
                     <div className={`hidden sm:block text-xs uppercase tracking-wider ${pomodoroSettings.isStudySession ? 'text-[var(--accent-purple)]' : 'text-[var(--accent-green)]'}`}>{pomodoroSettings.isStudySession ? 'Study Time' : 'Break Time'}</div>
-                    <div className="text-2xl font-mono font-bold text-white hidden sm:block">
+                    <div className="text-2xl font-mono font-bold text-[var(--text-primary)] hidden sm:block">
                         {formatTime(pomodoroSettings.timeLeft)}
                     </div>
                     <div className={`sm:hidden h-8 w-8 rounded-full flex items-center justify-center text-xs ${pomodoroSettings.isStudySession ? 'bg-[var(--accent-purple)] text-white' : 'bg-[var(--accent-green)] text-black'}`}>
@@ -517,14 +517,14 @@ const App: React.FC = () => {
           <main className={`flex-1 overflow-y-auto min-h-0 ${isMobile && isSidebarOpen ? 'overflow-hidden' : ''}`}>
               <div className="pt-3 md:pt-6 pl-[calc(0.75rem+env(safe-area-inset-left))] pr-[calc(0.75rem+env(safe-area-inset-right))] flex flex-col">
                 <div className="mb-6 flex-shrink-0 px-3 md:px-6">
-                      <div className="inline-flex bg-[var(--background-tertiary)] p-1 rounded-lg space-x-1">
-                          <button onClick={() => setActiveTab('schedule')} className={`py-1.5 px-4 font-semibold text-sm rounded-md flex-1 transition-colors ${activeTab === 'schedule' ? 'bg-[var(--background-tertiary-hover)] shadow text-[var(--text-primary)]' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}>
+                      <div className="inline-flex bg-[var(--background-secondary)] p-1 rounded-lg space-x-1">
+                          <button onClick={() => setActiveTab('schedule')} className={`py-1.5 px-4 font-semibold text-sm rounded-md flex-1 transition-colors ${activeTab === 'schedule' ? 'bg-[var(--glass-bg-active)] shadow text-[var(--text-primary)]' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}>
                               <i className="fa-regular fa-calendar-days mr-2"></i> Schedule
                           </button>
-                          <button onClick={() => setActiveTab('progress')} className={`py-1.5 px-4 font-semibold text-sm rounded-md flex-1 transition-colors ${activeTab === 'progress' ? 'bg-[var(--background-tertiary-hover)] shadow text-[var(--text-primary)]' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}>
+                          <button onClick={() => setActiveTab('progress')} className={`py-1.5 px-4 font-semibold text-sm rounded-md flex-1 transition-colors ${activeTab === 'progress' ? 'bg-[var(--glass-bg-active)] shadow text-[var(--text-primary)]' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}>
                               <i className="fa-solid fa-chart-pie mr-2"></i> Progress
                           </button>
-                          <button onClick={() => setActiveTab('content')} className={`py-1.5 px-4 font-semibold text-sm rounded-md flex-1 transition-colors ${activeTab === 'content' ? 'bg-[var(--background-tertiary-hover)] shadow text-[var(--text-primary)]' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}>
+                          <button onClick={() => setActiveTab('content')} className={`py-1.5 px-4 font-semibold text-sm rounded-md flex-1 transition-colors ${activeTab === 'content' ? 'bg-[var(--glass-bg-active)] shadow text-[var(--text-primary)]' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}>
                               <i className="fa-solid fa-book-bookmark mr-2"></i> Content
                           </button>
                       </div>
@@ -574,7 +574,7 @@ const App: React.FC = () => {
           </main>
 
           {systemNotification && (
-            <div className={`flex-shrink-0 p-3 text-sm text-center flex justify-between items-center ${systemNotification.type === 'error' ? 'bg-red-900/60 text-red-100' : 'bg-purple-900/60 text-purple-100'} backdrop-blur-md border-t border-white/10`}>
+            <div className={`flex-shrink-0 p-3 text-sm text-center flex justify-between items-center text-white ${systemNotification.type === 'error' ? 'bg-red-500/80' : 'bg-purple-500/80'} backdrop-blur-md border-t border-white/10`}>
               <span className="text-left"><i className={`fas ${systemNotification.type === 'error' ? 'fa-exclamation-circle' : 'fa-info-circle'} mr-2`}></i>{systemNotification.message}</span>
               <button onClick={() => setSystemNotification(null)} className="ml-4 font-bold text-xl leading-none" aria-label="Dismiss notification">&times;</button>
             </div>
