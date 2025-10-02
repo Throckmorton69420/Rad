@@ -69,7 +69,8 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   -webkit-tap-highlight-color: transparent;
-  position: relative; /* Stacking context */
+  position: relative; /* Creates a stacking context */
+  isolation: isolate; /* Ensures the ::before pseudo-element stays behind all content */
 }
 
 /* The Wallpaper Layer */
@@ -77,8 +78,8 @@ body::before {
   content: '';
   position: fixed; /* Covers viewport, doesn't scroll */
   inset: -10px; /* Overlap edges to prevent gaps from blur */
-  z-index: -1; /* Sits behind ALL content */
-  background: url('light-stream-blue-big-sur-kf.jpg') no-repeat center center;
+  z-index: -1; /* Sits behind ALL content within the 'body' stacking context */
+  background: url('/light-stream-blue-big-sur-kf.jpg') no-repeat center center;
   background-size: cover;
   filter: blur(24px) brightness(0.6);
 }

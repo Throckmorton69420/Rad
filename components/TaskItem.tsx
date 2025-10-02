@@ -62,7 +62,7 @@ const TaskItem: React.FC<PatchedTaskItemProps> = ({ task, onToggle, isCurrentPom
             {isCompleted ? <i className="fas fa-check-circle text-[var(--accent-green)] text-2xl"></i> : <i className="far fa-circle text-[var(--text-secondary)] hover:text-[var(--text-primary)] text-2xl"></i>}
           </button>
 
-          <div className="group relative flex-grow min-w-0 cursor-pointer flex flex-col items-start" onClick={() => !isCompleted && onToggle(task.id)} role="button" tabIndex={0} onKeyDown={e => { if (e.key === ' ' || e.key === 'Enter') onToggle(task.id)}}>
+          <div className="flex-grow min-w-0 cursor-pointer flex flex-col items-start" onClick={() => !isCompleted && onToggle(task.id)} role="button" tabIndex={0} onKeyDown={e => { if (e.key === ' ' || e.key === 'Enter') onToggle(task.id)}}>
             <h4 className={`text-base font-semibold ${titleColor} ${isCompleted ? 'line-through' : ''} leading-snug`} title={displayTitle}>
               {displayTitle}
             </h4>
@@ -75,10 +75,6 @@ const TaskItem: React.FC<PatchedTaskItemProps> = ({ task, onToggle, isCurrentPom
                   {task.bookSource || task.videoSource}
               </span>
             )}
-            <div className="task-tooltip pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-              <div className="font-semibold">{displayTitle}</div>
-              {(task.bookSource || task.videoSource) && <div className="text-sm text-[var(--text-secondary)]">{task.bookSource || task.videoSource}</div>}
-            </div>
           </div>
 
           <div className="flex flex-col items-end justify-start ml-2 flex-shrink-0 min-w-[70px]">
