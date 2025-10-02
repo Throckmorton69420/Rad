@@ -40,11 +40,12 @@ const CountdownTimer: React.FC<CountdownTimerProps> = ({ examDate }) => {
   const formattedExamDate = parseDateString(examDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
 
   useEffect(() => {
-    const timer = setTimeout(() => {
+    const timerId = setInterval(() => {
       setTimeLeft(calculateTimeLeft());
     }, 1000);
-    return () => clearTimeout(timer);
-  });
+
+    return () => clearInterval(timerId);
+  }, []); // Empty dependency array ensures this runs only once on mount.
 
   const formatPlural = (value: number, unit: string) => `${value} ${unit}${value !== 1 ? 's' : ''}`;
 

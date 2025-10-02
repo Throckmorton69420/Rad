@@ -19,6 +19,11 @@ export const useStudyPlanManager = () => {
     const isInitialLoadRef = useRef(true);
     const debounceTimerRef = useRef<number | null>(null);
 
+    const planStateRef = useRef({ studyPlan, userExceptions });
+    useEffect(() => {
+        planStateRef.current = { studyPlan, userExceptions };
+    }, [studyPlan, userExceptions]);
+
     const loadSchedule = useCallback(async (regenerate = false) => {
         setIsLoading(true);
         setSystemNotification(null);
@@ -89,12 +94,13 @@ export const useStudyPlanManager = () => {
 
             // This block runs for new users OR for a manual regeneration.
             const poolForGeneration = initialMasterResourcePool;
-            const exceptionsForGeneration = regenerate ? [] : userExceptions;
+            const exceptionsForGeneration = regenerate ? [] : planStateRef.current.userExceptions;
             if (regenerate) {
                 setUserExceptions([]);
             }
 
-            const outcome: GeneratedStudyPlanOutcome = generateInitialSchedule(poolForGeneration, exceptionsForGeneration, studyPlan?.topicOrder, { allContent: '2025-11-03' });
+            const currentTopicOrder = planStateRef.current.studyPlan?.topicOrder;
+            const outcome: GeneratedStudyPlanOutcome = generateInitialSchedule(poolForGeneration, exceptionsForGeneration, currentTopicOrder, { allContent: '2025-11-03' });
 
             setStudyPlan(outcome.plan);
             setGlobalMasterResourcePool(poolForGeneration); // Use the fresh pool
@@ -116,7 +122,7 @@ export const useStudyPlanManager = () => {
             setIsLoading(false);
             isInitialLoadRef.current = false;
         }
-    }, [studyPlan?.topicOrder]);
+    }, []);
 
     useEffect(() => {
         if (isInitialLoadRef.current || isLoading) return;
