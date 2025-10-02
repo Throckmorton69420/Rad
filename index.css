@@ -137,19 +137,37 @@ body {
   box-shadow: var(--glass-sheen), var(--glass-shadow);
   transition: background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
   border-radius: 12px;
-  /* Force application of the glass filter on all glass elements */
   backdrop-filter: var(--glass-backdrop-filter);
   -webkit-backdrop-filter: var(--glass-backdrop-filter);
 }
 
 .glass-panel { background-color: var(--glass-bg-panel); }
-.glass-chrome { background-color: var(--glass-bg-chrome); }
 .modal-panel { background-color: var(--glass-bg-modal); border-radius: 16px; }
 
 .glass-panel-interactive:hover:not(.is-pomodoro-active) {
   background-color: var(--glass-bg-hover);
   border-color: rgba(255, 255, 255, 0.4);
 }
+
+/* --- UI Chrome Elements (Header & Sidebar) --- */
+header.glass-chrome,
+aside.glass-chrome {
+  background-color: var(--glass-bg-chrome);
+  backdrop-filter: var(--glass-backdrop-filter);
+  -webkit-backdrop-filter: var(--glass-backdrop-filter);
+  border-radius: 0;
+  box-shadow: var(--glass-sheen); /* simplified shadow for chrome */
+  border: none;
+}
+
+header.glass-chrome {
+  border-bottom: 1px solid var(--separator-primary);
+}
+
+aside.glass-chrome {
+  border-right: 1px solid var(--separator-primary);
+}
+
 
 /* --- Glow Effects & Active States --- */
 .interactive-glow-border:hover,
@@ -176,25 +194,6 @@ body {
 ::-webkit-scrollbar-thumb:hover { background-color: rgba(255, 255, 255, 0.3); }
 .no-scrollbar::-webkit-scrollbar { display: none; }
 .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-
-/* --- UI Chrome (FIXED) --- */
-.glass-chrome {
-  border-radius: 0;
-  box-shadow: var(--glass-sheen); /* simplified shadow for chrome */
-  border: none;
-  border-bottom: 1px solid var(--separator-primary);
-}
-
-header.glass-chrome {
-  border-bottom: 1px solid var(--separator-primary);
-}
-
-/* Specific fix for sidebar border */
-aside.glass-chrome {
-  border-bottom: none;
-  border-right: 1px solid var(--separator-primary);
-}
-
 
 .border-\[\--separator-primary\] { border-color: var(--separator-primary) !important; }
 
