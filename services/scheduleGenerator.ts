@@ -469,7 +469,10 @@ export const rebalanceSchedule = (
     masterResourcePool: StudyResource[]
 ): GeneratedStudyPlanOutcome => {
     const activeResources = masterResourcePool.filter(r => !r.isArchived);
+    let notifications: GeneratedStudyPlanOutcome['notifications'] = [];
+    let finalSchedule: DailySchedule[];
 
+    // This is the definitive list of what's been completed.
     const completedOriginalResourceIds = new Set<string>();
     currentPlan.schedule.flatMap(day => day.tasks).forEach(task => {
         if (task.status === 'completed') {
@@ -477,20 +480,35 @@ export const rebalanceSchedule = (
         }
     });
 
+    // This pool contains every resource that still needs to be scheduled.
     const baseSchedulingPool = JSON.parse(JSON.stringify(
         activeResources.filter(r => !completedOriginalResourceIds.has(r.id))
     ));
 
-    let finalSchedule: DailySchedule[];
-    let notifications: GeneratedStudyPlanOutcome['notifications'] = [];
+    const rebalanceStartDate = getTodayInNewYork();
+    
+    // Preserve the past, but only with completed tasks. Unfinished tasks from the past will be rescheduled.
+    const pastScheduleShell = currentPlan.schedule
+        .filter(day => day.date < rebalanceStartDate)
+        .map(day => ({
+            ...day,
+            tasks: day.tasks.filter(t => t.status === 'completed')
+        }));
 
     if (options.type === 'topic-time') {
-        console.log("[Scheduler Engine] Rebalancing with Topic/Time specification.");
+        console.log("[Scheduler Engine] Rebalancing with Topic/Time specification, carrying over past pending tasks.");
         const { date: modifiedDate, topics, totalTimeMinutes } = options;
 
-        const pastScheduleShell = currentPlan.schedule.filter(day => day.date < modifiedDate).map(day => ({ ...day }));
+        if (modifiedDate < rebalanceStartDate) {
+            notifications.push({ type: 'error', message: "Cannot use Topic/Time rebalance for a past date. Please use Standard Rebalance." });
+            return { plan: currentPlan, notifications };
+        }
 
-        const modifiedDayTemplate = currentPlan.schedule.find(d => d.date === modifiedDate) || createScheduleShell(modifiedDate, modifiedDate, userAddedExceptions)[0];
+        // Create shell for days between today and the modified day.
+        const intermediateScheduleShell = createScheduleShell(rebalanceStartDate, modifiedDate, userAddedExceptions).filter(d => d.date < modifiedDate);
+
+        // Create the modified day.
+        const modifiedDayTemplate = createScheduleShell(modifiedDate, modifiedDate, userAddedExceptions)[0];
         const modifiedDay: DailySchedule = {
             ...modifiedDayTemplate,
             tasks: [],
@@ -498,15 +516,8 @@ export const rebalanceSchedule = (
             isRestDay: totalTimeMinutes === 0,
             isManuallyModified: true,
         };
-
-        let priorityPool = baseSchedulingPool.filter((r: StudyResource) => topics.includes(r.domain));
-        let remainingPool = baseSchedulingPool.filter((r: StudyResource) => !topics.includes(r.domain));
         
-        const modifiedDayNotifications = runSchedulingEngine([modifiedDay], priorityPool, currentPlan);
-        notifications.push(...modifiedDayNotifications);
-        
-        remainingPool.push(...priorityPool); // Add back unused priority tasks
-
+        // Create shell for days after the modified day.
         const futureStartDate = new Date(parseDateString(modifiedDate));
         futureStartDate.setUTCDate(futureStartDate.getUTCDate() + 1);
         const futureStartDateStr = futureStartDate.toISOString().split('T')[0];
@@ -514,19 +525,34 @@ export const rebalanceSchedule = (
         let futureScheduleShell: DailySchedule[] = [];
         if (futureStartDateStr <= currentPlan.endDate) {
             futureScheduleShell = createScheduleShell(futureStartDateStr, currentPlan.endDate, userAddedExceptions);
-            const futureNotifications = runSchedulingEngine(futureScheduleShell, remainingPool, currentPlan);
-            notifications.push(...futureNotifications);
         }
+
+        // Separate task pools.
+        let priorityPool = baseSchedulingPool.filter((r: StudyResource) => topics.includes(r.domain));
+        let remainingPool = baseSchedulingPool.filter((r: StudyResource) => !topics.includes(r.domain));
+
+        // Schedule the modified day first with priority tasks.
+        const modifiedDayNotifications = runSchedulingEngine([modifiedDay], priorityPool, currentPlan);
+        notifications.push(...modifiedDayNotifications);
         
-        finalSchedule = [...pastScheduleShell, modifiedDay, ...futureScheduleShell];
+        // Add unused priority tasks back to the main pool to be scheduled later.
+        remainingPool.push(...priorityPool);
+
+        // Schedule all other future days (before and after the modified day) with the remaining pool.
+        const remainingScheduleShell = [...intermediateScheduleShell, ...futureScheduleShell];
+        const remainingNotifications = runSchedulingEngine(remainingScheduleShell, remainingPool, currentPlan);
+        notifications.push(...remainingNotifications);
+        
+        // Stitch the full schedule back together.
+        finalSchedule = [...pastScheduleShell, ...intermediateScheduleShell, modifiedDay, ...futureScheduleShell];
 
     } else { // Standard rebalance
-        console.log("[Scheduler Engine] Rebalancing schedule from today onwards.");
-        const rebalanceStartDate = getTodayInNewYork();
-        const pastScheduleShell = currentPlan.schedule.filter(day => day.date < rebalanceStartDate).map(day => ({ ...day }));
+        console.log("[Scheduler Engine] Rebalancing schedule from today onwards, carrying over past pending tasks.");
         const futureScheduleShell = createScheduleShell(rebalanceStartDate, currentPlan.endDate, userAddedExceptions);
         
-        notifications = runSchedulingEngine(futureScheduleShell, baseSchedulingPool, currentPlan);
+        const standardNotifications = runSchedulingEngine(futureScheduleShell, baseSchedulingPool, currentPlan);
+        notifications.push(...standardNotifications);
+        
         finalSchedule = [...pastScheduleShell, ...futureScheduleShell];
     }
     
