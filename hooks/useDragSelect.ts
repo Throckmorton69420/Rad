@@ -1,3 +1,5 @@
+// FIX: Imported React to resolve namespace errors.
+import * as React from 'react';
 import { useState, useRef, useCallback, useEffect } from 'react';
 
 interface InteractionState {
@@ -115,6 +117,7 @@ export const useDragSelect = () => {
       }
   }, [state, stopAutoScroll]);
 
+  // FIX: Added native TouchEvent type to resolve type errors.
   const handleTouchMove = (e: TouchEvent) => {
     if (state.mode === 'pending') {
       const dx = Math.abs(e.touches[0].clientX - state.startX);
@@ -130,6 +133,7 @@ export const useDragSelect = () => {
     }
   };
 
+  // FIX: Added native MouseEvent type to resolve type errors.
   const handleMouseMove = (e: MouseEvent) => {
     if (state.mode === 'pending') {
       const dx = Math.abs(e.clientX - state.startX);
@@ -145,6 +149,7 @@ export const useDragSelect = () => {
     }
   };
 
+  // FIX: Added native TouchEvent type to resolve type errors.
   const handleTouchEnd = (e: TouchEvent) => {
       const resourceId = getResourceIdFromTarget(e.changedTouches[0].target);
       if (state.mode === 'pending' && resourceId) {
@@ -162,6 +167,7 @@ export const useDragSelect = () => {
       endInteraction();
   };
 
+  // FIX: Added native MouseEvent type to resolve type errors.
   const handleMouseUp = (e: MouseEvent) => {
       const resourceId = getResourceIdFromTarget(e.target);
       if (state.mode === 'pending' && resourceId) {
@@ -208,7 +214,7 @@ export const useDragSelect = () => {
 
     window.addEventListener('mousemove', handleMouseMove);
     window.addEventListener('mouseup', handleMouseUp);
-  }, [state, startDragSelection]);
+  }, [state]);
 
   useEffect(() => {
     return () => endInteraction();

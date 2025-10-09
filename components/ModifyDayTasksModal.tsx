@@ -130,9 +130,10 @@ const ModifyDayTasksModal: React.FC<ModifyDayTasksModalProps> = ({
     }, [availableResources, domainFilter, typeFilter]);
     
     // 3. Effects to reset a filter if its current selection becomes invalid
-    useEffect(() => { if (!availableDomains.includes(domainFilter as Domain)) setDomainFilter('all'); }, [availableDomains, domainFilter]);
-    useEffect(() => { if (!availableResourceTypes.includes(typeFilter as ResourceType)) setTypeFilter('all'); }, [availableResourceTypes, typeFilter]);
-    useEffect(() => { if (!availableSources.includes(sourceFilter)) setSourceFilter('all'); }, [availableSources, sourceFilter]);
+    // FIX: Add type-safe checks to prevent invalid casting.
+    useEffect(() => { if (domainFilter !== 'all' && !availableDomains.includes(domainFilter)) setDomainFilter('all'); }, [availableDomains, domainFilter]);
+    useEffect(() => { if (typeFilter !== 'all' && !availableResourceTypes.includes(typeFilter)) setTypeFilter('all'); }, [availableResourceTypes, typeFilter]);
+    useEffect(() => { if (sourceFilter !== 'all' && !availableSources.includes(sourceFilter)) setSourceFilter('all'); }, [availableSources, sourceFilter]);
 
     // ------------------------------------------
 

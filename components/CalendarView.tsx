@@ -19,7 +19,8 @@ const CalendarView: React.FC<CalendarViewProps> = ({ schedule, selectedDate, onD
   const scheduleMap = new Map(schedule.map(day => [day.date, day]));
   const gridRef = useRef<HTMLDivElement>(null);
 
-  const getMajorDomainForDay = (day: DailySchedule): Domain | null => {
+  // FIX: Changed parameter type to allow for undefined day schedules.
+  const getMajorDomainForDay = (day: DailySchedule | undefined): Domain | null => {
     if (!day || day.isRestDay || day.tasks.length === 0) return null;
 
     const timeByDomain: Partial<Record<Domain, number>> = {};
@@ -90,6 +91,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ schedule, selectedDate, onD
                     isSelected ? 'bg-[var(--accent-purple)] text-white' : 'text-[var(--text-primary)]',
                     isToday && !isSelected ? 'ring-1 ring-[var(--text-secondary)]' : '',
                     isHighlighted ? 'is-highlighted' : '',
+                    // FIX: Use optional chaining as daySchedule can be undefined.
                     daySchedule?.isRestDay && !isSelected ? 'opacity-50' : '',
                     !isCurrentMonth ? 'opacity-30 bg-black' : ''
                 ].filter(Boolean).join(' ');
@@ -105,15 +107,18 @@ const CalendarView: React.FC<CalendarViewProps> = ({ schedule, selectedDate, onD
                         aria-label={`${parseDateString(dateStr).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', timeZone: 'UTC' })}. ${daySchedule ? (daySchedule.isRestDay ? 'Rest Day' : `${Math.round(daySchedule.totalStudyTimeMinutes / 60)} hours assigned.`) : 'No tasks.'}`}
                     >
                         <span className={`${isSelected ? 'font-bold' : ''}`}>{dayOfMonth}</span>
+                        {/* FIX: Use optional chaining as daySchedule can be undefined. */}
                         {domainColor && !isSelected && !daySchedule?.isRestDay && (
                            <div className="absolute bottom-1.5 left-1/2 -translate-x-1/2 w-1.5 h-1.5 rounded-full" style={{ backgroundColor: domainColor }}></div>
                         )}
+                        {/* FIX: Use optional chaining as daySchedule can be undefined. */}
                         {daySchedule?.isManuallyModified && !isSelected && <i className="fas fa-hand-paper text-xxs text-[var(--accent-yellow)] absolute top-1 right-1" title="Manually Modified"></i>}
                         {daySchedule && !daySchedule.isRestDay && daySchedule.totalStudyTimeMinutes > 0 && (
                             <span className={`mt-auto text-xxs px-1 py-0.5 rounded ${isSelected ? 'bg-black/30' : 'bg-black/50'}`}>
                                 {Math.round(daySchedule.totalStudyTimeMinutes / 60)}h
                             </span>
                         )}
+                        {/* FIX: Use optional chaining as daySchedule can be undefined. */}
                         {daySchedule?.isRestDay && (
                             <i className="fas fa-coffee text-xxs self-center mt-auto text-gray-500"></i>
                         )}

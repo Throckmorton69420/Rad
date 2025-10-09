@@ -28,7 +28,7 @@ const DeadlineManager: React.FC<{
 
     const DeadlineInput: React.FC<{ dKey: keyof DeadlineSettings, label: string }> = ({ dKey, label }) => (
         <div>
-            <label htmlFor={`deadline-${dKey}`} className="block text-sm font-medium text-[var(--text-secondary)] mb-1">{label}:</label>
+            <label htmlFor={`deadline-${dKey}`} className="block text-xs font-medium text-[var(--text-secondary)] mb-1">{label}:</label>
             <input
                 type="date"
                 id={`deadline-${dKey}`}
@@ -43,8 +43,8 @@ const DeadlineManager: React.FC<{
     return (
         <div className="p-3 glass-panel rounded-lg mt-2 space-y-3 animate-fade-in">
             <h4 className="text-md font-semibold text-[var(--text-primary)]">Deadline Manager</h4>
-            <p className="text-xxs text-[var(--text-secondary)] -mt-2">Set target completion dates for primary content. The scheduler will adjust daily hours to meet these goals.</p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <p className="text-xxs text-[var(--text-secondary)]">Set target completion dates for primary content. The scheduler will adjust daily hours to meet these goals.</p>
+            <div className="grid grid-cols-2 gap-2">
                 <DeadlineInput dKey="allContent" label="All Content" />
                 <DeadlineInput dKey="physicsContent" label="Physics Content" />
                 <DeadlineInput dKey="nucMedContent" label="Nuclear Med Content" />

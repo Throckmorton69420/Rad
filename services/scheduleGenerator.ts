@@ -164,30 +164,60 @@ const adjustBudgetsForDeadlines = (
     resourcePool: StudyResource[],
     deadlines: DeadlineSettings
 ): GeneratedStudyPlanOutcome['notifications'] => {
-    if (!deadlines || Object.keys(deadlines).length === 0) {
+    if (!deadlines || Object.values(deadlines).every(d => !d)) {
         return [];
     }
     
     const notifications: GeneratedStudyPlanOutcome['notifications'] = [];
-    const today = getTodayInNewYork();
-    
-    const deadlineCategories: { key: keyof DeadlineSettings, domains: Domain[], label: string }[] = [
-        { key: 'physicsContent', domains: [Domain.PHYSICS], label: 'Physics' },
-        { key: 'nucMedContent', domains: [Domain.NUCLEAR_MEDICINE], label: 'Nuclear Medicine' },
-        { key: 'otherContent', domains: ALL_DOMAINS.filter(d => d !== Domain.PHYSICS && d !== Domain.NUCLEAR_MEDICINE), label: 'Other Topics' },
-    ];
+    const primaryResources = resourcePool.filter(r => r.isPrimaryMaterial);
 
-    for (const category of deadlineCategories) {
-        const deadlineStr = deadlines[category.key];
-        if (!deadlineStr) continue;
+    const resourceToDeadlineMap = new Map<StudyResource, string>();
+    for (const resource of primaryResources) {
+        let earliestDeadline: string | null = deadlines.allContent || null;
 
-        const categoryResources = resourcePool.filter(r => category.domains.includes(r.domain) && r.isPrimaryMaterial);
-        const totalMinutesNeeded = categoryResources.reduce((acc, r) => acc + r.durationMinutes, 0);
+        const isPhysics = resource.domain === Domain.PHYSICS;
+        const isNucMed = resource.domain === Domain.NUCLEAR_MEDICINE;
 
-        const daysUntilDeadline = scheduleShell.filter(d => d.date >= today && d.date <= deadlineStr && !d.isRestDay);
+        if (isPhysics && deadlines.physicsContent) {
+            if (!earliestDeadline || deadlines.physicsContent < earliestDeadline) {
+                earliestDeadline = deadlines.physicsContent;
+            }
+        }
+        if (isNucMed && deadlines.nucMedContent) {
+            if (!earliestDeadline || deadlines.nucMedContent < earliestDeadline) {
+                earliestDeadline = deadlines.nucMedContent;
+            }
+        }
+        if (!isPhysics && !isNucMed && deadlines.otherContent) {
+            if (!earliestDeadline || deadlines.otherContent < earliestDeadline) {
+                earliestDeadline = deadlines.otherContent;
+            }
+        }
+
+        if (earliestDeadline) {
+            resourceToDeadlineMap.set(resource, earliestDeadline);
+        }
+    }
+
+    const deadlineToResourcesMap = new Map<string, StudyResource[]>();
+    for (const [resource, deadline] of resourceToDeadlineMap.entries()) {
+        if (!deadlineToResourcesMap.has(deadline)) {
+            deadlineToResourcesMap.set(deadline, []);
+        }
+        deadlineToResourcesMap.get(deadline)!.push(resource);
+    }
+
+    const sortedDeadlines = Array.from(deadlineToResourcesMap.keys()).sort();
+
+    for (const deadlineStr of sortedDeadlines) {
+        const resourcesForDeadline = deadlineToResourcesMap.get(deadlineStr)!;
+        const totalMinutesNeeded = resourcesForDeadline.reduce((acc, r) => acc + r.durationMinutes, 0);
+
+        const daysUntilDeadline = scheduleShell.filter(d => d.date <= deadlineStr && !d.isRestDay);
+        
         if (daysUntilDeadline.length === 0) {
             if (totalMinutesNeeded > 0) {
-                notifications.push({ type: 'error', message: `Cannot meet ${category.label} deadline. No study days available before ${deadlineStr}.` });
+                notifications.push({ type: 'error', message: `Cannot meet deadline ${deadlineStr}. No study days available before this date.` });
             }
             continue;
         }
@@ -199,10 +229,11 @@ const adjustBudgetsForDeadlines = (
             
             const newTotalMinutesAvailable = daysUntilDeadline.reduce((acc, d) => acc + d.totalStudyTimeMinutes, 0);
             if (totalMinutesNeeded > newTotalMinutesAvailable) {
-                 notifications.push({ type: 'warning', message: `Could not fit all ${category.label} content by deadline even after maximizing daily study time.` });
+                 notifications.push({ type: 'warning', message: `Could not fit all content for deadline ${deadlineStr} even after maximizing daily study time.` });
             }
         }
     }
+    
     return notifications;
 };
 
