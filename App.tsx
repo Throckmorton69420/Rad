@@ -43,7 +43,7 @@ interface SidebarContentProps {
     navigatePeriod: (direction: 'next' | 'prev', viewMode: 'Weekly' | 'Monthly') => void;
     highlightedDates: string[];
     todayInNewYork: string;
-    handleRebalance: (options: RebalanceOptions) => void;
+    handleRebalance: (options: RebalanceOptions, planToUse?: StudyPlan) => void;
     isLoading: boolean;
     handleToggleCramMode: (isActive: boolean) => void;
     handleUpdateDeadlines: (newDeadlines: DeadlineSettings) => void;
@@ -408,11 +408,11 @@ const App: React.FC = () => {
   }, [currentPomodoroTaskId, studyPlan, setStudyPlan, updatePreviousStudyPlan, setSystemNotification, showConfirmation, handleTaskToggle, selectedDate]);
 
   const handleUpdateDeadlines = useCallback((newDeadlines: DeadlineSettings) => {
-      if (!studyPlan) return;
-      updatePreviousStudyPlan(studyPlan);
-      const updatedPlan = { ...studyPlan, deadlines: newDeadlines };
-      setStudyPlan(updatedPlan);
-      handleRebalance({ type: 'standard' });
+    if (!studyPlan) return;
+    updatePreviousStudyPlan(studyPlan);
+    const updatedPlan = { ...studyPlan, deadlines: newDeadlines };
+    setStudyPlan(updatedPlan);
+    handleRebalance({ type: 'standard' }, updatedPlan);
   }, [studyPlan, updatePreviousStudyPlan, setStudyPlan, handleRebalance]);
 
   const scheduledResourceIds = useMemo(() => {

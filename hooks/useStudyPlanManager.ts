@@ -1,5 +1,5 @@
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
-import { StudyPlan, RebalanceOptions, ExceptionDateRule, StudyResource, ScheduledTask, GeneratedStudyPlanOutcome, Domain, ResourceType, PlanDataBlob } from '../types';
+import { StudyPlan, RebalanceOptions, ExceptionDateRule, StudyResource, ScheduledTask, GeneratedStudyPlanOutcome, Domain, ResourceType, PlanDataBlob, DeadlineSettings } from '../types';
 import { generateInitialSchedule, rebalanceSchedule } from '../services/scheduleGenerator';
 import { masterResourcePool as initialMasterResourcePool } from '../services/studyResources';
 import { supabase } from '../services/supabaseClient';
@@ -100,7 +100,13 @@ export const useStudyPlanManager = () => {
             }
 
             const currentTopicOrder = planStateRef.current.studyPlan?.topicOrder;
-            const outcome: GeneratedStudyPlanOutcome = generateInitialSchedule(poolForGeneration, exceptionsForGeneration, currentTopicOrder, { allContent: '2025-11-03' });
+            const defaultDeadlines: DeadlineSettings = {
+                allContent: '2025-11-03',
+                physicsContent: '2025-10-09',
+                nucMedContent: '2025-10-09',
+                otherContent: '2025-10-09',
+            };
+            const outcome: GeneratedStudyPlanOutcome = generateInitialSchedule(poolForGeneration, exceptionsForGeneration, currentTopicOrder, defaultDeadlines);
 
             setStudyPlan(outcome.plan);
             setGlobalMasterResourcePool(poolForGeneration); // Use the fresh pool
@@ -183,10 +189,11 @@ export const useStudyPlanManager = () => {
         }, 50);
     };
 
-    const handleRebalance = (options: RebalanceOptions) => {
-        if (!studyPlan) return;
-        updatePreviousStudyPlan(studyPlan);
-        triggerRebalance(studyPlan, options);
+    const handleRebalance = (options: RebalanceOptions, planToUse?: StudyPlan) => {
+        const planForRebalance = planToUse || studyPlan;
+        if (!planForRebalance) return;
+        updatePreviousStudyPlan(planForRebalance);
+        triggerRebalance(planForRebalance, options);
     };
 
     const handleAddOrUpdateException = useCallback((newRule: ExceptionDateRule) => {
