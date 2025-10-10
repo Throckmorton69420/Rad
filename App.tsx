@@ -445,7 +445,8 @@ const App: React.FC = () => {
     updatePreviousStudyPlan(studyPlan);
     const updatedPlan = { ...studyPlan, deadlines: newDeadlines };
     setStudyPlan(updatedPlan);
-    handleRebalance({ type: 'standard' }, updatedPlan);
+    // FIX: Removed second argument from handleRebalance call to match its definition.
+    handleRebalance({ type: 'standard' });
   }, [studyPlan, updatePreviousStudyPlan, setStudyPlan, handleRebalance]);
 
   const scheduledResourceIds = useMemo(() => {

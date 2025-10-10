@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import { PlanDataBlob } from '../types';
+import { PlanDataBlob, Run, ScheduleSlot } from '../types';
 
 const supabaseUrl = (import.meta as any).env.VITE_SUPABASE_URL;
 const supabaseAnonKey = (import.meta as any).env.VITE_SUPABASE_ANON_KEY;
@@ -30,15 +30,29 @@ export interface Database {
         Row: { // The data shape of a row
           id: number;
           created_at: string;
-          plan_data: Json;
+          // FIX: Changed type to 'any' to resolve 'never' type inference issue in Supabase client.
+          plan_data: any;
         };
         Insert: { // The data shape for inserting a new row
           id: number;
-          plan_data: Json;
+          // FIX: Changed type to 'any' to resolve 'never' type inference issue in Supabase client.
+          plan_data: any;
         };
         Update: { // The data shape for updating a row
-          plan_data?: Json;
+          // FIX: Changed type to 'any' to resolve 'never' type inference issue in Supabase client.
+          plan_data?: any;
         };
+      };
+      // As per the user spec, these tables are required for the solver orchestration
+      runs: {
+        Row: Run;
+        Insert: Partial<Run>;
+        Update: Partial<Run>;
+      };
+      schedule_slots: {
+        Row: ScheduleSlot;
+        Insert: Partial<ScheduleSlot>;
+        Update: Partial<ScheduleSlot>;
       };
     };
     Views: {
