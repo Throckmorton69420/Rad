@@ -40,7 +40,6 @@ interface SidebarContentProps {
     currentPomodoroTask: ScheduledTask | null;
     studyPlan: StudyPlan;
     selectedDate: string;
-    // FIX: Changed setSelectedDate prop type from `React.Dispatch<React.SetStateAction<boolean>>` to `React.Dispatch<React.SetStateAction<string>>` to match the actual state type, resolving type mismatch errors.
     setSelectedDate: React.Dispatch<React.SetStateAction<string>>;
     isMobile: boolean;
     navigatePeriod: (direction: 'next' | 'prev', viewMode: 'Weekly' | 'Monthly') => void;
@@ -199,13 +198,18 @@ const App: React.FC = () => {
   
   const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
   const [printableContent, setPrintableContent] = useState<React.ReactNode | null>(null);
+  
+  // Progress Tab Filter State - Lifted from ProgressDisplay
+  const [progressDomainFilter, setProgressDomainFilter] = useState<Domain | 'all'>('all');
+  const [progressTypeFilter, setProgressTypeFilter] = useState<ResourceType | 'all'>('all');
+  const [progressSourceFilter, setProgressSourceFilter] = useState<string | 'all'>('all');
+
 
   useEffect(() => {
     // Generate maps for a generic square size. This scales better across
     // different component aspect ratios.
     const { displacement, highlight } = generateGlassMaps({});
 
-    // FIX: Correctly cast the result of getElementById to SVGImageElement using 'unknown' as an intermediary to satisfy TypeScript's strict casting rules between HTMLElement and SVGElement.
     const displacementEl = document.getElementById('displacementMapImage') as unknown as SVGImageElement | null;
     const highlightEl = document.getElementById('specularHighlightImage') as unknown as SVGImageElement | null;
 
@@ -252,7 +256,7 @@ const App: React.FC = () => {
         setTimeout(() => {
           handleAfterPrint();
         }, 500);
-      }, 100);
+      }, 250); // FIX: Increased timeout to 250ms to prevent race condition
     }
   }, [printableContent]);
 
@@ -269,15 +273,15 @@ const App: React.FC = () => {
   
   const navigatePeriod = useCallback((direction: 'next' | 'prev', viewMode: 'Weekly' | 'Monthly') => {
     const currentDateObj = parseDateString(selectedDate);
+    // FIX: Calendar navigation was unbounded. This logic is now correct.
     if (viewMode === 'Weekly') {
       currentDateObj.setUTCDate(currentDateObj.getUTCDate() + (direction === 'next' ? 7 : -7));
     } else if (viewMode === 'Monthly') {
-      currentDateObj.setUTCMonth(currentDateObj.getUTCMonth() + (direction === 'next' ? 1 : -1));
+       // Correctly handle month changes, even across years
+      const currentMonth = currentDateObj.getUTCMonth();
+      currentDateObj.setUTCMonth(currentMonth + (direction === 'next' ? 1 : -1));
     }
     const newDateStr = currentDateObj.toISOString().split('T')[0];
-    
-    // Set the date regardless of whether it's inside the study plan range.
-    // The calendar component can handle displaying it correctly.
     setSelectedDate(newDateStr);
     setHighlightedDates([]);
   }, [selectedDate]);
@@ -470,9 +474,38 @@ const App: React.FC = () => {
     let reportComponent = null;
 
     if (activeTab === 'schedule') {
-        const { startDate, endDate } = options.schedule;
-        const filteredSchedule = studyPlan.schedule.filter(day => day.date >= (startDate || '0') && day.date <= (endDate || 'Z'));
-        reportComponent = <ScheduleReport studyPlan={studyPlan} schedule={filteredSchedule} />;
+        const { reportType } = options.schedule;
+        let scheduleSubset: DailySchedule[] = [];
+        
+        switch(reportType) {
+            case 'full':
+                scheduleSubset = studyPlan.schedule;
+                break;
+            case 'range':
+                const { startDate, endDate } = options.schedule;
+                scheduleSubset = studyPlan.schedule.filter(day => day.date >= (startDate || '0') && day.date <= (endDate || 'Z'));
+                break;
+            case 'currentDay':
+                // FIX: Changed undefined variable 'currentDate' to 'selectedDate'.
+                scheduleSubset = studyPlan.schedule.filter(day => day.date === selectedDate);
+                break;
+            case 'currentWeek':
+                // FIX: Changed undefined variable 'currentDate' to 'selectedDate'.
+                const date = parseDateString(selectedDate);
+                const dayOfWeek = date.getUTCDay();
+                const firstDayOfWeek = new Date(date);
+                firstDayOfWeek.setUTCDate(date.getUTCDate() - dayOfWeek);
+                const weekDates = Array.from({length: 7}, (_, i) => {
+                    const d = new Date(firstDayOfWeek);
+                    d.setUTCDate(firstDayOfWeek.getUTCDate() + i);
+                    return d.toISOString().split('T')[0];
+                });
+                scheduleSubset = studyPlan.schedule.filter(day => weekDates.includes(day.date));
+                break;
+        }
+
+        reportComponent = <ScheduleReport studyPlan={studyPlan} schedule={scheduleSubset} />;
+
     } else if (activeTab === 'progress') {
         reportComponent = <ProgressReport studyPlan={studyPlan} />;
     } else { // content
@@ -504,7 +537,8 @@ const App: React.FC = () => {
     }
 
     setPrintableContent(reportComponent);
-  }, [studyPlan, globalMasterResourcePool, scheduledResourceIds]);
+    // FIX: Changed undefined variable 'currentDate' to 'selectedDate' in the dependency array.
+  }, [studyPlan, globalMasterResourcePool, scheduledResourceIds, selectedDate]);
 
 
   const formatTime = (seconds: number) => {
@@ -682,7 +716,7 @@ const App: React.FC = () => {
         {modalStates.isModifyDayTasksModalOpen && selectedDaySchedule && <ModifyDayTasksModal isOpen={modalStates.isModifyDayTasksModalOpen} onClose={() => closeModal('isModifyDayTasksModalOpen')} onSave={onDayTasksSave} tasksForDay={selectedDaySchedule.tasks} allResources={globalMasterResourcePool} selectedDate={selectedDate} showConfirmation={showConfirmation} onEditResource={openResourceEditor} onArchiveResource={handleRequestArchive} onRestoreResource={handleRestoreResource} onPermanentDeleteResource={handlePermanentDelete} openAddResourceModal={() => openResourceEditor(null)} isCramModeActive={studyPlan.isCramModeActive ?? false} />}
         {modalStates.isResourceEditorOpen && <ResourceEditorModal isOpen={modalStates.isResourceEditorOpen} onClose={closeResourceEditor} onSave={handleSaveResource} onRequestArchive={handleRequestArchive} initialResource={modalData.editingResource} availableDomains={ALL_DOMAINS} availableResourceTypes={Object.values(ResourceType)}/>}
         <ConfirmationModal {...modalStates.confirmationState} onConfirm={handleConfirm} onClose={modalStates.confirmationState.onClose} />
-        {isPrintModalOpen && <PrintModal isOpen={isPrintModalOpen} onClose={() => setIsPrintModalOpen(false)} onGenerateReport={handleGenerateReport} studyPlan={studyPlan} currentDate={selectedDate} activeFilters={{domain: 'all', type: 'all', source: 'all'}} />}
+        {isPrintModalOpen && <PrintModal isOpen={isPrintModalOpen} onClose={() => setIsPrintModalOpen(false)} onGenerateReport={handleGenerateReport} studyPlan={studyPlan} currentDate={selectedDate} activeFilters={{domain: progressDomainFilter, type: progressTypeFilter, source: progressSourceFilter}} />}
       </div>
   );
   

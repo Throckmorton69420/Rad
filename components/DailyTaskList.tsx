@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { DailyTaskListProps, ScheduledTask } from '../types';
 import { Button } from './Button';
 import TaskItem from './TaskItem';
+import TaskGroupItem from './TaskGroupItem';
 import { formatDuration } from '../utils/timeFormatter';
 import TimeInputScroller from './TimeInputScroller';
 import { parseDateString } from '../utils/timeFormatter';
@@ -22,6 +23,7 @@ const DailyTaskList: React.FC<DailyTaskListProps> = ({
   const [pulsingTaskId, setPulsingTaskId] = useState<string | null>(null);
   const [isTimeEditorOpen, setIsTimeEditorOpen] = useState(false);
   const [editedTime, setEditedTime] = useState(dailySchedule.totalStudyTimeMinutes);
+  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
 
   const { date, tasks, totalStudyTimeMinutes, isRestDay, dayName } = dailySchedule;
   const displayDate = parseDateString(date);
@@ -42,8 +44,38 @@ const DailyTaskList: React.FC<DailyTaskListProps> = ({
     setIsTimeEditorOpen(false);
   };
   
+  const toggleGroup = (groupKey: string) => {
+    setExpandedGroups(prev => ({ ...prev, [groupKey]: !prev[groupKey] }));
+  };
+
+  const groupedAndSortedTasks = useMemo(() => {
+    const sortedTasks = [...tasks].sort((a, b) => a.order - b.order);
+    const result: (ScheduledTask | { isGroup: true; id: string; source: string; tasks: ScheduledTask[] })[] = [];
+    let i = 0;
+    while (i < sortedTasks.length) {
+      const task = sortedTasks[i];
+      const source = task.bookSource || task.videoSource;
+      if (source) {
+        let group: ScheduledTask[] = [task];
+        let j = i + 1;
+        while (j < sortedTasks.length && (sortedTasks[j].bookSource || sortedTasks[j].videoSource) === source) {
+          group.push(sortedTasks[j]);
+          j++;
+        }
+        if (group.length >= 3) {
+          result.push({ isGroup: true, id: `${date}-${source}`, source, tasks: group });
+          i = j;
+          continue;
+        }
+      }
+      result.push(task);
+      i++;
+    }
+    return result;
+  }, [tasks, date]);
+
   return (
-    <div className="relative flex flex-col h-full text-[var(--text-primary)]">
+    <div className="relative flex flex-col">
       <div className="flex-shrink-0">
         <div className="flex justify-between items-center mb-1">
           <Button onClick={() => onNavigateDay('prev')} variant="ghost" size="sm" className="!px-2.5" aria-label="Previous Day"><i className="fas fa-chevron-left"></i></Button>
@@ -66,7 +98,7 @@ const DailyTaskList: React.FC<DailyTaskListProps> = ({
           </div>
           {isTimeEditorOpen && (
             <div className="mt-3 pt-3 border-t border-[var(--separator-secondary)] space-y-3">
-              <TimeInputScroller valueInMinutes={editedTime} onChange={setEditedTime} maxHours={12} disabled={isLoading} />
+              <TimeInputScroller valueInMinutes={editedTime} onChange={setEditedTime} maxHours={14} disabled={isLoading} />
               <div className="flex justify-end space-x-2">
                 <Button variant="secondary" size="sm" onClick={() => { setIsTimeEditorOpen(false); setEditedTime(totalStudyTimeMinutes); }}>Cancel</Button>
                 <Button variant="primary" size="sm" onClick={handleSaveTime} disabled={isLoading || editedTime === totalStudyTimeMinutes}>
@@ -97,16 +129,46 @@ const DailyTaskList: React.FC<DailyTaskListProps> = ({
             </div>
           ) : (
             <div className="space-y-2">
-              {tasks.sort((a, b) => a.order - b.order).map(task => (
-                <TaskItem
-                  key={task.id}
-                  task={task}
-                  onToggle={onTaskToggle}
-                  isCurrentPomodoroTask={currentPomodoroTaskId === task.id}
-                  isPulsing={pulsingTaskId === task.id && !isPomodoroActive}
-                  onSetPomodoro={() => handleSetPomodoro(task)}
-                />
-              ))}
+              {groupedAndSortedTasks.map((item, index) => {
+                if ('isGroup' in item) {
+                  const isExpanded = !!expandedGroups[item.id];
+                  return (
+                    <div key={item.id}>
+                      <TaskGroupItem 
+                        groupKey={item.id}
+                        sourceName={item.source} 
+                        tasks={item.tasks}
+                        isExpanded={isExpanded}
+                        onToggle={() => toggleGroup(item.id)}
+                      />
+                      {isExpanded && (
+                        <div className="pl-4 border-l-2 border-[var(--separator-primary)] ml-3 space-y-2 pt-2">
+                          {item.tasks.map(task => (
+                            <TaskItem
+                              key={task.id}
+                              task={task}
+                              onToggle={onTaskToggle}
+                              isCurrentPomodoroTask={currentPomodoroTaskId === task.id}
+                              isPulsing={pulsingTaskId === task.id && !isPomodoroActive}
+                              onSetPomodoro={() => handleSetPomodoro(task)}
+                            />
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                }
+                return (
+                  <TaskItem
+                    key={item.id}
+                    task={item}
+                    onToggle={onTaskToggle}
+                    isCurrentPomodoroTask={currentPomodoroTaskId === item.id}
+                    isPulsing={pulsingTaskId === item.id && !isPomodoroActive}
+                    onSetPomodoro={() => handleSetPomodoro(item)}
+                  />
+                );
+              })}
             </div>
           )}
         </div>

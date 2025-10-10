@@ -115,7 +115,7 @@ const MasterResourcePoolViewer: React.FC<MasterResourcePoolViewerProps> = ({
   const sourceOptions = useMemo(() => Array.from(new Set(resources.map(r => r.bookSource || r.videoSource).filter(Boolean) as string[])).sort().map(s => ({ value: s, label: s })), [resources]);
 
   return (
-    <div className="bg-transparent h-full flex flex-col pb-[calc(1rem+env(safe-area-inset-bottom))]">
+    <div className="bg-transparent flex flex-col pb-[calc(1rem+env(safe-area-inset-bottom))]">
       <div className="flex-shrink-0">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 items-end mb-3">
           <input type="text" placeholder="Search resources..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="input-base !py-1.5 !text-sm"/>
@@ -182,7 +182,6 @@ const MasterResourcePoolViewer: React.FC<MasterResourcePoolViewerProps> = ({
                    <span className="text-xxs px-2 py-0.5 rounded-full font-semibold text-white/90" style={{backgroundColor: 'hsl(210, 15%, 50%)'}}>{resource.type}</span>
                    <span className={`text-xxs px-2 py-0.5 rounded-full font-semibold ${resource.isScheduled ? 'bg-green-800/80 text-green-200' : 'bg-yellow-800/80 text-yellow-200'}`}>{resource.isScheduled ? 'Scheduled' : 'Unscheduled'}</span>
                 </div>
-                {/* FIX: Added a new details section to the resource card to provide more specific information requested by the user, such as chapter number, page count, and question count. */}
                 <div className="flex items-center gap-x-3 gap-y-1 flex-wrap mt-1.5 text-xs text-[var(--text-secondary)]">
                     {resource.chapterNumber && <span><i className="fas fa-book-open mr-1 opacity-70"></i>Ch. {resource.chapterNumber}</span>}
                     {resource.pages && <span><i className="fas fa-file-alt mr-1 opacity-70"></i>{resource.pages} pgs</span>}
