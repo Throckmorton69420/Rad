@@ -31,54 +31,45 @@ const durationToMinutes = (durationStr: string): number => {
 };
 
 const readingDuration = (pages: number | undefined): number => {
-    return pages ? Math.round(pages * 1.0) : 0;
+    return pages ? Math.round(pages * 1.5) : 0; // Adjusted reading time to be more realistic
 };
 
-
-// Domain mapping from Python script to TS Enum
 const domainMap: Record<string, Domain> = {
-  "PHYSICS": Domain.PHYSICS,
-  "BREAST": Domain.BREAST_IMAGING,
-  "CARDIOVASCULAR": Domain.CARDIOVASCULAR_IMAGING,
-  "GASTROINTESTINAL": Domain.GASTROINTESTINAL_IMAGING,
-  "GENITOURINARY": Domain.GENITOURINARY_IMAGING,
-  "INTERVENTIONAL": Domain.INTERVENTIONAL_RADIOLOGY,
-  "MUSCULOSKELETAL": Domain.MUSCULOSKELETAL_IMAGING,
-  "NEURORADIOLOGY": Domain.NEURORADIOLOGY,
-  "NUCLEAR": Domain.NUCLEAR_MEDICINE,
-  "PEDIATRIC": Domain.PEDIATRIC_RADIOLOGY,
-  "THORACIC": Domain.THORACIC_IMAGING,
-  "ULTRASOUND": Domain.ULTRASOUND_IMAGING,
-  "NIS": Domain.NIS,
-  "RISC": Domain.RISC,
-  "BODY": Domain.GASTROINTESTINAL_IMAGING, 
-  "NEURO": Domain.NEURORADIOLOGY,
-  "PEDS": Domain.PEDIATRIC_RADIOLOGY,
-  "NUCS": Domain.NUCLEAR_MEDICINE,
-  "CHEST": Domain.THORACIC_IMAGING,
+  "PHYSICS": Domain.PHYSICS, "BREAST": Domain.BREAST_IMAGING, "CARDIOVASCULAR": Domain.CARDIOVASCULAR_IMAGING,
+  "GASTROINTESTINAL": Domain.GASTROINTESTINAL_IMAGING, "GENITOURINARY": Domain.GENITOURINARY_IMAGING,
+  "INTERVENTIONAL": Domain.INTERVENTIONAL_RADIOLOGY, "MUSCULOSKELETAL": Domain.MUSCULOSKELETAL_IMAGING,
+  "NEURORADIOLOGY": Domain.NEURORADIOLOGY, "NUCLEAR": Domain.NUCLEAR_MEDICINE,
+  "PEDIATRIC": Domain.PEDIATRIC_RADIOLOGY, "THORACIC": Domain.THORACIC_IMAGING,
+  "ULTRASOUND": Domain.ULTRASOUND_IMAGING, "NIS": Domain.NIS, "RISC": Domain.RISC,
+  "BODY": Domain.GASTROINTESTINAL_IMAGING, "NEURO": Domain.NEURORADIOLOGY, "PEDS": Domain.PEDIATRIC_RADIOLOGY,
+  "NUCS": Domain.NUCLEAR_MEDICINE, "CHEST": Domain.THORACIC_IMAGING, "MSK": Domain.MUSCULOSKELETAL_IMAGING,
+  "IR": Domain.INTERVENTIONAL_RADIOLOGY, "GU": Domain.GENITOURINARY_IMAGING,
+  "GI": Domain.GASTROINTESTINAL_IMAGING, "CARDIAC": Domain.CARDIOVASCULAR_IMAGING,
+  "REPRODUCTIVE": Domain.GENITOURINARY_IMAGING, "RENAL": Domain.GENITOURINARY_IMAGING,
   "UNKNOWN": Domain.MIXED_REVIEW, 
 };
 
-const getDiscordDomain = (category: string, title: string): Domain => {
+const getResourceDomain = (category: string, title: string): Domain => {
   const upperCategory = category.toUpperCase();
-  if (domainMap[upperCategory]) {
-    return domainMap[upperCategory];
-  }
-  const lowerTitle = title.toLowerCase();
-  if (lowerTitle.includes("msk")) return Domain.MUSCULOSKELETAL_IMAGING;
-  if (lowerTitle.includes("neuro") || lowerTitle.includes("head and neck") || lowerTitle.includes("ent")) return Domain.NEURORADIOLOGY;
-  if (lowerTitle.includes("gi/gu") || lowerTitle.includes("body")) return Domain.GASTROINTESTINAL_IMAGING;
-  if (lowerTitle.includes("peds") || lowerTitle.includes("pediatric")) return Domain.PEDIATRIC_RADIOLOGY;
-  if (lowerTitle.includes("nucs") || lowerTitle.includes("nuclear")) return Domain.NUCLEAR_MEDICINE;
-  if (lowerTitle.includes("cardiac") || lowerTitle.includes("cardiovascular")) return Domain.CARDIOVASCULAR_IMAGING;
-  if (lowerTitle.includes("breast")) return Domain.BREAST_IMAGING;
-  if (lowerTitle.includes("thoracic") || lowerTitle.includes("chest")) return Domain.THORACIC_IMAGING;
-  if (lowerTitle.includes("physics")) return Domain.PHYSICS;
-  if (lowerTitle.includes("nis")) return Domain.NIS;
-  if (lowerTitle.includes("ir")) return Domain.INTERVENTIONAL_RADIOLOGY;
+  if (domainMap[upperCategory]) return domainMap[upperCategory];
 
+  const lowerTitle = title.toLowerCase();
+  if (lowerTitle.includes("physics")) return Domain.PHYSICS;
+  if (lowerTitle.includes("breast")) return Domain.BREAST_IMAGING;
+  if (lowerTitle.includes("cardiac") || lowerTitle.includes("carotid") || lowerTitle.includes("vascular") || lowerTitle.includes("aortic")) return Domain.CARDIOVASCULAR_IMAGING;
+  if (lowerTitle.includes("gi/") || lowerTitle.includes("gu ") || lowerTitle.includes("gi ") || lowerTitle.includes("renal") || lowerTitle.includes("prostate") || lowerTitle.includes("reproductive") || lowerTitle.includes("body") || lowerTitle.includes("barium")) return Domain.GASTROINTESTINAL_IMAGING;
+  if (lowerTitle.includes("interventional") || lowerTitle.includes("ir ")) return Domain.INTERVENTIONAL_RADIOLOGY;
+  if (lowerTitle.includes("msk") || lowerTitle.includes("musculoskeletal") || lowerTitle.includes("bone")) return Domain.MUSCULOSKELETAL_IMAGING;
+  if (lowerTitle.includes("neuro") || lowerTitle.includes("head and neck") || lowerTitle.includes("ent") || lowerTitle.includes("skull base") || lowerTitle.includes("spine")) return Domain.NEURORADIOLOGY;
+  if (lowerTitle.includes("nucs") || lowerTitle.includes("nuclear") || lowerTitle.includes("pet") || lowerTitle.includes("parathyroid") || lowerTitle.includes("thyroid")) return Domain.NUCLEAR_MEDICINE;
+  if (lowerTitle.includes("peds") || lowerTitle.includes("pediatric")) return Domain.PEDIATRIC_RADIOLOGY;
+  if (lowerTitle.includes("thoracic") || lowerTitle.includes("chest") || lowerTitle.includes("pulmonary")) return Domain.THORACIC_IMAGING;
+  if (lowerTitle.includes("ultrasound")) return Domain.ULTRASOUND_IMAGING;
+  if (lowerTitle.includes("nis")) return Domain.NIS;
+  
   return Domain.HIGH_YIELD; 
 };
+
 
 const createQBankChunks = (
   baseId: string,
@@ -139,15 +130,18 @@ const createQBankChunks = (
   return chunks;
 };
 
-const chapterToDomainMap: Record<number, Domain> = {
+// Corrected Chapter to Domain mapping for Core Radiology
+const coreRadiologyChapterMap: Record<number, Domain> = {
     1: Domain.THORACIC_IMAGING, 2: Domain.GASTROINTESTINAL_IMAGING, 3: Domain.GENITOURINARY_IMAGING,
-    4: Domain.PEDIATRIC_RADIOLOGY, 5: Domain.CARDIOVASCULAR_IMAGING, 6: Domain.INTERVENTIONAL_RADIOLOGY,
+    // FIX: Mapped chapter 4 (Obstetrics) to GENITOURINARY_IMAGING as OBSTETRIC_IMAGING does not exist in the Domain enum.
+    4: Domain.GENITOURINARY_IMAGING, 5: Domain.CARDIOVASCULAR_IMAGING, 6: Domain.INTERVENTIONAL_RADIOLOGY,
     7: Domain.NEURORADIOLOGY, 8: Domain.NEURORADIOLOGY, 9: Domain.NEURORADIOLOGY,
     10: Domain.MUSCULOSKELETAL_IMAGING, 11: Domain.PEDIATRIC_RADIOLOGY, 12: Domain.PHYSICS,
 };
 
+// Data from "Core Radiology, 2nd Edition" TOC
 const coreRadiologyToc = [
-  // Chapter 1: Chest Imaging
+  // ... [The extensive Table of Contents from the prompt is included here]
   { chapter: 1, section: '1.1.1', title: 'Lobar and Segmental Anatomy', startPage: 14, endPage: 14 },
   { chapter: 1, section: '1.1.2', title: 'Overview of Atelectasis (Direct/Indirect Signs, Mechanisms, Patterns)', startPage: 15, endPage: 19 },
   { chapter: 1, section: '1.2.1', title: 'Essential Anatomy: Secondary Pulmonary Lobule (SPL)', startPage: 20, endPage: 20 },
@@ -181,7 +175,6 @@ const coreRadiologyToc = [
   { chapter: 1, section: '1.8.3', title: 'Prevascular Compartment Mediastinal Mass', startPage: 86, endPage: 88 },
   { chapter: 1, section: '1.8.4', title: 'Visceral Compartment Mediastinal Mass', startPage: 89, endPage: 92 },
   { chapter: 1, section: '1.8.5', title: 'Paravertebral Compartment Mediastinal Mass', startPage: 93, endPage: 94 },
-  // Chapter 2: GI Imaging
   { chapter: 2, section: '2.1.1', title: 'Liver Anatomy', startPage: 96, endPage: 97 },
   { chapter: 2, section: '2.1.2', title: 'Imaging of the Liver', startPage: 98, endPage: 99 },
   { chapter: 2, section: '2.1.3', title: 'Diffuse Parenchymal Liver Disease', startPage: 99, endPage: 102 },
@@ -247,7 +240,6 @@ const coreRadiologyToc = [
   { chapter: 2, section: '2.11.3', title: 'Mesenteric Masses', startPage: 224, endPage: 226 },
   { chapter: 2, section: '2.11.4', title: 'Omental Disease', startPage: 226, endPage: 226 },
   { chapter: 2, section: '2.11.5', title: 'Diffuse Peritoneal Disease', startPage: 227, endPage: 228 },
-  // Chapter 3: GU Imaging
   { chapter: 3, section: '3.1.1', title: 'Retroperitoneal Anatomy', startPage: 230, endPage: 230 },
   { chapter: 3, section: '3.1.2', title: 'Retroperitoneal Disease', startPage: 231, endPage: 232 },
   { chapter: 3, section: '3.2.1', title: 'Adrenal Glands: Anatomy', startPage: 233, endPage: 233 },
@@ -309,7 +301,6 @@ const coreRadiologyToc = [
   { chapter: 3, section: '3.12.3', title: 'Ovarian Masses', startPage: 316, endPage: 321 },
   { chapter: 3, section: '3.12.4', title: 'Miscellaneous Ovarian Syndromes', startPage: 322, endPage: 322 },
   { chapter: 3, section: '3.12.5', title: 'Adnexal Cystic Lesions', startPage: 323, endPage: 323 },
-  // Chapter 4: Obstetrical Imaging
   { chapter: 4, section: '4.1.1', title: 'Imaging of the Early Pregnancy', startPage: 325, endPage: 326 },
   { chapter: 4, section: '4.1.2', title: 'Pregnancy Dating', startPage: 326, endPage: 326 },
   { chapter: 4, section: '4.1.3', title: 'Early Pregnancy Prognosis', startPage: 327, endPage: 327 },
@@ -333,7 +324,6 @@ const coreRadiologyToc = [
   { chapter: 4, section: '4.2.12', title: 'Fetal Genitourinary', startPage: 361, endPage: 363 },
   { chapter: 4, section: '4.2.13', title: 'Fetal Musculoskeletal Imaging', startPage: 364, endPage: 365 },
   { chapter: 4, section: '4.2.14', title: 'Trisomies and Syndromes', startPage: 365, endPage: 367 },
-  // Chapter 5: Vascular Imaging
   { chapter: 5, section: '5.1.1', title: 'Anatomy of Thoracic Aorta', startPage: 540, endPage: 540 },
   { chapter: 5, section: '5.1.2', title: 'Aortic Arch and Variants', startPage: 540, endPage: 542 },
   { chapter: 5, section: '5.2.1', title: 'Acute Aortic Syndrome: Overview', startPage: 543, endPage: 543 },
@@ -381,7 +371,6 @@ const coreRadiologyToc = [
   { chapter: 5, section: '5.15.3', title: 'Vascular US: Renal Artery Stenosis', startPage: 586, endPage: 586 },
   { chapter: 5, section: '5.15.4', title: 'Vascular US: Deep Venous Thrombosis (DVT)', startPage: 587, endPage: 587 },
   { chapter: 5, section: '5.15.5', title: 'Vascular US: Aortic Disease', startPage: 587, endPage: 587 },
-  // Chapter 6: Interventional Radiology
   { chapter: 6, section: '6.1.1', title: 'IR: Pre-procedure Preparation', startPage: 589, endPage: 590 },
   { chapter: 6, section: '6.1.2', title: 'IR: Achieving Hemostasis', startPage: 591, endPage: 591 },
   { chapter: 6, section: '6.2.1', title: 'IR Tools: Needles', startPage: 592, endPage: 592 },
@@ -430,7 +419,6 @@ const coreRadiologyToc = [
   { chapter: 6, section: '6.10.2', title: 'Lines, Tubes, Drains: Central Venous Access', startPage: 647, endPage: 648 },
   { chapter: 6, section: '6.10.3', title: 'Lines, Tubes, Drains: Fluid Drainage and Aspiration', startPage: 648, endPage: 649 },
   { chapter: 6, section: '6.10.4', title: 'Lines, Tubes, Drains: Enteric Access', startPage: 649, endPage: 649 },
-  // Chapter 7: Neuroimaging Brain
   { chapter: 7, section: '7.1.1', title: 'Neuroimaging Fundamentals: CSF Spaces', startPage: 651, endPage: 653 },
   { chapter: 7, section: '7.1.2', title: 'Hydrocephalus', startPage: 654, endPage: 654 },
   { chapter: 7, section: '7.1.3', title: 'Cerebral Edema', startPage: 654, endPage: 654 },
@@ -461,6 +449,7 @@ const coreRadiologyToc = [
   { chapter: 7, section: '7.9.4', title: 'Supratentorial Cortical Glial/Neuronal Tumors', startPage: 712, endPage: 713 },
   { chapter: 7, section: '7.9.5', title: 'Posterior Fossa Intra-axial Tumors', startPage: 714, endPage: 720 },
   { chapter: 7, section: '7.9.6', title: 'Intraventricular Tumors', startPage: 721, endPage: 723 },
+  { chapter: 7, section: '7.9.7', title: 'CNS Lymphoma', startPage: 724, endPage: 725 },
   { chapter: 7, section: '7.9.8', title: 'Metastatic Disease', startPage: 725, endPage: 726 },
   { chapter: 7, section: '7.9.9', title: 'Primary Dural Neoplasms', startPage: 727, endPage: 727 },
   { chapter: 7, section: '7.9.10', title: 'Pineal Region Masses', startPage: 728, endPage: 730 },
@@ -478,7 +467,6 @@ const coreRadiologyToc = [
   { chapter: 7, section: '7.13.3', title: 'Fungal Brain Infection', startPage: 747, endPage: 749 },
   { chapter: 7, section: '7.13.4', title: 'Parasitic Brain Infection', startPage: 750, endPage: 751 },
   { chapter: 7, section: '7.13.5', title: 'Prion Infection', startPage: 752, endPage: 752 },
-  // Chapter 8: Head & Neck
   { chapter: 8, section: '8.1.1', title: 'Paranasal Sinuses: Overview', startPage: 754, endPage: 755 },
   { chapter: 8, section: '8.1.2', title: 'Sinonasal Anatomic Variants', startPage: 755, endPage: 756 },
   { chapter: 8, section: '8.1.3', title: 'Imaging of the Sinuses', startPage: 756, endPage: 756 },
@@ -532,7 +520,6 @@ const coreRadiologyToc = [
   { chapter: 8, section: '8.11.1', title: 'Diffuse Thyroid Disease', startPage: 856, endPage: 857 },
   { chapter: 8, section: '8.11.2', title: 'Thyroid Nodule and Thyroid Cancer', startPage: 857, endPage: 858 },
   { chapter: 8, section: '8.11.3', title: 'Parathyroid', startPage: 858, endPage: 859 },
-  // Chapter 9: Spine Imaging
   { chapter: 9, section: '9.1.1', title: 'Spine Lesion Localization Overview', startPage: 861, endPage: 861 },
   { chapter: 9, section: '9.2.1', title: 'Intramedullary Lesions: Overview', startPage: 862, endPage: 862 },
   { chapter: 9, section: '9.2.2', title: 'Intramedullary Spinal Cord Neoplasms', startPage: 862, endPage: 863 },
@@ -556,7 +543,6 @@ const coreRadiologyToc = [
   { chapter: 9, section: '9.8.2', title: 'Cervical Spine Trauma', startPage: 898, endPage: 902 },
   { chapter: 9, section: '9.8.3', title: 'Thoracolumbar Spine Trauma', startPage: 903, endPage: 904 },
   { chapter: 9, section: '9.9.1', title: 'Postoperative Spine Imaging', startPage: 917, endPage: 919 },
-  // Chapter 10: MSK
   { chapter: 10, section: '10.1.1', title: 'Basics: Structure of Bone', startPage: 909, endPage: 909 },
   { chapter: 10, section: '10.1.2', title: 'Basics: Synovial Joint Anatomy', startPage: 909, endPage: 909 },
   { chapter: 10, section: '10.2.1', title: 'Arthritis: Osteoarthritis', startPage: 910, endPage: 913 },
@@ -629,7 +615,6 @@ const coreRadiologyToc = [
   { chapter: 10, section: '10.14.4', title: 'Wrist and Hand: Fingers and Hand Trauma', startPage: 1077, endPage: 1079 },
   { chapter: 10, section: '10.15.1', title: 'MSK Interventions: Arthrography', startPage: 1080, endPage: 1081 },
   { chapter: 10, section: '10.15.2', title: 'MSK Interventions: Biopsy', startPage: 1082, endPage: 1083 },
-  // Chapter 11: Pediatric Imaging
   { chapter: 11, section: '11.1.1', title: 'Pediatric Airway: Anatomy', startPage: 1085, endPage: 1085 },
   { chapter: 11, section: '11.1.2', title: 'Pediatric Upper Airway Obstruction', startPage: 1085, endPage: 1086 },
   { chapter: 11, section: '11.1.3', title: 'Pediatric Stridor', startPage: 1087, endPage: 1093 },
@@ -678,7 +663,6 @@ const coreRadiologyToc = [
   { chapter: 11, section: '11.7.4', title: 'Pediatric Neuro: Phakomatoses', startPage: 1191, endPage: 1194 },
   { chapter: 11, section: '11.7.5', title: 'Pediatric Neuro: Midbrain Malformations', startPage: 1194, endPage: 1194 },
   { chapter: 11, section: '11.7.6', title: 'Pediatric Neuro: Brain Tumors', startPage: 1194, endPage: 1194 },
-  // Chapter 12: Imaging Physics
   { chapter: 12, section: '12.1.1', title: 'Contrast Media Reaction Overview', startPage: 1196, endPage: 1196 },
   { chapter: 12, section: '12.1.2', title: 'Classification of Contrast Reactions', startPage: 1197, endPage: 1197 },
   { chapter: 12, section: '12.1.3', title: 'Premedication to Prevent Contrast Reaction', startPage: 1196, endPage: 1196 },
@@ -709,13 +693,13 @@ const enhancedCoreRadiologyResources: StudyResource[] = coreRadiologyToc.map((it
     return {
         id: `core_rad_${item.section.replace(/\./g, '_')}`,
         title: `Core Radiology - ${item.section} ${item.title}`,
-        domain: chapterToDomainMap[item.chapter] || Domain.MIXED_REVIEW,
+        domain: coreRadiologyChapterMap[item.chapter] || Domain.MIXED_REVIEW,
         type: ResourceType.READING_TEXTBOOK,
         durationMinutes: duration,
         pages: pages,
         startPage: item.startPage,
         endPage: item.endPage,
-        bookSource: 'Core Radiology: A Visual Approach to Diagnostic Imaging',
+        bookSource: 'Core Radiology',
         chapterNumber: item.chapter,
         sequenceOrder: 4000 + index,
         isPrimaryMaterial: true,
@@ -726,75 +710,257 @@ const enhancedCoreRadiologyResources: StudyResource[] = coreRadiologyToc.map((it
     };
 });
 
+// Full, updated list from user-provided PDFs
 const discordVideos = [
-    {"category": "Musculoskeletal", "title": "Dr. Eric Ledermann, Junior MSK Review", "duration": "01:00:29"},
-    {"category": "Musculoskeletal", "title": "Dr. Angel Gómez-Cintrón, MSK Case Review", "duration": "01:00:09"},
-    {"category": "Musculoskeletal", "title": "Dr. Eric Ledermann, MSK Case Review", "duration": "01:01:21"},
-    {"category": "Musculoskeletal", "title": "Dr. Brian Chan, MSK Case Review", "duration": "00:59:10"},
-    {"category": "Musculoskeletal", "title": "Dr. Navid Faraji, MSK Case Review", "duration": "01:02:29"},
-    {"category": "Musculoskeletal", "title": "Dr. Jonathan Samet, Pediatric MSK Jeopardy", "duration": "00:53:35"},
-    {"category": "Musculoskeletal", "title": "Dr. Angel Gómez-Cintrón, MSK Case Review 2", "duration": "01:00:13"},
-    {"category": "Musculoskeletal", "title": "Dr. Brian Chan from University of Utah", "duration": "01:00:48"},
-    {"category": "Musculoskeletal", "title": "Dr. Michael D. Darcy, IR Case Review (MSK Categorized)", "duration": "00:56:51"},
-    {"category": "Musculoskeletal", "title": "Dr. Michael D. Darcy, IR Case Review 2 (MSK Categorized)", "duration": "01:02:08"},
-    {"category": "Musculoskeletal", "title": "Dr. Jeffrey Chick, University of Washington (MSK Categorized)", "duration": "01:00:23"},
-    {"category": "Musculoskeletal", "title": "Dr. Sasha Ushinsky, MIR (MSK Categorized)", "duration": "00:59:57"},
+    {"category": "MSK", "title": "Dr. Eric Ledermann, Junior MSK Review", "duration": "01:00:29"},
+    {"category": "MSK", "title": "Dr. Angel Gómez-Cintrón, MSK Case Review", "duration": "01:00:09"},
+    {"category": "MSK", "title": "Dr. Eric Ledermann, MSK Case Review", "duration": "01:01:21"},
+    {"category": "MSK", "title": "Dr. Brian Chan, MSK Case Review", "duration": "00:59:10"},
+    {"category": "MSK", "title": "Dr. Navid Faraji, MSK Case Review", "duration": "01:02:29"},
+    {"category": "MSK", "title": "Dr. Jonathan Samet, Pediatric MSK Jeopardy", "duration": "00:53:35"},
+    {"category": "MSK", "title": "Dr. Angel Gómez-Cintrón, MSK Case Review 2", "duration": "01:00:13"},
+    {"category": "MSK", "title": "Dr. Brian Chan from University of Utah", "duration": "01:00:48"},
+    {"category": "MSK", "title": "Dr. Michael D. Darcy, IR Case Review (MSK Categorized)", "duration": "00:56:51"},
+    {"category": "MSK", "title": "Dr. Michael Darcy, IR Case Review 2 (MSK Categorized)", "duration": "01:02:08"},
+    {"category": "MSK", "title": "Dr. Jeffrey Chick, University of Washington (MSK Categorized)", "duration": "01:00:23"},
+    {"category": "MSK", "title": "Dr. Sasha Ushinsky, MIR (MSK Categorized)", "duration": "00:59:57"},
     {"category": "NEURO", "title": "Dr. Rick Wiggins from University of Utah (Part 1)", "duration": "01:04:15"},
     {"category": "NEURO", "title": "Dr. Rick Wiggins from University of Utah (Part 2)", "duration": "01:01:21"},
     {"category": "NEURO", "title": "Dr. Burce Ozgen", "duration": "01:03:02"},
     {"category": "NEURO", "title": "Dr. Judith Gadde, Lurie childrens hospital", "duration": "01:00:12"},
-    {"category": "PEDS", "title": "Dr. A. B. Chaudry, CHOP, pediatric neuroradiology case review", "duration": "01:01:42"},
-    {"category": "PEDS", "title": "Dr. Jonathan Samet, Ann & Robert H. Lurie Children's Hospital of Chicago, Peds MSK Case Review", "duration": "00:53:35"},
-    {"category": "PEDS", "title": "Dr. Jane S. Kim, Ann & Robert H. Lurie Children's Hospital of Chicago, Peds Chest/Airway Case Review", "duration": "01:01:29"},
-    {"category": "PEDS", "title": "Dr. Sarah Milla, Children's Healthcare of Atlanta", "duration": "01:03:00"},
-    {"category": "PEDS", "title": "Dr. Rama Ayyala, CHOP", "duration": "01:01:47"},
-    {"category": "NUCS", "title": "Dr. David Naeger from UCSF, nuclear medicine case review", "duration": "00:58:14"},
-    {"category": "NUCS", "title": "Dr. David Naeger, nuclear medicine review part 2", "duration": "01:00:26"},
-    {"category": "NUCS", "title": "Dr. David Naeger, nuclear medicine review part 3", "duration": "00:59:17"},
-    {"category": "NUCS", "title": "Dr. Spencer Behr, UCSF", "duration": "00:56:59"},
-    {"category": "NUCS", "title": "Dr. Andrew T. T. Chen, MIR", "duration": "01:00:09"},
-    {"category": "NUCS", "title": "Dr. Andrew T. T. Chen, Nuclear Medicine Review", "duration": "01:01:21"},
-    {"category": "BODY", "title": "Dr. Bryan Foster, OHSU Body Case Review", "duration": "01:01:34"},
-    {"category": "BODY", "title": "Dr. Christine O. Menias, GU Rapid Fire Case Review", "duration": "00:58:34"},
-    {"category": "BODY", "title": "Dr. Bryan Foster, OHSU GI Case Review", "duration": "01:01:12"},
-    {"category": "BODY", "title": "Dr. Christine O. Menias, GU Rapid Fire Case Review 2", "duration": "01:00:29"},
-    {"category": "BODY", "title": "Dr. Christine Menias from Mayo, GU Rapid Fire Case Review", "duration": "00:58:21"},
-    {"category": "BODY", "title": "Dr. Bryan Foster from OHSU", "duration": "01:01:08"},
-    {"category": "BODY", "title": "Dr. Christine Menias from Mayo", "duration": "00:58:39"},
-    {"category": "BODY", "title": "Dr. Akram Shaaban, GU Case Review", "duration": "01:01:09"},
-    {"category": "BREAST", "title": "Dr. Haydee Ojeda-Fournier, UCSD, breast imaging review", "duration": "01:01:43"},
-    {"category": "BREAST", "title": "Dr. Haydee Ojeda-Fournier, UCSD, breast imaging review 2", "duration": "01:00:52"},
-    {"category": "CHEST", "title": "Dr. Justin Stowell, MIR, Chest Case Review", "duration": "00:59:04"},
-    {"category": "CHEST", "title": "Dr. Sanjeev Bhalla from MIR", "duration": "01:00:15"},
-    {"category": "CHEST", "title": "Dr. Constantine Raptis from MIR", "duration": "01:00:21"},
-    {"category": "CHEST", "title": "Dr. Justin Stowell from MIR", "duration": "00:59:22"},
-    {"category": "CHEST", "title": "Dr. Sanjeev Bhalla from MIR", "duration": "01:00:46"},
-    {"category": "CHEST", "title": "Dr. Constantine Raptis from MIR", "duration": "01:00:27"},
-    {"category": "CHEST", "title": "Dr. Sanjeev Bhalla, Cardiac Case Review", "duration": "01:00:12"},
-    {"category": "CHEST", "title": "Dr. Sanjeev Bhalla, Cardiac Case Review 2", "duration": "01:00:30"},
-    {"category": "PHYSICS", "title": "Dr. Tim Szczykutowicz, Physics Review", "duration": "01:04:36"},
-    {"category": "IR", "title": "Dr. Michael D. Darcy, IR Case Review", "duration": "00:56:51"},
-    {"category": "IR", "title": "Dr. Michael D. Darcy, IR Case Review 2", "duration": "01:02:08"},
-    {"category": "IR", "title": "Dr. Jeffrey Chick, University of Washington", "duration": "01:00:23"},
-    {"category": "IR", "title": "Dr. Sasha Ushinsky, MIR", "duration": "00:59:57"}
+    {"category": "NEURO", "title": "Dr. Rick Wiggins, Head and Neck Case Review I", "duration": "00:58:24"},
+    {"category": "NEURO", "title": "Dr. Rick Wiggins, Head and Neck Case Review II", "duration": "00:58:19"},
+    {"category": "NEURO", "title": "Dr. Ryan Peterson, Neuro Case Review +Bonus physics Q's", "duration": "00:59:38"},
+    {"category": "NEURO", "title": "Dr. Nolan Kagetsu, Neuroradiology Case Review", "duration": "01:01:52"},
+    {"category": "NEURO", "title": "Dr. Michael Hoch, Neuroradiology:Spine Case review", "duration": "01:01:52"},
+    {"category": "NEURO", "title": "Dr. Judith Gadde, Pediatric Neuro Case Review", "duration": "01:02:08"},
+    {"category": "NEURO", "title": "Dr. Brent Weinberg, Neuroradiology: Brain Tumors", "duration": "00:55:40"},
+    {"category": "NEURO", "title": "Dr. Mohit Agarwal, Neuroradiology Case Review", "duration": "00:59:44"},
+    {"category": "NEURO", "title": "Dr. Sarah Moum, Neuroradiology Case Review", "duration": "01:03:49"},
+    {"category": "NEURO", "title": "Dr. Brent Weinberg, Neuroradiology: RAPID FIRE", "duration": "00:59:16"},
+    {"category": "NEURO", "title": "Dr. Francis Deng, Neuroradiology/ENT Case Review", "duration": "00:59:18"},
+    {"category": "NEURO", "title": "Dr. Justin McCloskey, Neuroradiology +Physics RAPID FIRE", "duration": "01:00:42"},
+    {"category": "NEURO", "title": "Dr. David M. Yousem, Neuroradiology Case Review - Part 1", "duration": "01:01:31"},
+    {"category": "NEURO", "title": "Dr. Ryan Peterson, Neuroradiology Case Review", "duration": "01:01:51"},
+    {"category": "NEURO", "title": "Dr. Burce Ozgen, Head and Neck Case Review", "duration": "01:00:20"},
+    {"category": "NEURO", "title": "Dr. David M. Yousem, Neuroradiology Case Review - Part 2", "duration": "01:00:03"},
+    {"category": "NEURO", "title": "Dr. Mohit Agarwal, Neuroradiology Case Review", "duration": "01:02:19"},
+    {"category": "NEURO", "title": "Dr. Brent Weinberg, Neuroradiology Case Review", "duration": "01:02:08"},
+    {"category": "NEURO", "title": "Dr. Judith Gadde, Pediatric Neuroradiology Case Review", "duration": "00:59:22"},
+    {"category": "BODY", "title": "Dr. Dell Dunn from University of Utah", "duration": "01:01:46"},
+    {"category": "BODY", "title": "Dr. Gopal Punjabi, chairman of Hennepin", "duration": "01:05:46"},
+    {"category": "BODY", "title": "Dr. Dell Dunn, GI/GU Case Review Session", "duration": "00:59:59"},
+    {"category": "BODY", "title": "Dr. Anugayathri Jawahar, GU Case Review Session", "duration": "01:00:51"},
+    {"category": "BODY", "title": "Dr. Ashkan Malayeri, GI/GU Case Review Session", "duration": "01:00:46"},
+    {"category": "BODY", "title": "Dr. Rony Kampalath, GI/GU Case Review Session", "duration": "01:01:26"},
+    {"category": "BODY", "title": "Dr. Mahan Mathur, GI/GU Case Review Session", "duration": "00:59:21"},
+    {"category": "BODY", "title": "Dr. Aarti Sekhar, Body Case Review Session", "duration": "00:58:34"},
+    {"category": "BODY", "title": "Dr. Matthew Davenport, Body Case Review Session", "duration": "00:59:36"},
+    {"category": "BODY", "title": "Dr. Gopal Punjabi, Body 'Rapid Fire' Case Review", "duration": "01:01:13"},
+    {"category": "BODY", "title": "Dr. Roopa Ram, Body Case Review Session", "duration": "00:58:47"},
+    {"category": "BODY", "title": "Dr. Rony Kampalath, GI/GU Case Review Part 1", "duration": "01:02:18"},
+    {"category": "BODY", "title": "Dr. Dell Dunn, GI/GU Case Review", "duration": "01:01:09"},
+    {"category": "NIS", "title": "Dr. Justin McCloskey, NIS Session Part 2", "duration": "01:02:08"},
+    {"category": "PEDS", "title": "Dr. Jeffrey Tutman, Pediatric Case Review", "duration": "01:02:17"},
+    {"category": "PEDS", "title": "Dr. Erica Riedesel, Pediatric Case Review", "duration": "01:02:22"},
+    {"category": "PEDS", "title": "Dr. Erica Riedesel, Pediatric Case Review Part 2", "duration": "01:02:51"},
+    {"category": "PEDS", "title": "Dr. Nimisha Mehta, Pediatric Case Review", "duration": "00:59:16"},
+    {"category": "PEDS", "title": "Dr. Jonathan Samet, Pediatric MSK Case Review", "duration": "00:56:56"},
+    {"category": "NUCS", "title": "Dr. Philip Scherer, Nuclear Medicine Case Review Session", "duration": "01:02:35"},
+    {"category": "PHYSICS", "title": "Dr. Ulrich Rassner, Physics Case Review Part 1", "duration": "01:05:45"},
+    {"category": "PHYSICS", "title": "Dr. Ulrich Rassner, Physics Case Review Part 2", "duration": "01:04:14"},
+    {"category": "PHYSICS", "title": "Dr. Ulrich Rassner, Physics Case Review Part 3", "duration": "01:01:54"},
+    {"category": "BREAST", "title": "Dr. Nicole Winkler, Breast Case Review", "duration": "00:59:15"},
+    {"category": "BREAST", "title": "Dr. Priscilla J. Slanetz, Breast MRI Case Review", "duration": "01:01:14"},
+    {"category": "BREAST", "title": "Dr. Laura Heyneman, Thoracic Case Review Part 1", "duration": "01:01:21"},
+    {"category": "BREAST", "title": "Dr. John Lichtenberger, Chest case review", "duration": "01:00:29"},
+    {"category": "BREAST", "title": "Dr. Laura Heyneman, Chest case review", "duration": "01:00:46"},
+    {"category": "BREAST", "title": "Dr. Christopher Francois, Cardiac CT/MRI Case Review", "duration": "00:59:58"},
+    {"category": "BREAST", "title": "Dr. Laura Heyneman, Cardiac Case Review", "duration": "01:00:19"},
+    {"category": "BREAST", "title": "Dr. Aws Hamid, Cardiac Case Review", "duration": "01:03:04"},
+    {"category": "BREAST", "title": "Dr. Jeffrey Kanne, UW-Madison", "duration": "00:59:13"},
+    {"category": "BREAST", "title": "Dr. Jeffrey Kanne, UW-Madison (Part 2)", "duration": "01:01:34"},
+    {"category": "BREAST", "title": "Dr. Tan Lucien Mohammed, UF", "duration": "01:00:13"}
 ];
 
-const discordVideoResources: StudyResource[] = discordVideos.flatMap((vid: any, i): StudyResource[] => {
-    return [{
-        id: `discord_vid_${i}`,
-        title: `${vid.title}`,
-        domain: getDiscordDomain(vid.category, vid.title),
-        type: ResourceType.VIDEO_LECTURE,
-        durationMinutes: durationToMinutes(vid.duration),
-        videoSource: 'Discord Review Sessions',
-        sequenceOrder: 3000 + i,
-        isPrimaryMaterial: false,
-        isSplittable: durationToMinutes(vid.duration) > 90,
+const discordVideoResources: StudyResource[] = discordVideos.map((vid, i): StudyResource => ({
+    id: `discord_vid_${i}`,
+    title: `${vid.title}`,
+    domain: getResourceDomain(vid.category, vid.title),
+    type: ResourceType.VIDEO_LECTURE,
+    durationMinutes: durationToMinutes(vid.duration),
+    videoSource: 'Discord Review Sessions',
+    sequenceOrder: 3000 + i,
+    isPrimaryMaterial: false,
+    isSplittable: durationToMinutes(vid.duration) > 90,
+    isArchived: false,
+    isOptional: true,
+}));
+
+// ... [rest of the file content from prompt is included here]
+// ... caseCompanionResources, titanVideoResources, crack the core resources, qbanks, etc.
+
+const titanRadiologyVideos = [
+    {"category": "Pancreas", "title": "Part 1 - Congenital Malformations, Cystic Lesions, Pancreatitis", "duration": "00:32:24"},
+    {"category": "Pancreas", "title": "Part 2 - Solid Lesions, Trauma", "duration": "00:13:21"},
+    {"category": "Liver", "title": "Part 1 - Diffuse Disease - Fat, Iron, and Associated Physics", "duration": "00:29:16"},
+    {"category": "Liver", "title": "Part 2 - Focal Lesions, Infection, Biliary, Transplant", "duration": "00:35:17"},
+    {"category": "Renal", "title": "Part 1 - Solid Lesions, Cystic Disease", "duration": "00:30:11"},
+    {"category": "Renal", "title": "Part 2 - Renal Artery Stenosis, Captopril Nukes, Transplant", "duration": "00:19:53"},
+    {"category": "Renal", "title": "Part 3 - Congenital Malformations, Urethral Cancer", "duration": "00:25:27"},
+    {"category": "Renal", "title": "Special Topic - Miscellaneous Renal Diseases", "duration": "00:18:30"},
+    {"category": "Reproductive", "title": "Female Reproductive_ Endometrial and Cervical Cancer", "duration": "00:32:24"},
+    {"category": "Reproductive", "title": "Male Reproductive - Prostate and Testicular Cancer", "duration": "00:25:55"},
+    {"category": "Reproductive", "title": "Special Topic - Reproductive - OB Ultrasound", "duration": "00:50:30"},
+    {"category": "Abdominal Barium", "title": "Part 1 - Esophagus and Stomach", "duration": "00:39:21"},
+    {"category": "Abdominal Barium", "title": "Part 2 - Small Bowel", "duration": "00:23:28"},
+    {"category": "Abdominal Barium", "title": "Part 3 - Crohns, UC and a Review of Buzzwords", "duration": "00:14:56"},
+    {"category": "Chest", "title": "Part 1 - Localization Signs, UIP-NSIP, Infections", "duration": "00:44:19"},
+    {"category": "Chest", "title": "Part 2 - TB, Infections Misc, Trachea", "duration": "00:30:53"},
+    {"category": "Thyroid", "title": "Hyperthryoidism, and Nukes Correlates", "duration": "00:25:47"},
+    {"category": "Thyroid", "title": "Cancer and Nukes Correlates", "duration": "00:22:50"},
+    {"category": "Parathyroid", "title": "Adenoma, Cancer, and Nukes Correlates", "duration": "00:08:02"},
+    {"category": "Musculoskeletal", "title": "Part 1 - Trauma, Osteochondrosis, Coalition", "duration": "00:38:48"},
+    {"category": "Musculoskeletal", "title": "Part 2 - Athritis", "duration": "00:16:51"},
+    {"category": "Musculoskeletal", "title": "Part 3 - Benign (Cystic) and Malignant Bone Tumors", "duration": "00:38:02"},
+    {"category": "Musculoskeletal", "title": "Part 4 - MR Joints", "duration": "00:46:55"},
+    {"category": "MSK Special Topic", "title": "Denervation - MRI Shoulder Patterns, Acute and Chronic Denervation Changes", "duration": "00:16:37"},
+    {"category": "Musculoskeletal", "title": "Special Topic - MSK Ultrasound", "duration": "00:26:11"},
+    {"category": "Neuro", "title": "Part 1 - Skull Base and Vascular Anatomy", "duration": "00:29:01"},
+    {"category": "Neuro", "title": "Part 2 - Temporal Bone", "duration": "00:32:03"},
+    {"category": "Neuro", "title": "Part 3 - Demyelinating/Toxic", "duration": "00:17:35"},
+    {"category": "Neuro", "title": "Part 4 - Tumors", "duration": "00:36:22"},
+    {"category": "Neuro", "title": "Part 5 - SAH, Aneurysms, Stroke, Vascular Malformations", "duration": "00:41:59"},
+    {"category": "Neuro", "title": "Part 6 - Blood Age, Trauma - Face Smash, LeForts, NAT", "duration": "00:22:01"},
+    {"category": "Neuro", "title": "Part 7 - Infections", "duration": "00:24:24"},
+    {"category": "Neuro", "title": "Part 8 - Spine", "duration": "00:28:45"},
+    {"category": "Neuro Special Topic", "title": "Head and Neck, Sinus Tumors", "duration": "00:14:50"},
+    {"category": "Pediatric", "title": "Part 1 - Airway, Chest", "duration": "00:24:02"},
+    {"category": "Pediatric", "title": "Part 2 - GI", "duration": "00:26:56"},
+    {"category": "Pediatric", "title": "Part 3 - MSK", "duration": "00:24:12"},
+    {"category": "Pediatric", "title": "Part 4 - Heterotaxia, Solid Tumors - Liver - Kidney", "duration": "00:22:34"},
+    {"category": "Pediatric", "title": "Part 5 - Neuro - Congenital Malformations", "duration": "00:22:03"},
+    {"category": "Pediatric", "title": "Part 6 - Skull", "duration": "00:48:38"},
+    {"category": "Cardiac", "title": "Part 1 - CXR Analysis, Valves", "duration": "00:55:19"},
+    {"category": "Cardiac", "title": "Part 2 - Congenital Heart Surgeries", "duration": "00:20:53"},
+    {"category": "Cardiac", "title": "Part 3 - Cardiac MRI", "duration": "00:31:22"},
+    {"category": "Cardiac", "title": "Part 4 - Cardiac Nukes", "duration": "00:31:57"},
+    {"category": "Cardiac", "title": "Special Topic - Coronary", "duration": "00:12:04"},
+    {"category": "Breast Imaging", "title": "Part 1 - Introduction", "duration": "00:32:06"},
+    {"category": "Breast Imaging", "title": "Part 2 - Cancer and Ultrasound", "duration": "00:33:23"},
+    {"category": "Breast Imaging", "title": "Part 3 - Benign Disease", "duration": "00:26:05"},
+    {"category": "Breast Imaging", "title": "Part 4 - Male Breast Disease", "duration": "00:13:20"},
+    {"category": "Breast Imaging", "title": "Part 5 - MRI 1", "duration": "00:29:20"},
+    {"category": "Breast Imaging", "title": "Part 6 - MRI 2", "duration": "00:15:13"},
+    {"category": "Breast Imaging", "title": "Special Topic - Mammo Procedures - Part 1", "duration": "00:38:51"},
+    {"category": "Breast Imaging", "title": "Special Topic - Mammo Procedures - Part 2", "duration": "00:22:47"},
+    {"category": "Nuclear", "title": "Part 1 - Mystery Whole Body Scans", "duration": "00:15:24"},
+    {"category": "Nuclear", "title": "Part 2 - Bone Scan", "duration": "00:37:52"},
+    {"category": "Nuclear", "title": "Part 3 - Pulmonary (VQ)", "duration": "00:27:08"},
+    {"category": "Nuclear", "title": "Part 4 - GI (HIDA, Bleeding Scan, Sulfur Colloid)", "duration": "00:24:04"},
+    {"category": "Nuclear", "title": "Special Topic - PET and SPECT", "duration": "00:32:35"},
+    {"category": "Nuclear", "title": "Special Topic - Non-PET Cancer Part 1 (MIBG)", "duration": "00:22:05"},
+    {"category": "Nuclear", "title": "Special Topic - Non-PET Cancer Part 2 (Octreotide)", "duration": "00:21:35"},
+    {"category": "Nuclear", "title": "Special Topic - CNS (Seizure Scans, Dementia, CSF)", "duration": "00:26:27"},
+    {"category": "Nuclear", "title": "Special Topic - Mechanisms of Radiopharmaceutical", "duration": "00:25:59"},
+    {"category": "Interventional and Vascular Radiology", "title": "Part 1", "duration": "00:30:16"},
+    {"category": "Interventional and Vascular Radiology", "title": "Part 2 - Carotid US, Aortic Dissection, Misc Vascular", "duration": "00:58:34"},
+    {"category": "Interventional and Vascular Radiology", "title": "IR Special topic - HD Grafts-Fistulas", "duration": "00:27:13"},
+    {"category": "Interventional and Vascular Radiology", "title": "IR Special Topic - Urinary Access, Diversion", "duration": "00:28:02"},
+    {"category": "Interventional and Vascular Radiology", "title": "CV Special Topic - Venous Ultrasound", "duration": "00:14:32"},
+    {"category": "Interventional and Vascular Radiology", "title": "Special Topic - CV - Doppler Flow Dynamics", "duration": "00:35:59"},
+    {"category": "Physics Remastered", "title": "X-ray - Intro to Basic Science", "duration": "00:26:49"},
+    {"category": "Physics Remastered", "title": "X-ray - Characteristic and Breaking Radiation", "duration": "00:15:42"},
+    {"category": "Physics Remastered", "title": "X-ray - Machine", "duration": "00:18:05"},
+    {"category": "Physics Remastered", "title": "X-ray - Heel Effect", "duration": "00:19:25"},
+    {"category": "Physics Remastered", "title": "X-ray - Quality and Quantity", "duration": "00:25:40"},
+    {"category": "Physics Remastered", "title": "X-ray - Filtration", "duration": "00:24:45"},
+    {"category": "Physics Remastered", "title": "X-ray - Interactions with Matter", "duration": "00:25:55"},
+    {"category": "Physics Remastered", "title": "X-ray - K-edge and Contrast", "duration": "00:26:29"},
+    {"category": "Physics Remastered", "title": "X-ray - Mass and Linear Attenuation", "duration": "00:25:06"},
+    {"category": "Physics", "title": "X-Ray - Generation and Production", "duration": "00:45:13"},
+    {"category": "Physics", "title": "X-Ray - Interaction with Matter", "duration": "00:17:32"},
+    {"category": "Physics", "title": "X-Ray - Concepts", "duration": "00:16:29"},
+    {"category": "Physics", "title": "Breast Imaging", "duration": "00:15:47"},
+    {"category": "Physics", "title": "Fluoro - IR", "duration": "00:29:59"},
+    {"category": "Physics", "title": "CT - Basics", "duration": "00:31:39"},
+    {"category": "Physics", "title": "CT - Artifacts", "duration": "00:16:34"},
+    {"category": "Physics", "title": "Ultrasound Part 1 - Reflection, Refraction, Attenuation", "duration": "00:43:15"},
+    {"category": "Physics", "title": "Ultrasound Part 2 - Doppler, Compound Imaging, Har", "duration": "00:15:53"},
+    {"category": "Physics", "title": "Ultrasound Part 3 - Artifacts", "duration": "00:18:01"},
+    {"category": "Physics", "title": "MRI - Basics", "duration": "00:33:37"},
+    {"category": "Physics", "title": "MRI - Encoding", "duration": "00:19:12"},
+    {"category": "Physics", "title": "MRI - Sequences", "duration": "00:24:34"},
+    {"category": "Physics", "title": "MRI - Special Topic - MRI Safety", "duration": "00:31:22"},
+    {"category": "Physics", "title": "MRI - Artifacts", "duration": "00:27:27"},
+    {"category": "Physics", "title": "MRI Special Topic - Slice Thickness vs Table Time", "duration": "00:09:12"},
+    {"category": "Physics", "title": "Nukes - Basic Concepts", "duration": "00:34:54"},
+    {"category": "Physics", "title": "MRI - Special Topic - Blood age", "duration": "00:44:35"},
+    {"category": "Physics", "title": "Physics MCQ Review - Part 1", "duration": "00:53:25"},
+    {"category": "Physics", "title": "Physics MCQ Review - Part 2", "duration": "00:35:36"},
+    {"category": "Physics", "title": "Physics MCQ Review _ Part 3", "duration": "00:30:27"}
+];
+
+const titanVideoResources: StudyResource[] = titanRadiologyVideos.map((vid, i) => ({
+    id: `titan_vid_${i}`,
+    title: `Titan Videos - ${vid.category} - ${vid.title}`,
+    domain: getResourceDomain(vid.category, vid.title),
+    type: ResourceType.VIDEO_LECTURE,
+    durationMinutes: durationToMinutes(vid.duration),
+    videoSource: 'Titan Radiology Videos',
+    sequenceOrder: 1500 + i,
+    isPrimaryMaterial: true,
+    isSplittable: durationToMinutes(vid.duration) > 90,
+    isArchived: false,
+    isOptional: false,
+    schedulingPriority: 'high'
+}));
+
+// This section generates reading tasks from Crack the Core books.
+const createCtcReadingResources = (
+    vol: number, 
+    chapterNum: number, 
+    domain: Domain, 
+    sequenceStart: number, 
+    pageCount: number, 
+    avgMinsPerSection: number, 
+    sectionTitles: string[]
+): StudyResource[] => {
+    return sectionTitles.map((title, i) => ({
+        id: `ctc${vol}_ch${chapterNum}_sec${i+1}_read`,
+        title: `CTC Vol ${vol} Ch ${chapterNum} - ${title}`,
+        domain,
+        type: ResourceType.READING_TEXTBOOK,
+        durationMinutes: avgMinsPerSection,
+        pages: Math.round(pageCount / sectionTitles.length),
+        bookSource: `Crack the Core Volume ${vol}`,
+        chapterNumber: chapterNum,
+        sequenceOrder: sequenceStart + i,
+        isPrimaryMaterial: true,
+        isSplittable: false,
         isArchived: false,
-        isOptional: true,
-        // No priority for optional tasks
-    }];
-});
+        isOptional: false,
+        schedulingPriority: 'high',
+    }));
+};
+
+const ctcResources: StudyResource[] = [
+    // Volume 1
+    ...createCtcReadingResources(1, 2, Domain.THORACIC_IMAGING, 2000, 68, 15, ["Anatomy", "Atelectasis", "CXR Localization", "Infection", "Lung Cancer", "Congenital", "Cystic Lung Disease", "Pneumoconiosis", "ILDS", "Transplant", "Alveolar", "Airways", "Systemic", "Pleura", "Mediastinal Masses", "Pulmonary Arteries", "Trauma", "Lines and Devices"]),
+    ...createCtcReadingResources(1, 3, Domain.CARDIOVASCULAR_IMAGING, 2100, 31, 15, ["Chambers", "Coronaries", "Valves", "Great Vessels", "Congenital Heart", "Ischemic Heart", "Non-Ischemic Heart", "Genetics", "Tumors", "Pericardium", "Surgeries"]),
+    ...createCtcReadingResources(1, 4, Domain.PEDIATRIC_RADIOLOGY, 2200, 104, 15, ["Skull & Scalp", "Brain", "Head and Neck", "Airway", "Chest", "Mediastinal Masses", "Luminal GI", "Solid Organ GI", "Congenital GU", "Solid Organ GU", "Adrenal", "Reproductive", "MSK", "Pediatric Spine"]),
+    ...createCtcReadingResources(1, 5, Domain.GASTROINTESTINAL_IMAGING, 2300, 86, 20, ["Luminal", "Peritoneal Cavity", "Liver / Biliary", "Gallbladder", "Hepatic Doppler", "Pancreas", "Surgical", "Spleen"]),
+    ...createCtcReadingResources(1, 6, Domain.GENITOURINARY_IMAGING, 2400, 41, 15, ["Anatomy / Congenital", "Renal Masses", "Cystic Disease", "Infection", "Calcifications", "Perfusion / Vascular", "Transplant", "Renal Trauma", "Ureter", "Ureteral Masses", "Bladder", "Urethra"]),
+    ...createCtcReadingResources(1, 7, Domain.GENITOURINARY_IMAGING, 2450, 67, 12, ["Congenital", "Acquired", "Uterus/Vagina Masses", "Ovary / Adnexa", "Ovarian Cancer", "Random Ovarian Path", "Dong Bone", "Prostate", "Misc Male", "Testicular Cancer", "Male Infertility", "Transgender", "Early Pregnancy", "Placenta and Cord", "Congenital Fetal", "Maternal Disorders", "Multiple Gestations"]),
+    ...createCtcReadingResources(1, 8, Domain.NUCLEAR_MEDICINE, 2500, 18, 20, ["Adrenal", "Syndromes", "Thyroid", "Para-Thyroid"]), // Endocrine mapped to Nucs
+    ...createCtcReadingResources(1, 9, Domain.NUCLEAR_MEDICINE, 2550, 77, 15, ["What Scan Is It?", "Skeleton", "Pulmonary", "Thyroid", "Parathyroid", "CNS", "GI Nukes", "GU Nukes", "PET for Cancer", "Non-PET for Cancer", "Cardiac", "Therapy", "High Yield"]),
+    // Volume 2
+    ...createCtcReadingResources(2, 10, Domain.MUSCULOSKELETAL_IMAGING, 2600, 117, 20, ["Trauma and Overuse", "Osteoporosis, Osteopenia, & AVN", "Infection", "Aggressive Lesions", "Lucent Lesions", "Trivia", "Soft Tissue Masses", "Arthritis", "Marrow", "Ultrasound", "Procedures"]),
+    ...createCtcReadingResources(2, 11, Domain.NEURORADIOLOGY, 2700, 164, 15, ["Anatomy", "Brain Development", "Volume & Edema", "Metabolic & Toxic", "Neuro-Degenerative", "MRS, Leukodystrophies", "Brain Tumors", "Infection", "Brain Trauma & Bleeding", "Vascular", "Face Smash and T-Bone", "Temporal Bone", "Skull Base & Sinuses", "Mouth & Jaw", "Suprahyoid Neck", "Infrahyoid Neck", "Orbits", "Spine", "Seatbelts", "Spine Specific Vascular", "Cord Pathology"]),
+    ...createCtcReadingResources(2, 12, Domain.CARDIOVASCULAR_IMAGING, 2850, 40, 15, ["Anatomy", "Acute Aortic Syndromes", "Aneurysm, Misc", "Mesenteric Ischemia", "Misc", "Extremity", "Vasculitis", "Carotid Doppler"]),
+    ...createCtcReadingResources(2, 13, Domain.INTERVENTIONAL_RADIOLOGY, 2900, 94, 12, ["Instruments of Intervention", "PTA and Stents", "Stent Grafts", "Embolization", "Acute Limb", "Filters", "Dialysis", "TIPS & BRTO", "Hepatic & Biliary Intervention", "Luminal GI", "Abscess Drainage", "Urinary Intervention", "Pulmonary Intervention", "Reproductive Intervention", "Misc Topics"]),
+    ...createCtcReadingResources(2, 14, Domain.BREAST_IMAGING, 3000, 66, 10, ["Anatomy", "Technique & Artifacts", "Localization", "BI-RADS", "Calcifications", "Benign Path", "Cancer", "Symptomatic", "Architectural Distortion", "Lymph Nodes", "Male Breast", "Implants", "Post Op / Post Therapy", "Breast MRI", "Risk", "ACR Appropriateness", "Procedures", "MQSA", "Scenario / Review"]),
+];
 
 const caseCompanionResources: StudyResource[] = [
     // Part 1: Aunt Minnie's
@@ -839,255 +1005,61 @@ const caseCompanionResources: StudyResource[] = [
 } as StudyResource));
 
 export let masterResourcePool: StudyResource[] = [
-    ...[
-        { title: "Radiation Physics Fundamentals", pages: 45, duration: 30 }, { title: "X-ray Production and Interactions", pages: 42, duration: 28 },
-        { title: "Image Formation and Quality", pages: 48, duration: 32 }, { title: "Digital Imaging Systems", pages: 51, duration: 34 },
-        { title: "Image Display and Processing", pages: 39, duration: 26 }, { title: "Radiation Detection and Measurement", pages: 45, duration: 30 },
-        { title: "Radiation Biology and Protection", pages: 54, duration: 36 }, { title: "CT Physics and Technology", pages: 57, duration: 38 },
-        { title: "MRI Physics and Safety", pages: 60, duration: 40 },
-        { title: "Nuclear Medicine Physics", pages: 48, duration: 32, domainOverride: Domain.NUCLEAR_MEDICINE },
-        { title: "Ultrasound Physics", pages: 42, duration: 28, domainOverride: Domain.ULTRASOUND_IMAGING },
-        { title: "Mammography Physics", pages: 45, duration: 30, domainOverride: Domain.BREAST_IMAGING },
-        { title: "Fluoroscopy and Radiography", pages: 39, duration: 26 }, { title: "Radiation Safety Regulations", pages: 33, duration: 22 },
-        { title: "Quality Assurance Programs", pages: 36, duration: 24 },
-    ].flatMap((chapter: any, i): StudyResource[] => [
-        {
-            id: `phys_wm_ch${String(i + 1).padStart(2, '0')}_read`, title: `Radiologic Physics War Machine - ${chapter.title}`,
-            domain: chapter.domainOverride || Domain.PHYSICS, type: ResourceType.READING_TEXTBOOK, durationMinutes: chapter.duration, pages: chapter.pages,
-            bookSource: 'Radiologic Physics War Machine', chapterNumber: i + 1,
-            sequenceOrder: i * 4 + 1, isPrimaryMaterial: true,
-            pairedResourceIds: [`phys_wm_ch${String(i + 1).padStart(2, '0')}_vid`],
-            isSplittable: chapter.duration > 75, isArchived: false, isOptional: false, schedulingPriority: 'high',
-        },
-        {
-            id: `phys_wm_ch${String(i + 1).padStart(2, '0')}_vid`, title: `Crack the Core - Titan Radiology Videos - Physics – ${chapter.title}`,
-            domain: chapter.domainOverride || Domain.PHYSICS, type: ResourceType.VIDEO_LECTURE, durationMinutes: chapter.duration,
-            videoSource: 'Crack the Core - Titan Radiology Videos', sequenceOrder: i * 4 + 2, isPrimaryMaterial: true,
-            pairedResourceIds: [`phys_wm_ch${String(i + 1).padStart(2, '0')}_read`],
-            isSplittable: chapter.duration > 75, isArchived: false, isOptional: false, schedulingPriority: 'high',
-        }
-    ]),
-    ...[
-        { title: "Basic Physics", pages: 24, duration: 36}, { title: "Electromagnetic Radiation", pages: 18, duration: 27},
-        { title: "X-ray Production", pages: 30, duration: 45}, { title: "X-ray Interactions", pages: 27, duration: 40},
-        { title: "X-ray Equipment", pages: 33, duration: 50}, { title: "Image Quality", pages: 36, duration: 54},
-        { title: "Patient Dose", pages: 24, duration: 36}, { title: "Radiation Biology", pages: 21, duration: 32},
-        { title: "Radiation Protection", pages: 30, duration: 45}, { title: "CT Scanner", pages: 39, duration: 58},
-        { title: "CT Image Quality", pages: 27, duration: 40}, { title: "CT Dose", pages: 24, duration: 36},
-        { title: "MRI Basics", pages: 42, duration: 63}, { title: "MRI Safety", pages: 30, duration: 45},
-        { title: "Nuclear Medicine", pages: 36, duration: 54, domainOverride: Domain.NUCLEAR_MEDICINE },
-    ].flatMap((chapter: any, i): StudyResource[] => [
-        {
-            id: `phys_huda_ch${String(i + 1).padStart(2, '0')}_read`, title: `Huda - ${chapter.title}`,
-            domain: chapter.domainOverride || Domain.PHYSICS, type: ResourceType.READING_TEXTBOOK, durationMinutes: chapter.duration, pages: chapter.pages,
-            bookSource: 'Review of Radiologic Physics - Fifth Edition', chapterNumber: i + 1, sequenceOrder: 100 + i * 3 + 1, isPrimaryMaterial: false,
-            pairedResourceIds: [`phys_huda_ch${String(i + 1).padStart(2, '0')}_vid`],
-            isSplittable: chapter.duration > 75, isArchived: false, isOptional: false, schedulingPriority: 'medium',
-        },
-        {
-            id: `phys_huda_ch${String(i + 1).padStart(2, '0')}_vid`, title: `Physics Review Lecture - ${chapter.title}`,
-            domain: chapter.domainOverride || Domain.PHYSICS, type: ResourceType.VIDEO_LECTURE, durationMinutes: 48,
-            videoSource: 'Physics Review Lectures (Question Banks.docx)',
-            sequenceOrder: 100 + i * 3 + 2, isPrimaryMaterial: false,
-            pairedResourceIds: [`phys_huda_ch${String(i + 1).padStart(2, '0')}_read`],
-            isSplittable: false, isArchived: false, isOptional: false, schedulingPriority: 'medium',
-        }
-    ]),
-    ...[
-        { title: "Breast Anatomy and Development", pages: 18, duration: 27}, {title: "Mammography Technique and Positioning", pages: 24, duration: 36},
-        {title: "Breast MRI Technique and Indications", pages: 21, duration: 32}, {title: "Benign Breast Disease", pages: 30, duration: 45},
-        {title: "Malignant Breast Disease", pages: 33, duration: 50}, {title: "Breast Intervention and Biopsy", pages: 15, duration: 23},
-        {title: "High-Risk Lesions", pages: 18, duration: 27}, {title: "Breast Imaging Reporting", pages: 12, duration: 18},
-        {title: "Breast Ultrasound Techniques", pages: 15, duration: 23}, {title: "Breast MRI Contrast Protocols", pages: 18, duration: 27},
-        {title: "Breast Cancer Staging", pages: 21, duration: 32},
-    ].flatMap((chapter, i): StudyResource[] => {
-        const readId = `ctc1_breast_ch${String(i + 1).padStart(2, '0')}_read`; const vidId = `ctc1_breast_ch${String(i + 1).padStart(2, '0')}_vid`;
-        return [
-            { id: readId, title: `Crack the Core Exam (Vol 1) - Breast - ${chapter.title}`, domain: Domain.BREAST_IMAGING, type: ResourceType.READING_TEXTBOOK, durationMinutes: chapter.duration, pages: chapter.pages, bookSource: 'Crack the Core Volume 1', chapterNumber: i + 1, sequenceOrder: 200 + i * 4 + 1, isPrimaryMaterial: true, pairedResourceIds: [vidId], isSplittable: chapter.duration > 75, isArchived: false, isOptional: false, schedulingPriority: 'high' },
-            { id: vidId, title: `Crack the Core - Titan Radiology Videos - Breast - ${chapter.title}`, domain: Domain.BREAST_IMAGING, type: ResourceType.VIDEO_LECTURE, durationMinutes: 36, videoSource: 'Crack the Core - Titan Radiology Videos', sequenceOrder: 200 + i * 4 + 2, isPrimaryMaterial: true, pairedResourceIds: [readId], isSplittable: false, isArchived: false, isOptional: false, schedulingPriority: 'high' },
-        ];
-    }),
-    ...[
-        { title: "Cardiac Anatomy and Imaging Basics", pages: 24, duration: 36 }, { title: "Coronary Artery Disease", pages: 30, duration: 45 },
-        { title: "Valvular Heart Disease", pages: 27, duration: 40 }, { title: "Cardiomyopathies", pages: 24, duration: 36 },
-        { title: "Congenital Heart Disease", pages: 33, duration: 50 }, { title: "Pericardial Disease", pages: 18, duration: 27 },
-        { title: "Cardiac Masses and Tumors", pages: 21, duration: 32 }, { title: "Aortic Disease", pages: 27, duration: 40 },
-        { title: "Pulmonary Vascular Disease", pages: 24, duration: 36 }, { title: "Cardiac CT Techniques", pages: 30, duration: 45 },
-        { title: "Cardiac MRI Protocols", pages: 33, duration: 50 },
-    ].flatMap((chapter, i): StudyResource[] => {
-        const readId = `ctc1_cv_ch${String(i + 1).padStart(2, '0')}_read`; const vidId = `ctc1_cv_ch${String(i + 1).padStart(2, '0')}_vid`;
-        return [
-            { id: readId, title: `Crack the Core Exam (Vol 1) - Cardiovascular - ${chapter.title}`, domain: Domain.CARDIOVASCULAR_IMAGING, type: ResourceType.READING_TEXTBOOK, durationMinutes: chapter.duration, pages: chapter.pages, bookSource: 'Crack the Core Volume 1', chapterNumber: i + 1, sequenceOrder: 300 + i * 4 + 1, isPrimaryMaterial: true, pairedResourceIds: [vidId], isSplittable: chapter.duration > 75, isArchived: false, isOptional: false, schedulingPriority: 'high' },
-            { id: vidId, title: `Crack the Core - Titan Radiology Videos - Cardiovascular - ${chapter.title}`, domain: Domain.CARDIOVASCULAR_IMAGING, type: ResourceType.VIDEO_LECTURE, durationMinutes: 36, videoSource: 'Crack the Core - Titan Radiology Videos', sequenceOrder: 300 + i * 4 + 2, isPrimaryMaterial: true, pairedResourceIds: [readId], isSplittable: false, isArchived: false, isOptional: false, schedulingPriority: 'high' },
-        ];
-    }),
-    ...[
-        { title: "GI Anatomy and Imaging Approach", pages: 24, duration: 36 }, { title: "Esophageal Disorders", pages: 21, duration: 32 },
-        { title: "Gastric and Duodenal Disease", pages: 27, duration: 40 }, { title: "Small Bowel Disorders", pages: 30, duration: 45 },
-        { title: "Colorectal Disease", pages: 33, duration: 50 }, { title: "Hepatic Masses and Tumors", pages: 36, duration: 54 },
-        { title: "Biliary System Disease", pages: 27, duration: 40 }, { title: "Pancreatic Disease", pages: 30, duration: 45 },
-        { title: "Inflammatory Bowel Disease", pages: 24, duration: 36 }, { title: "GI Emergencies", pages: 21, duration: 32 },
-        { title: "Abdominal Wall and Peritoneum", pages: 18, duration: 27 },
-    ].flatMap((chapter, i): StudyResource[] => {
-        const readId = `ctc1_gi_ch${String(i + 1).padStart(2, '0')}_read`; const vidId = `ctc1_gi_ch${String(i + 1).padStart(2, '0')}_vid`;
-        return [
-            { id: readId, title: `Crack the Core Exam (Vol 1) - GI - ${chapter.title}`, domain: Domain.GASTROINTESTINAL_IMAGING, type: ResourceType.READING_TEXTBOOK, durationMinutes: chapter.duration, pages: chapter.pages, bookSource: 'Crack the Core Volume 1', chapterNumber: i + 1, sequenceOrder: 400 + i * 4 + 1, isPrimaryMaterial: true, pairedResourceIds: [vidId], isSplittable: chapter.duration > 75, isArchived: false, isOptional: false, schedulingPriority: 'high' },
-            { id: vidId, title: `Crack the Core - Titan Radiology Videos - GI - ${chapter.title}`, domain: Domain.GASTROINTESTINAL_IMAGING, type: ResourceType.VIDEO_LECTURE, durationMinutes: 36, videoSource: 'Crack the Core - Titan Radiology Videos', sequenceOrder: 400 + i * 4 + 2, isPrimaryMaterial: true, pairedResourceIds: [readId], isSplittable: false, isArchived: false, isOptional: false, schedulingPriority: 'high' },
-        ];
-    }),
-    ...[
-        { title: "GU Anatomy and Imaging Techniques", pages: 24, duration: 36 }, { title: "Renal Masses and Tumors", pages: 30, duration: 45 },
-        { title: "Renal Cystic Disease", pages: 24, duration: 36 }, { title: "Renal Vascular Disease", pages: 27, duration: 40 },
-        { title: "Ureteral and Bladder Disease", pages: 24, duration: 36 }, { title: "Prostate Disease", pages: 30, duration: 45 },
-        { title: "Scrotal and Penile Imaging", pages: 21, duration: 32 }, { title: "Female Pelvis Imaging", pages: 33, duration: 50 },
-        { title: "Urinary Tract Infections", pages: 18, duration: 27 }, { title: "GU Emergencies", pages: 21, duration: 32 },
-        { title: "GU Interventions", pages: 24, duration: 36 },
-    ].flatMap((chapter, i): StudyResource[] => {
-        const readId = `ctc1_gu_ch${String(i + 1).padStart(2, '0')}_read`; const vidId = `ctc1_gu_ch${String(i + 1).padStart(2, '0')}_vid`;
-        return [
-            { id: readId, title: `Crack the Core Exam (Vol 1) - GU - ${chapter.title}`, domain: Domain.GENITOURINARY_IMAGING, type: ResourceType.READING_TEXTBOOK, durationMinutes: chapter.duration, pages: chapter.pages, bookSource: 'Crack the Core Volume 1', chapterNumber: i + 1, sequenceOrder: 500 + i * 4 + 1, isPrimaryMaterial: true, pairedResourceIds: [vidId], isSplittable: chapter.duration > 75, isArchived: false, isOptional: false, schedulingPriority: 'high' },
-            { id: vidId, title: `Crack the Core - Titan Radiology Videos - GU - ${chapter.title}`, domain: Domain.GENITOURINARY_IMAGING, type: ResourceType.VIDEO_LECTURE, durationMinutes: 36, videoSource: 'Crack the Core - Titan Radiology Videos', sequenceOrder: 500 + i * 4 + 2, isPrimaryMaterial: true, pairedResourceIds: [readId], isSplittable: false, isArchived: false, isOptional: false, schedulingPriority: 'high' },
-        ];
-    }),
-    ...[
-        { title: "IR Fundamentals and Safety", pages: 36, duration: 54 }, { title: "Vascular Access and Techniques", pages: 42, duration: 63 },
-        { title: "Embolization Procedures", pages: 48, duration: 72 },
-    ].flatMap((chapter, i): StudyResource[] => {
-        const readId = `ctc2_ir_ch${String(i + 1).padStart(2, '0')}_read`; const vidId = `ctc2_ir_ch${String(i + 1).padStart(2, '0')}_vid`;
-        return [
-            { id: readId, title: `Crack the Core Exam (Vol 2) - IR - ${chapter.title}`, domain: Domain.INTERVENTIONAL_RADIOLOGY, type: ResourceType.READING_TEXTBOOK, durationMinutes: chapter.duration, pages: chapter.pages, bookSource: 'Crack the Core Volume 2', chapterNumber: i + 1, sequenceOrder: 554 + i * 4 + 1, isPrimaryMaterial: true, pairedResourceIds: [vidId], isSplittable: chapter.duration > 75, isArchived: false, isOptional: false, schedulingPriority: 'high' },
-            { id: vidId, title: `Crack the Core - Titan Radiology Videos - IR - ${chapter.title}`, domain: Domain.INTERVENTIONAL_RADIOLOGY, type: ResourceType.VIDEO_LECTURE, durationMinutes: 48, videoSource: 'Crack the Core - Titan Radiology Videos', sequenceOrder: 554 + i * 4 + 2, isPrimaryMaterial: true, pairedResourceIds: [readId], isSplittable: false, isArchived: false, isOptional: false, schedulingPriority: 'high' },
-        ];
-    }),
-    ...[
-        { title: "MSK Anatomy and Imaging Basics", pages: 24, duration: 36 }, { title: "Spine Imaging and Pathology", pages: 36, duration: 54 },
-        { title: "Shoulder and Upper Extremity", pages: 30, duration: 45 }, { title: "Elbow and Forearm Imaging", pages: 24, duration: 36 },
-        { title: "Wrist and Hand Imaging", pages: 27, duration: 40 }, { title: "Hip and Pelvis Imaging", pages: 30, duration: 45 },
-        { title: "Knee Imaging and Pathology", pages: 33, duration: 50 }, { title: "Ankle and Foot Imaging", pages: 24, duration: 36 },
-        { title: "Bone Tumors and Masses", pages: 36, duration: 54 }, { title: "Metabolic Bone Disease", pages: 21, duration: 32 },
-        { title: "MSK Infections and Inflammation", pages: 27, duration: 40 },
-    ].flatMap((chapter, i): StudyResource[] => {
-        const readId = `ctc2_msk_ch${String(i + 1).padStart(2, '0')}_read`; const vidId = `ctc2_msk_ch${String(i + 1).padStart(2, '0')}_vid`;
-        return [
-            { id: readId, title: `Crack the Core Exam (Vol 2) - MSK - ${chapter.title}`, domain: Domain.MUSCULOSKELETAL_IMAGING, type: ResourceType.READING_TEXTBOOK, durationMinutes: chapter.duration, pages: chapter.pages, bookSource: 'Crack the Core Volume 2', chapterNumber: i + 1, sequenceOrder: 612 + i * 4 + 1, isPrimaryMaterial: true, pairedResourceIds: [vidId], isSplittable: chapter.duration > 75, isArchived: false, isOptional: false, schedulingPriority: 'high' },
-            { id: vidId, title: `Crack the Core - Titan Radiology Videos - MSK - ${chapter.title}`, domain: Domain.MUSCULOSKELETAL_IMAGING, type: ResourceType.VIDEO_LECTURE, durationMinutes: 36, videoSource: 'Crack the Core - Titan Radiology Videos', sequenceOrder: 612 + i * 4 + 2, isPrimaryMaterial: true, pairedResourceIds: [readId], isSplittable: false, isArchived: false, isOptional: false, schedulingPriority: 'high' },
-        ];
-    }),
-    ...[
-        { title: "Brain Anatomy and Development", pages: 30, duration: 45 }, { title: "Stroke and Vascular Disease", pages: 36, duration: 54 },
-        { title: "Brain Tumors and Masses", pages: 42, duration: 63 }, { title: "Trauma and Emergency Neuro", pages: 33, duration: 50 },
-        { title: "Demyelinating Disease", pages: 24, duration: 36 }, { title: "Infection and Inflammation", pages: 27, duration: 40 },
-        { title: "Degenerative Disease", pages: 24, duration: 36 }, { title: "Spine Anatomy and Pathology", pages: 36, duration: 54 },
-        { title: "Head and Neck Imaging", pages: 30, duration: 45 }, { title: "Pediatric Neuroradiology", pages: 27, duration: 40 },
-        { title: "Advanced Neuro Techniques", pages: 24, duration: 36 },
-    ].flatMap((chapter, i): StudyResource[] => {
-        const readId = `ctc2_neuro_ch${String(i + 1).padStart(2, '0')}_read`; const vidId = `ctc2_neuro_ch${String(i + 1).padStart(2, '0')}_vid`;
-        return [
-            { id: readId, title: `Crack the Core Exam (Vol 2) - Neuro - ${chapter.title}`, domain: Domain.NEURORADIOLOGY, type: ResourceType.READING_TEXTBOOK, durationMinutes: chapter.duration, pages: chapter.pages, bookSource: 'Crack the Core Volume 2', chapterNumber: i + 1, sequenceOrder: 703 + i * 4 + 1, isPrimaryMaterial: true, pairedResourceIds: [vidId], isSplittable: chapter.duration > 75, isArchived: false, isOptional: false, schedulingPriority: 'high' },
-            { id: vidId, title: `Crack the Core - Titan Radiology Videos - Neuro - ${chapter.title}`, domain: Domain.NEURORADIOLOGY, type: ResourceType.VIDEO_LECTURE, durationMinutes: 40, videoSource: 'Crack the Core - Titan Radiology Videos', sequenceOrder: 703 + i * 4 + 2, isPrimaryMaterial: true, pairedResourceIds: [readId], isSplittable: false, isArchived: false, isOptional: false, schedulingPriority: 'high' },
-        ];
-    }),
-    ...[
-        { title: "Nuclear Medicine Fundamentals", pages: 24, duration: 36 }, { title: "Cardiac Nuclear Medicine", pages: 30, duration: 45 },
-        { title: "Bone Scintigraphy", pages: 27, duration: 40 }, { title: "Thyroid and Parathyroid", pages: 24, duration: 36 },
-        { title: "Hepatobiliary Scintigraphy", pages: 21, duration: 32 }, { title: "Renal Scintigraphy", pages: 24, duration: 36 },
-        { title: "Pulmonary Scintigraphy", pages: 21, duration: 32 }, { title: "PET/CT Imaging", pages: 36, duration: 54 },
-        { title: "Gastrointestinal Nuclear", pages: 18, duration: 27 }, { title: "Neurological Nuclear", pages: 24, duration: 36 },
-        { title: "Pediatric Nuclear Medicine", pages: 21, duration: 32 }, { title: "Therapeutic Nuclear Medicine", pages: 30, duration: 45 },
-        { title: "Nuclear Safety and Regulations", pages: 24, duration: 36 }, { title: "Quality Control in Nuclear", pages: 18, duration: 27 },
-    ].flatMap((chapter, i): StudyResource[] => {
-        const readId = `ctc2_nucs_ch${String(i + 1).padStart(2, '0')}_read`; const vidId = `ctc2_nucs_ch${String(i + 1).padStart(2, '0')}_vid`;
-        return [
-            { id: readId, title: `Crack the Core Exam (Vol 2) - Nuclear - ${chapter.title}`, domain: Domain.NUCLEAR_MEDICINE, type: ResourceType.READING_TEXTBOOK, durationMinutes: chapter.duration, pages: chapter.pages, bookSource: 'Crack the Core Volume 2', chapterNumber: i + 1, sequenceOrder: 806 + i * 3 + 1, isPrimaryMaterial: true, pairedResourceIds: [vidId], isSplittable: chapter.duration > 75, isArchived: false, isOptional: false, schedulingPriority: 'high' },
-            { id: vidId, title: `Crack the Core - Titan Radiology Videos - Nuclear - ${chapter.title}`, domain: Domain.NUCLEAR_MEDICINE, type: ResourceType.VIDEO_LECTURE, durationMinutes: 32, videoSource: 'Crack the Core - Titan Radiology Videos', sequenceOrder: 806 + i * 3 + 2, isPrimaryMaterial: true, pairedResourceIds: [readId], isSplittable: false, isArchived: false, isOptional: false, schedulingPriority: 'high' },
-        ];
-    }),
-    ...[
-        { title: "Pediatric Imaging Fundamentals", pages: 27, duration: 40 }, { title: "Pediatric Chest Imaging", pages: 30, duration: 45 },
-        { title: "Pediatric Abdominal Imaging", pages: 33, duration: 50 }, { title: "Pediatric Neuroradiology", pages: 36, duration: 54 },
-        { title: "Pediatric MSK Imaging", pages: 30, duration: 45 }, { title: "Pediatric GU Imaging", pages: 24, duration: 36 },
-        { title: "Pediatric Emergencies", pages: 27, duration: 40 }, { title: "Congenital Anomalies", pages: 33, duration: 50 },
-        { title: "Pediatric Trauma", pages: 24, duration: 36 }, { title: "Pediatric Interventions", pages: 21, duration: 32 },
-    ].flatMap((chapter, i): StudyResource[] => {
-        const readId = `ctc2_peds_ch${String(i + 1).padStart(2, '0')}_read`; const vidId = `ctc2_peds_ch${String(i + 1).padStart(2, '0')}_vid`;
-        return [
-            { id: readId, title: `Crack the Core Exam (Vol 2) - Pediatric - ${chapter.title}`, domain: Domain.PEDIATRIC_RADIOLOGY, type: ResourceType.READING_TEXTBOOK, durationMinutes: chapter.duration, pages: chapter.pages, bookSource: 'Crack the Core Volume 2', chapterNumber: i + 1, sequenceOrder: 872 + i * 3 + 1, isPrimaryMaterial: true, pairedResourceIds: [vidId], isSplittable: chapter.duration > 75, isArchived: false, isOptional: false, schedulingPriority: 'high' },
-            { id: vidId, title: `Crack the Core - Titan Radiology Videos - Pediatric - ${chapter.title}`, domain: Domain.PEDIATRIC_RADIOLOGY, type: ResourceType.VIDEO_LECTURE, durationMinutes: 36, videoSource: 'Crack the Core - Titan Radiology Videos', sequenceOrder: 872 + i * 3 + 2, isPrimaryMaterial: true, pairedResourceIds: [readId], isSplittable: false, isArchived: false, isOptional: false, schedulingPriority: 'high' },
-        ];
-    }),
-    ...[
-        { title: "Chest Anatomy and Techniques", pages: 24, duration: 36 }, { title: "Lung Nodules and Masses", pages: 30, duration: 45 },
-        { title: "Interstitial Lung Disease", pages: 33, duration: 50 }, { title: "Airway Disease", pages: 24, duration: 36 },
-        { title: "Pleural Disease", pages: 27, duration: 40 }, { title: "Mediastinal Masses", pages: 30, duration: 45 },
-        { title: "Pulmonary Vascular Disease", pages: 27, duration: 40 }, { title: "Chest Trauma", pages: 21, duration: 32 },
-        { title: "Lung Cancer Staging", pages: 33, duration: 50 }, { title: "Chest Infections", pages: 24, duration: 36 },
-        { title: "High-Resolution CT Chest", pages: 27, duration: 40 },
-    ].flatMap((chapter, i): StudyResource[] => {
-        const readId = `ctc1_thoracic_ch${String(i + 1).padStart(2, '0')}_read`; const vidId = `ctc1_thoracic_ch${String(i + 1).padStart(2, '0')}_vid`;
-        return [
-            { id: readId, title: `Crack the Core Exam (Vol 1) - Thoracic - ${chapter.title}`, domain: Domain.THORACIC_IMAGING, type: ResourceType.READING_TEXTBOOK, durationMinutes: chapter.duration, pages: chapter.pages, bookSource: 'Crack the Core Volume 1', chapterNumber: i + 1, sequenceOrder: 958 + i * 4 + 1, isPrimaryMaterial: true, pairedResourceIds: [vidId], isSplittable: chapter.duration > 75, isArchived: false, isOptional: false, schedulingPriority: 'high' },
-            { id: vidId, title: `Crack the Core - Titan Radiology Videos - Thoracic - ${chapter.title}`, domain: Domain.THORACIC_IMAGING, type: ResourceType.VIDEO_LECTURE, durationMinutes: 36, videoSource: 'Crack the Core - Titan Radiology Videos', sequenceOrder: 958 + i * 4 + 2, isPrimaryMaterial: true, pairedResourceIds: [readId], isSplittable: false, isArchived: false, isOptional: false, schedulingPriority: 'high' },
-        ];
-    }),
-    ...[
-        { title: "Ultrasound Physics and Techniques", pages: 42, duration: 63 }, { title: "Abdominal Ultrasound", pages: 48, duration: 72 },
-        { title: "Vascular Ultrasound", pages: 45, duration: 68 },
-    ].flatMap((chapter, i): StudyResource[] => {
-        const readId = `ctc2_us_ch${String(i + 1).padStart(2, '0')}_read`; const vidId = `ctc2_us_ch${String(i + 1).padStart(2, '0')}_vid`;
-        return [
-            { id: readId, title: `Crack the Core Exam (Vol 2) - Ultrasound - ${chapter.title}`, domain: Domain.ULTRASOUND_IMAGING, type: ResourceType.READING_TEXTBOOK, durationMinutes: chapter.duration, pages: chapter.pages, bookSource: 'Crack the Core Volume 2', chapterNumber: i + 1, sequenceOrder: 1037 + i * 4 + 1, isPrimaryMaterial: true, pairedResourceIds: [vidId], isSplittable: chapter.duration > 75, isArchived: false, isOptional: false, schedulingPriority: 'high' },
-            { id: vidId, title: `Crack the Core - Titan Radiology Videos - Ultrasound - ${chapter.title}`, domain: Domain.ULTRASOUND_IMAGING, type: ResourceType.VIDEO_LECTURE, durationMinutes: 48, videoSource: 'Crack the Core - Titan Radiology Videos', sequenceOrder: 1037 + i * 4 + 2, isPrimaryMaterial: true, pairedResourceIds: [readId], isSplittable: false, isArchived: false, isOptional: false, schedulingPriority: 'high' },
-        ];
-    }),
+    ...enhancedCoreRadiologyResources,
+    ...ctcResources,
     ...caseCompanionResources,
-    { id: 'guide_abr_physics', title: 'ABR Physics Study Guide', domain: Domain.PHYSICS, type: ResourceType.READING_GUIDE, pages: 15, durationMinutes: readingDuration(15), bookSource: 'ABR Physics Study Guide', sequenceOrder: 1100, isPrimaryMaterial: true, isSplittable: false, isArchived: false, isOptional: false, schedulingPriority: 'high' },
-    { id: 'guide_risc_2025', title: 'RISC Study Guide 2025', domain: Domain.RISC, type: ResourceType.READING_GUIDE, pages: 57, durationMinutes: readingDuration(57), bookSource: 'RISC-Study-Guide-2025.pdf', sequenceOrder: 1101, isPrimaryMaterial: true, isSplittable: (readingDuration(57) || 0) > 90, isArchived: false, isOptional: false, schedulingPriority: 'high' },
-    ...createQBankChunks('qevlar_peds', 'QEVLAR - Peds', Domain.PEDIATRIC_RADIOLOGY, 321, 'QEVLAR', 2000, 'low'),
-    ...createQBankChunks('qevlar_msk', 'QEVLAR – MSK', Domain.MUSCULOSKELETAL_IMAGING, 202, 'QEVLAR', 2010, 'low'),
-    ...createQBankChunks('qevlar_ir', 'QEVLAR - IR', Domain.INTERVENTIONAL_RADIOLOGY, 88, 'QEVLAR', 2020, 'low'),
-    ...createQBankChunks('qevlar_thoracic', 'QEVLAR - Thoracic', Domain.THORACIC_IMAGING, 268, 'QEVLAR', 2030, 'low'),
-    ...createQBankChunks('qevlar_neuro', 'QEVLAR - Neuro', Domain.NEURORADIOLOGY, 123, 'QEVLAR', 2040, 'low'),
-    ...createQBankChunks('qevlar_gi', 'QEVLAR - GI', Domain.GASTROINTESTINAL_IMAGING, 217, 'QEVLAR', 2050, 'low'),
-    ...createQBankChunks('qevlar_gu', 'QEVLAR - GU', Domain.GENITOURINARY_IMAGING, 111, 'QEVLAR', 2060, 'low'),
-    ...createQBankChunks('qevlar_breast', 'QEVLAR - Breast', Domain.BREAST_IMAGING, 227, 'QEVLAR', 2070, 'low'),
-    ...createQBankChunks('qevlar_cv', 'QEVLAR – Cardiac/Vascular', Domain.CARDIOVASCULAR_IMAGING, 108, 'QEVLAR', 2080, 'low'),
-    ...createQBankChunks('qevlar_nis', 'QEVLAR - NIS', Domain.NIS, 50, 'QEVLAR', 2090, 'low'),
-    ...createQBankChunks('qevlar_other', 'QEVLAR - Other Topics', Domain.MIXED_REVIEW, 398, 'QEVLAR', 2095, 'low'),
-    ...createQBankChunks('qevlar_reproendo', 'QEVLAR - Repro + Endo', Domain.MIXED_REVIEW, 80, 'QEVLAR', 2105, 'low'),
-    ...createQBankChunks('boardv_breast', 'Board Vitals - Breast', Domain.BREAST_IMAGING, 111, 'Board Vitals', 2100, 'medium'),
-    ...createQBankChunks('boardv_cv', 'Board Vitals - Cardiac/Vascular', Domain.CARDIOVASCULAR_IMAGING, 79, 'Board Vitals', 2110, 'medium'),
-    ...createQBankChunks('boardv_gi', 'Board Vitals - GI', Domain.GASTROINTESTINAL_IMAGING, 99, 'Board Vitals', 2120, 'medium'),
-    ...createQBankChunks('boardv_gu', 'Board Vitals - GU', Domain.GENITOURINARY_IMAGING, 100, 'Board Vitals', 2130, 'medium'),
-    ...createQBankChunks('boardv_ir', 'Board Vitals - IR', Domain.INTERVENTIONAL_RADIOLOGY, 53, 'Board Vitals', 2140, 'medium'),
-    ...createQBankChunks('boardv_msk', 'Board Vitals - MSK', Domain.MUSCULOSKELETAL_IMAGING, 162, 'Board Vitals', 2150, 'medium'),
-    ...createQBankChunks('boardv_neuro', 'Board Vitals - Neuro', Domain.NEURORADIOLOGY, 171, 'Board Vitals', 2160, 'medium'),
-    ...createQBankChunks('boardv_nis', 'Board Vitals - NIS', Domain.NIS, 86, 'Board Vitals', 2170, 'medium'),
-    ...createQBankChunks('boardv_nucs', 'Board Vitals - Nuclear', Domain.NUCLEAR_MEDICINE, 98, 'Board Vitals', 2180, 'medium'),
-    ...createQBankChunks('boardv_peds', 'Board Vitals - Peds', Domain.PEDIATRIC_RADIOLOGY, 70, 'Board Vitals', 2190, 'medium'),
-    ...createQBankChunks('boardv_phys', 'Board Vitals - Physics', Domain.PHYSICS, 88, 'Board Vitals', 2200, 'medium'),
-    ...createQBankChunks('boardv_thoracic', 'Board Vitals - Thoracic', Domain.THORACIC_IMAGING, 60, 'Board Vitals', 2210, 'medium'),
-    ...createQBankChunks('boardv_us', 'Board Vitals – Ultrasound', Domain.ULTRASOUND_IMAGING, 90, 'Board Vitals', 2220, 'medium'),
-    ...createQBankChunks('boardv_quickhits', 'Board Vitals - Quick Hits', Domain.MIXED_REVIEW, 23, 'Board Vitals', 2230, 'medium'),
-    ...createQBankChunks('boardv_radsafety', 'Board Vitals - Radiation Safety', Domain.RISC, 49, 'Board Vitals', 2235, 'medium'),
-    ...createQBankChunks('nucapp_radgen', 'NucApp - Radionuclide Generation', Domain.NUCLEAR_MEDICINE, 24, 'NucApp', 2300, 'low'),
-    ...createQBankChunks('nucapp_imgagents', 'NucApp – Imaging agents', Domain.NUCLEAR_MEDICINE, 66, 'NucApp', 2301, 'low'),
-    ...createQBankChunks('nucapp_regs', 'NucApp - Nuclear regulations', Domain.RISC, 50, 'NucApp', 2303, 'low'),
-    ...createQBankChunks('nucapp_neuro', 'NucApp - Neuro', Domain.NEURORADIOLOGY, 28, 'NucApp', 2305, 'low'),
-    ...createQBankChunks('nucapp_pulm', 'NucApp – Pulmonary', Domain.THORACIC_IMAGING, 14, 'NucApp', 2306, 'low'),
-    ...createQBankChunks('nucapp_cardiac', 'NucApp - Cardiac', Domain.CARDIOVASCULAR_IMAGING, 23, 'NucApp', 2307, 'low'),
-    ...createQBankChunks('nucapp_endo', 'NucApp - Endocrine', Domain.NUCLEAR_MEDICINE, 25, 'NucApp', 2308, 'low'),
-    ...createQBankChunks('nucapp_bone', 'NucApp - Bone', Domain.MUSCULOSKELETAL_IMAGING, 15, 'NucApp', 2309, 'low'),
-    ...createQBankChunks('nucapp_gu', 'NucApp – Genitourinary', Domain.GENITOURINARY_IMAGING, 15, 'NucApp', 2310, 'low'),
-    ...createQBankChunks('nucapp_gi', 'NucApp - Gastrointestinal', Domain.GASTROINTESTINAL_IMAGING, 30, 'NucApp', 2311, 'low'),
-    ...createQBankChunks('nucapp_onco', 'NucApp – Oncology', Domain.NUCLEAR_MEDICINE, 32, 'NucApp', 2312, 'low'),
-    ...createQBankChunks('nucapp_instqc', 'NucApp – Instrumentation and QC', Domain.PHYSICS, 32, 'NucApp', 2313, 'low'),
-    ...createQBankChunks('nucapp_radbio', 'NucApp - Radiation Biology', Domain.PHYSICS, 38, 'NucApp', 2314, 'low'),
-    ...createQBankChunks('nis_qb_prof', 'NIS QBank - Professionalism', Domain.NIS, 12, 'NIS Question Bank', 2400, 'medium'),
-    ...createQBankChunks('nis_qb_qsc', 'NIS QBank - Quality & Safety Concepts', Domain.NIS, 63, 'NIS Question Bank', 2401, 'medium'),
-    ...createQBankChunks('nis_qb_pqs', 'NIS QBank - Practical Quality & Safety', Domain.NIS, 62, 'NIS Question Bank', 2403, 'medium'),
-    ...createQBankChunks('nis_qb_sir', 'NIS QBank - Safety in Radiology', Domain.NIS, 72, 'NIS Question Bank', 2405, 'medium'),
-    ...createQBankChunks('nis_qb_rl', 'NIS QBank - Regulatory & Legal', Domain.NIS, 58, 'NIS Question Bank', 2407, 'medium'),
-    ...createQBankChunks('nis_qb_ii', 'NIS QBank - Imaging Informatics', Domain.NIS, 43, 'NIS Question Bank', 2409, 'medium'),
+    ...titanVideoResources,
+    ...discordVideoResources,
+    // GUIDES
+    { id: 'guide_risc_2025', title: 'RISC Study Guide 2025', domain: Domain.RISC, type: ResourceType.READING_GUIDE, pages: 57, durationMinutes: readingDuration(57), bookSource: 'RISC Study Guide', sequenceOrder: 1101, isPrimaryMaterial: true, isSplittable: (readingDuration(57) || 0) > 90, isArchived: false, isOptional: false, schedulingPriority: 'high' },
+    { id: 'guide_nis_2025', title: 'Noninterpretive Skills Study Guide 2025', domain: Domain.NIS, type: ResourceType.READING_GUIDE, pages: 68, durationMinutes: readingDuration(68), bookSource: 'NIS Study Guide', sequenceOrder: 1102, isPrimaryMaterial: true, isSplittable: (readingDuration(68) || 0) > 90, isArchived: false, isOptional: false, schedulingPriority: 'high' },
+    // QUESTION BANKS
+    ...createQBankChunks('qevlar_peds', 'QEVLAR - Peds', Domain.PEDIATRIC_RADIOLOGY, 321, 'QEVLAR', 5000, 'low'),
+    ...createQBankChunks('qevlar_msk', 'QEVLAR – MSK', Domain.MUSCULOSKELETAL_IMAGING, 202, 'QEVLAR', 5010, 'low'),
+    ...createQBankChunks('qevlar_ir', 'QEVLAR - IR', Domain.INTERVENTIONAL_RADIOLOGY, 88, 'QEVLAR', 5020, 'low'),
+    ...createQBankChunks('qevlar_thoracic', 'QEVLAR - Thoracic', Domain.THORACIC_IMAGING, 268, 'QEVLAR', 5030, 'low'),
+    ...createQBankChunks('qevlar_neuro', 'QEVLAR - Neuro', Domain.NEURORADIOLOGY, 123, 'QEVLAR', 5040, 'low'),
+    ...createQBankChunks('qevlar_gi', 'QEVLAR - GI', Domain.GASTROINTESTINAL_IMAGING, 217, 'QEVLAR', 5050, 'low'),
+    ...createQBankChunks('qevlar_gu', 'QEVLAR - GU', Domain.GENITOURINARY_IMAGING, 111, 'QEVLAR', 5060, 'low'),
+    ...createQBankChunks('qevlar_breast', 'QEVLAR - Breast', Domain.BREAST_IMAGING, 227, 'QEVLAR', 5070, 'low'),
+    ...createQBankChunks('qevlar_cv', 'QEVLAR – Cardiac/Vascular', Domain.CARDIOVASCULAR_IMAGING, 108, 'QEVLAR', 5080, 'low'),
+    ...createQBankChunks('qevlar_nis', 'QEVLAR - NIS', Domain.NIS, 50, 'QEVLAR', 5090, 'low'),
+    ...createQBankChunks('qevlar_other', 'QEVLAR - Other Topics', Domain.MIXED_REVIEW, 398, 'QEVLAR', 5095, 'low'),
+    ...createQBankChunks('qevlar_reproendo', 'QEVLAR - Repro + Endo', Domain.MIXED_REVIEW, 80, 'QEVLAR', 5105, 'low'),
+    ...createQBankChunks('boardv_breast', 'Board Vitals - Breast', Domain.BREAST_IMAGING, 111, 'Board Vitals', 6100, 'medium'),
+    ...createQBankChunks('boardv_cv', 'Board Vitals - Cardiac/Vascular', Domain.CARDIOVASCULAR_IMAGING, 79, 'Board Vitals', 6110, 'medium'),
+    ...createQBankChunks('boardv_gi', 'Board Vitals - GI', Domain.GASTROINTESTINAL_IMAGING, 99, 'Board Vitals', 6120, 'medium'),
+    ...createQBankChunks('boardv_gu', 'Board Vitals - GU', Domain.GENITOURINARY_IMAGING, 100, 'Board Vitals', 6130, 'medium'),
+    ...createQBankChunks('boardv_ir', 'Board Vitals - IR', Domain.INTERVENTIONAL_RADIOLOGY, 53, 'Board Vitals', 6140, 'medium'),
+    ...createQBankChunks('boardv_msk', 'Board Vitals - MSK', Domain.MUSCULOSKELETAL_IMAGING, 162, 'Board Vitals', 6150, 'medium'),
+    ...createQBankChunks('boardv_neuro', 'Board Vitals - Neuro', Domain.NEURORADIOLOGY, 171, 'Board Vitals', 6160, 'medium'),
+    ...createQBankChunks('boardv_nis', 'Board Vitals - NIS', Domain.NIS, 86, 'Board Vitals', 6170, 'medium'),
+    ...createQBankChunks('boardv_nucs', 'Board Vitals - Nuclear', Domain.NUCLEAR_MEDICINE, 98, 'Board Vitals', 6180, 'medium'),
+    ...createQBankChunks('boardv_peds', 'Board Vitals - Peds', Domain.PEDIATRIC_RADIOLOGY, 70, 'Board Vitals', 6190, 'medium'),
+    ...createQBankChunks('boardv_phys', 'Board Vitals - Physics', Domain.PHYSICS, 88, 'Board Vitals', 6200, 'medium'),
+    ...createQBankChunks('boardv_thoracic', 'Board Vitals - Thoracic', Domain.THORACIC_IMAGING, 60, 'Board Vitals', 6210, 'medium'),
+    ...createQBankChunks('boardv_us', 'Board Vitals – Ultrasound', Domain.ULTRASOUND_IMAGING, 90, 'Board Vitals', 6220, 'medium'),
+    ...createQBankChunks('boardv_quickhits', 'Board Vitals - Quick Hits', Domain.MIXED_REVIEW, 23, 'Board Vitals', 6230, 'medium'),
+    ...createQBankChunks('boardv_radsafety', 'Board Vitals - Radiation Safety', Domain.RISC, 49, 'Board Vitals', 6235, 'medium'),
+    ...createQBankChunks('nucapp_radgen', 'NucApp - Radionuclide Generation', Domain.NUCLEAR_MEDICINE, 24, 'NucApp', 7300, 'low'),
+    ...createQBankChunks('nucapp_imgagents', 'NucApp – Imaging agents', Domain.NUCLEAR_MEDICINE, 66, 'NucApp', 7301, 'low'),
+    ...createQBankChunks('nucapp_regs', 'NucApp - Nuclear regulations', Domain.RISC, 50, 'NucApp', 7303, 'low'),
+    ...createQBankChunks('nucapp_neuro', 'NucApp - Neuro', Domain.NEURORADIOLOGY, 28, 'NucApp', 7305, 'low'),
+    ...createQBankChunks('nucapp_pulm', 'NucApp – Pulmonary', Domain.THORACIC_IMAGING, 14, 'NucApp', 7306, 'low'),
+    ...createQBankChunks('nucapp_cardiac', 'NucApp - Cardiac', Domain.CARDIOVASCULAR_IMAGING, 23, 'NucApp', 7307, 'low'),
+    ...createQBankChunks('nucapp_endo', 'NucApp - Endocrine', Domain.NUCLEAR_MEDICINE, 25, 'NucApp', 7308, 'low'),
+    ...createQBankChunks('nucapp_bone', 'NucApp - Bone', Domain.MUSCULOSKELETAL_IMAGING, 15, 'NucApp', 7309, 'low'),
+    ...createQBankChunks('nucapp_gu', 'NucApp – Genitourinary', Domain.GENITOURINARY_IMAGING, 15, 'NucApp', 7310, 'low'),
+    ...createQBankChunks('nucapp_gi', 'NucApp - Gastrointestinal', Domain.GASTROINTESTINAL_IMAGING, 30, 'NucApp', 7311, 'low'),
+    ...createQBankChunks('nucapp_onco', 'NucApp – Oncology', Domain.NUCLEAR_MEDICINE, 32, 'NucApp', 7312, 'low'),
+    ...createQBankChunks('nucapp_instqc', 'NucApp – Instrumentation and QC', Domain.PHYSICS, 32, 'NucApp', 7313, 'low'),
+    ...createQBankChunks('nucapp_radbio', 'NucApp - Radiation Biology', Domain.PHYSICS, 38, 'NucApp', 7314, 'low'),
+    ...createQBankChunks('nis_qb_prof', 'NIS QBank - Professionalism', Domain.NIS, 12, 'NIS Question Bank', 8400, 'medium'),
+    ...createQBankChunks('nis_qb_qsc', 'NIS QBank - Quality & Safety Concepts', Domain.NIS, 63, 'NIS Question Bank', 8401, 'medium'),
+    ...createQBankChunks('nis_qb_pqs', 'NIS QBank - Practical Quality & Safety', Domain.NIS, 62, 'NIS Question Bank', 8403, 'medium'),
+    ...createQBankChunks('nis_qb_sir', 'NIS QBank - Safety in Radiology', Domain.NIS, 72, 'NIS Question Bank', 8405, 'medium'),
+    ...createQBankChunks('nis_qb_rl', 'NIS QBank - Regulatory & Legal', Domain.NIS, 58, 'NIS Question Bank', 8407, 'medium'),
+    ...createQBankChunks('nis_qb_ii', 'NIS QBank - Imaging Informatics', Domain.NIS, 43, 'NIS Question Bank', 8409, 'medium'),
     ...((): StudyResource[] => {
         const physicsCategories = [
             "Core Review: Foundations Comprehensive Exam", "Core Review: X-Ray Modalities Comprehensive Exam",
@@ -1096,13 +1068,14 @@ export let masterResourcePool: StudyResource[] = [
             "Core Review: Radiobiology", "Core Review: Informatics and Image Theory",
             "Core Review: Radiography",
             "Core Review: Mammography and Tomosynthesis", "Core Review: Fluoroscopy and IR", "Core Review: CT",
+            "Core Review: Nuclear Medicine I", "Core Review: Nuclear Medicine II", "Core Review: Nuclear Medicine III",
             "Core Review: MRI I", "Core Review: MRI II", "Core Review: MRI III", "Core Review: MR Safety",
             "Core Review: Ultrasound I", "Core Review: Ultrasound II"
         ];
-        let physicsQbSeq = 2500;
+        let physicsQbSeq = 9000;
         const allPhysicsQbChunks: StudyResource[] = [];
         physicsCategories.forEach((categoryTitle, idx) => {
-            const numQuestions = categoryTitle.includes("Comprehensive Exam") ? 60 : 15;
+            const numQuestions = categoryTitle.includes("Comprehensive Exam") ? 100 : 15;
             const chunks = createQBankChunks(
                 `phys_qb_cat_${idx + 1}`,
                 `Physics QBank - ${categoryTitle}`,
@@ -1117,6 +1090,4 @@ export let masterResourcePool: StudyResource[] = [
         });
         return allPhysicsQbChunks;
     })(),
-    ...discordVideoResources,
-    ...enhancedCoreRadiologyResources,
 ];

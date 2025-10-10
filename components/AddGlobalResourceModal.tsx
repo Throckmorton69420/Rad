@@ -14,6 +14,8 @@ const ResourceEditorModal: React.FC<ResourceEditorModalProps> = ({
   const [taskType, setTaskType] = useState<ResourceType>(availableResourceTypes[0] || ResourceType.READING_TEXTBOOK);
   
   const [pages, setPages] = useState<number | undefined>(undefined);
+  const [startPage, setStartPage] = useState<number | undefined>(undefined);
+  const [endPage, setEndPage] = useState<number | undefined>(undefined);
   const [questionCount, setQuestionCount] = useState<number | undefined>(undefined);
   const [bookSource, setBookSource] = useState<string | undefined>(undefined);
   const [videoSource, setVideoSource] = useState<string | undefined>(undefined);
@@ -31,6 +33,8 @@ const ResourceEditorModal: React.FC<ResourceEditorModalProps> = ({
     setSelectedDomain(availableDomains[0] || Domain.PHYSICS);
     setTaskType(availableResourceTypes[0] || ResourceType.READING_TEXTBOOK);
     setPages(undefined);
+    setStartPage(undefined);
+    setEndPage(undefined);
     setQuestionCount(undefined);
     setBookSource(undefined);
     setVideoSource(undefined);
@@ -49,6 +53,8 @@ const ResourceEditorModal: React.FC<ResourceEditorModalProps> = ({
         setSelectedDomain(initialResource.domain);
         setTaskType(initialResource.type);
         setPages(initialResource.pages);
+        setStartPage(initialResource.startPage);
+        setEndPage(initialResource.endPage);
         setQuestionCount(initialResource.questionCount);
         setBookSource(initialResource.bookSource);
         setVideoSource(initialResource.videoSource);
@@ -62,6 +68,12 @@ const ResourceEditorModal: React.FC<ResourceEditorModalProps> = ({
       }
     }
   }, [initialResource, isOpen, availableDomains, availableResourceTypes]);
+
+  useEffect(() => {
+    if (startPage !== undefined && endPage !== undefined && endPage >= startPage) {
+        setPages(endPage - startPage + 1);
+    }
+  }, [startPage, endPage]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -79,6 +91,8 @@ const ResourceEditorModal: React.FC<ResourceEditorModalProps> = ({
         domain: selectedDomain, 
         type: taskType,
         pages: pages || undefined,
+        startPage: startPage || undefined,
+        endPage: endPage || undefined,
         questionCount: questionCount || undefined,
         bookSource: bookSource || undefined,
         videoSource: videoSource || undefined,
@@ -141,17 +155,25 @@ const ResourceEditorModal: React.FC<ResourceEditorModalProps> = ({
               <TimeInputScroller valueInMinutes={totalMinutesDuration} onChange={setTotalMinutesDuration} maxHours={10} />
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
-                <label htmlFor="globalResPages" className="block text-xs font-medium text-[var(--text-secondary)] mb-0.5">Pages (Opt.):</label>
-                <input type="number" id="globalResPages" value={pages || ''} onChange={(e) => setPages(parseInt(e.target.value) || undefined)}
-                  className="input-base text-sm" min="0" />
+                <label htmlFor="globalResStartPage" className="block text-xs font-medium text-[var(--text-secondary)] mb-0.5">Start Pg (Opt.):</label>
+                <input type="number" id="globalResStartPage" value={startPage || ''} onChange={(e) => setStartPage(parseInt(e.target.value) || undefined)} className="input-base text-sm" min="0"/>
               </div>
               <div>
-                <label htmlFor="globalResQs" className="block text-xs font-medium text-[var(--text-secondary)] mb-0.5">Questions (Opt.):</label>
-                <input type="number" id="globalResQs" value={questionCount || ''} onChange={(e) => setQuestionCount(parseInt(e.target.value) || undefined)}
-                  className="input-base text-sm" min="0" />
+                <label htmlFor="globalResEndPage" className="block text-xs font-medium text-[var(--text-secondary)] mb-0.5">End Pg (Opt.):</label>
+                <input type="number" id="globalResEndPage" value={endPage || ''} onChange={(e) => setEndPage(parseInt(e.target.value) || undefined)} className="input-base text-sm" min="0"/>
               </div>
+              <div>
+                  <label htmlFor="globalResPages" className="block text-xs font-medium text-[var(--text-secondary)] mb-0.5">Total Pgs (Opt.):</label>
+                  <input type="number" id="globalResPages" value={pages || ''} onChange={(e) => setPages(parseInt(e.target.value) || undefined)}
+                    className="input-base text-sm" min="0" disabled={startPage !== undefined && endPage !== undefined} />
+              </div>
+            </div>
+
+            <div>
+              <label htmlFor="globalResQs" className="block text-xs font-medium text-[var(--text-secondary)] mb-0.5">Questions (Opt.):</label>
+              <input type="number" id="globalResQs" value={questionCount || ''} onChange={(e) => setQuestionCount(parseInt(e.target.value) || undefined)} className="input-base text-sm" min="0"/>
             </div>
             
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

@@ -52,16 +52,18 @@ const splitTask = (task: StudyResource, timeToFill: number): { part1: StudyResou
 
     const ratio = timeToFill / task.durationMinutes;
     const originalId = task.originalResourceId || task.id;
-
     const currentPartNumber = task.partNumber || 1;
     const totalParts = task.totalParts || Math.ceil(task.durationMinutes / MIN_DURATION_for_SPLIT_PART);
+    
+    const part1Pages = task.pages ? Math.round(task.pages * ratio) : undefined;
+    const part1Questions = task.questionCount ? Math.round(task.questionCount * ratio) : undefined;
 
     const part1: StudyResource = {
         ...task,
         id: `${originalId}_part_${Date.now()}`,
         durationMinutes: timeToFill,
-        pages: task.pages ? Math.ceil(task.pages * ratio) : undefined,
-        questionCount: task.questionCount ? Math.ceil(task.questionCount * ratio) : undefined,
+        pages: part1Pages,
+        questionCount: part1Questions,
         isSplitSource: true,
         originalResourceId: originalId,
         partNumber: currentPartNumber,
@@ -72,13 +74,18 @@ const splitTask = (task: StudyResource, timeToFill: number): { part1: StudyResou
         ...task,
         id: task.id,
         durationMinutes: task.durationMinutes - timeToFill,
-        pages: task.pages ? task.pages - (part1.pages || 0) : undefined,
-        questionCount: task.questionCount ? task.questionCount - (part1.questionCount || 0) : undefined,
+        pages: (task.pages && part1Pages) ? task.pages - part1Pages : undefined,
+        questionCount: (task.questionCount && part1Questions) ? task.questionCount - part1Questions : undefined,
         isSplitSource: true,
         originalResourceId: originalId,
         partNumber: currentPartNumber + 1,
         totalParts: totalParts,
     };
+    
+    if (task.startPage && task.pages && part1.pages && part1.pages > 0) {
+        part1.endPage = task.startPage + part1.pages - 1;
+        part2.startPage = part1.endPage + 1;
+    }
 
     return { part1, part2 };
 };
