@@ -137,7 +137,7 @@ const MasterResourcePoolViewer: React.FC<MasterResourcePoolViewerProps> = ({
         </div>
       </div>
       
-      {unscheduledResources.length > 0 && (
+      {unscheduledResources.length > 0 && !showArchived && (
         <div className="flex-shrink-0 my-4 p-3 rounded-lg glass-panel bg-red-900/20 border border-red-700/50">
           <button onClick={() => setIsSummaryExpanded(!isSummaryExpanded)} className="w-full flex justify-between items-center text-left">
             <h3 className="text-md font-semibold text-red-200">
@@ -168,7 +168,7 @@ const MasterResourcePoolViewer: React.FC<MasterResourcePoolViewerProps> = ({
         </div>
       )}
 
-      <div className="flex-grow overflow-y-auto pr-2 -mr-2 mt-4 space-y-2 isolated-scroll" onMouseLeave={onClearHighlights}>
+      <div className="mt-4 space-y-2" onMouseLeave={onClearHighlights}>
         {filteredAndSortedResources.map((resource) => (
           <div key={resource.id} 
                className={`p-2 rounded-lg transition-colors duration-150 glass-panel interactive-glow-border ${resource.isArchived ? 'bg-black/50 opacity-60' : ''}`}

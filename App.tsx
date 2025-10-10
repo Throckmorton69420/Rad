@@ -249,14 +249,10 @@ const App: React.FC = () => {
       };
       window.addEventListener('afterprint', handleAfterPrint);
       
-      // Delay printing slightly to ensure content is rendered
-      setTimeout(() => {
+      // Use requestAnimationFrame to ensure DOM is updated before printing
+      requestAnimationFrame(() => {
         window.print();
-        // Fallback for browsers that don't support afterprint
-        setTimeout(() => {
-          handleAfterPrint();
-        }, 500);
-      }, 250); // FIX: Increased timeout to 250ms to prevent race condition
+      });
     }
   }, [printableContent]);
 
@@ -486,11 +482,9 @@ const App: React.FC = () => {
                 scheduleSubset = studyPlan.schedule.filter(day => day.date >= (startDate || '0') && day.date <= (endDate || 'Z'));
                 break;
             case 'currentDay':
-                // FIX: Changed undefined variable 'currentDate' to 'selectedDate'.
                 scheduleSubset = studyPlan.schedule.filter(day => day.date === selectedDate);
                 break;
             case 'currentWeek':
-                // FIX: Changed undefined variable 'currentDate' to 'selectedDate'.
                 const date = parseDateString(selectedDate);
                 const dayOfWeek = date.getUTCDay();
                 const firstDayOfWeek = new Date(date);
@@ -537,7 +531,6 @@ const App: React.FC = () => {
     }
 
     setPrintableContent(reportComponent);
-    // FIX: Changed undefined variable 'currentDate' to 'selectedDate' in the dependency array.
   }, [studyPlan, globalMasterResourcePool, scheduledResourceIds, selectedDate]);
 
 
@@ -657,7 +650,7 @@ const App: React.FC = () => {
                         {isLoading && <div className="flex flex-col items-center justify-center p-10"> <i className="fas fa-spinner fa-spin fa-2x text-[var(--accent-purple)] mb-3"></i> <span className="text-[var(--text-primary)]">Loading...</span> </div>}
                         
                         {!isLoading && activeTab === 'schedule' && (
-                          <div className="flex-grow">
+                          <div>
                               {selectedDaySchedule ?
                                 <DailyTaskList 
                                     dailySchedule={selectedDaySchedule} 

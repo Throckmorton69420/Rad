@@ -50,29 +50,47 @@ const DailyTaskList: React.FC<DailyTaskListProps> = ({
 
   const groupedAndSortedTasks = useMemo(() => {
     const sortedTasks = [...tasks].sort((a, b) => a.order - b.order);
+    
+    const groups: Record<string, ScheduledTask[]> = {};
+    const singleTasks: ScheduledTask[] = [];
+
+    // First, categorize all tasks by source or as single items
+    sortedTasks.forEach(task => {
+        const source = task.bookSource || task.videoSource;
+        if (source) {
+            if (!groups[source]) groups[source] = [];
+            groups[source].push(task);
+        } else {
+            singleTasks.push(task);
+        }
+    });
+
+    // Now, build the final render list from the categorized tasks
     const result: (ScheduledTask | { isGroup: true; id: string; source: string; tasks: ScheduledTask[] })[] = [];
-    let i = 0;
-    while (i < sortedTasks.length) {
-      const task = sortedTasks[i];
-      const source = task.bookSource || task.videoSource;
-      if (source) {
-        let group: ScheduledTask[] = [task];
-        let j = i + 1;
-        while (j < sortedTasks.length && (sortedTasks[j].bookSource || sortedTasks[j].videoSource) === source) {
-          group.push(sortedTasks[j]);
-          j++;
+    
+    Object.entries(groups).forEach(([source, groupTasks]) => {
+        if (groupTasks.length >= 3) {
+            // This source has enough items to be a collapsible group
+            result.push({ isGroup: true, id: `${date}-${source}`, source, tasks: groupTasks });
+        } else {
+            // Not enough items, so add them as individual tasks
+            result.push(...groupTasks);
         }
-        if (group.length >= 3) {
-          result.push({ isGroup: true, id: `${date}-${source}`, source, tasks: group });
-          i = j;
-          continue;
-        }
-      }
-      result.push(task);
-      i++;
-    }
+    });
+    
+    // Add tasks that didn't have a source
+    result.push(...singleTasks);
+
+    // Finally, sort the combined list of groups and single tasks by their original order
+    result.sort((a, b) => {
+        const orderA = 'isGroup' in a ? a.tasks[0].order : a.order;
+        const orderB = 'isGroup' in b ? b.tasks[0].order : b.order;
+        return orderA - orderB;
+    });
+
     return result;
   }, [tasks, date]);
+
 
   return (
     <div className="relative flex flex-col">
@@ -110,8 +128,8 @@ const DailyTaskList: React.FC<DailyTaskListProps> = ({
         </div>
       </div>
       
-      <div className="flex-grow">
-        <div className="flex-grow min-h-[200px] transition-colors p-1 rounded-lg pb-32">
+      <div>
+        <div className="min-h-[200px] transition-colors p-1 rounded-lg pb-32">
           {isRestDay ? (
             <div className="h-full flex flex-col justify-center items-center text-center p-6 glass-panel rounded-lg">
               <i className="fas fa-coffee fa-2x text-[var(--text-secondary)] mb-3"></i>
