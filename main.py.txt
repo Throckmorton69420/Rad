@@ -28,7 +28,7 @@ def solve_schedule(run_id: str):
     """
     try:
         app.logger.info(f"[{run_id}] Solver process started.")
-        supabase.table("runs").update({"status": "SOLVING"}).eq("id", run_id).execute()
+        supabase.table("runs").update({"status": "SOLVING", "progress": 5}).eq("id", run_id).execute()
 
         # 1. Fetch all necessary data from Supabase
         run_data_req = supabase.table("runs").select("start_date, end_date").eq("id", run_id).single().execute()
@@ -50,6 +50,8 @@ def solve_schedule(run_id: str):
         except Exception as user_data_error:
             app.logger.warning(f"[{run_id}] Could not fetch or parse user_data for exceptions, continuing without them. Error: {user_data_error}")
             exception_dates = []
+        
+        supabase.table("runs").update({"progress": 15}).eq("id", run_id).execute()
 
 
         # --- CP-SAT MODEL CONSTRUCTION ---
@@ -95,6 +97,8 @@ def solve_schedule(run_id: str):
             priority_map.get(task['resource'].get('schedulingPriority', 'medium'), 100) * sum(task['days'])
             for task in tasks.values()
         ))
+        
+        supabase.table("runs").update({"progress": 25}).eq("id", run_id).execute()
 
         # --- SOLVER EXECUTION ---
         app.logger.info(f"[{run_id}] Starting solver...")
@@ -102,6 +106,8 @@ def solve_schedule(run_id: str):
         solver.parameters.max_time_in_seconds = 840 # 14 minutes
         solver.parameters.num_search_workers = 8 # Use multiple cores
         status = solver.Solve(model)
+        
+        supabase.table("runs").update({"progress": 85}).eq("id", run_id).execute()
         
         # --- PROCESS AND SAVE RESULTS ---
         app.logger.info(f"[{run_id}] Solver finished with status: {solver.StatusName(status)}")
@@ -143,7 +149,9 @@ def solve_schedule(run_id: str):
                 supabase.table("schedule_slots").delete().eq('run_id', run_id).execute()
                 supabase.table("schedule_slots").insert(schedule_slots).execute()
             
-            supabase.table("runs").update({"status": "COMPLETE"}).eq("id", run_id).execute()
+            supabase.table("runs").update({"progress": 95}).eq("id", run_id).execute()
+
+            supabase.table("runs").update({"status": "COMPLETE", "progress": 100}).eq("id", run_id).execute()
             app.logger.info(f"[{run_id}] Run marked as COMPLETE.")
         else:
             raise Exception(f"Solver could not find a solution. Status: {solver.StatusName(status)}")
@@ -151,12 +159,13 @@ def solve_schedule(run_id: str):
     except Exception as e:
         error_trace = traceback.format_exc()
         app.logger.error(f"CRITICAL ERROR during solve for run_id {run_id}: {e}\n{error_trace}")
-        supabase.table("runs").update({"status": "FAILED", "error_text": f"Error: {str(e)}\nTrace: {error_trace}"}).eq("id", run_id).execute()
+        supabase.table("runs").update({"status": "FAILED", "progress": -1, "error_text": f"Error: {str(e)}\nTrace: {error_trace}"}).eq("id", run_id).execute()
 
 
 # --- API Endpoints ---
 @app.route("/internal/run-solver", methods=["POST"])
 def run_solver_endpoint():
+    # Authentication is handled by Cloud Run's IAM ingress controls with OIDC
     data = request.get_json()
     run_id = data.get("run_id")
     if not run_id:
