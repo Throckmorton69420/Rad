@@ -364,11 +364,46 @@ const runSchedulingEngine = (
         }
     }
 
-    if (tasksToSchedule.length > 0) {
-        const remainingTime = tasksToSchedule.reduce((acc, task) => acc + task.durationMinutes, 0);
+    // This captures tasks that were in the queue but couldn't be placed.
+    const unscheduledPrimary = tasksToSchedule;
+    // The optionalTasks array has had items spliced out of it, so what remains is unscheduled.
+    const unscheduledOptional = optionalTasks;
+
+    if (unscheduledPrimary.length > 0 || unscheduledOptional.length > 0) {
+        const primaryTime = unscheduledPrimary.reduce((acc, task) => acc + task.durationMinutes, 0);
+        const optionalTime = unscheduledOptional.reduce((acc, task) => acc + task.durationMinutes, 0);
+
+        let message = '';
+        // FIX: The notification type should be 'error' if primary content is unscheduled, as this is a critical planning failure.
+        let notifType: 'error' | 'warning' | 'info' = 'info';
+
+        if (unscheduledPrimary.length > 0) {
+            notifType = 'error';
+            message += `Could not fit all primary content. ${unscheduledPrimary.length} tasks (~${formatDuration(primaryTime)}) remain unscheduled.\n\n`;
+            message += "Primary Items Left:\n";
+            message += unscheduledPrimary.slice(0, 10).map(task => `• ${task.title} [${formatDuration(task.durationMinutes)}]`).join('\n');
+            if (unscheduledPrimary.length > 10) {
+                message += `\n...and ${unscheduledPrimary.length - 10} more.`;
+            }
+            message += `\n\n`;
+        }
+
+        if (unscheduledOptional.length > 0) {
+            if (notifType === 'info') notifType = 'warning';
+            message += `Could not fit all optional content. ${unscheduledOptional.length} tasks (~${formatDuration(optionalTime)}) remain unscheduled.\n\n`;
+            message += "Optional Items Left:\n";
+            message += unscheduledOptional.slice(0, 10).map(task => `• ${task.title} [${formatDuration(task.durationMinutes)}]`).join('\n');
+            if (unscheduledOptional.length > 10) {
+                message += `\n...and ${unscheduledOptional.length - 10} more.`;
+            }
+            message += `\n\n`;
+        }
+
+        message += 'To fit more content, consider extending your study period, adding study time on specific days, or adjusting content deadlines.';
+
         notifications.push({
-            type: 'warning',
-            message: `Could not fit all primary content. ${tasksToSchedule.length} tasks (~${formatDuration(remainingTime)}) remain. Please extend your end date or increase daily study time.`
+            type: notifType,
+            message: message.trim()
         });
     }
 

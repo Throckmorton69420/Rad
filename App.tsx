@@ -599,7 +599,7 @@ const App: React.FC = () => {
                   backgroundColor: `color-mix(in srgb, var(--notification-color) 25%, var(--glass-bg-chrome))`,
                 } as React.CSSProperties}
             >
-              <span className="text-left"><i className={`fas ${systemNotification.type === 'error' ? 'fa-exclamation-circle' : 'fa-info-circle'} mr-2`}></i>{systemNotification.message}</span>
+              <span className="text-left whitespace-pre-wrap"><i className={`fas ${systemNotification.type === 'error' ? 'fa-exclamation-circle' : 'fa-info-circle'} mr-2`}></i>{systemNotification.message}</span>
               <button onClick={() => setSystemNotification(null)} className="ml-4 font-bold text-xl leading-none" aria-label="Dismiss notification">&times;</button>
             </div>
           )}
