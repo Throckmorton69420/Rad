@@ -18,7 +18,7 @@ interface MasterResourcePoolViewerProps {
   onClearHighlights: () => void;
 }
 
-type SortKey = 'title' | 'domain' | 'type' | 'durationMinutes' | 'sequenceOrder' | 'status' | 'source';
+type SortKey = 'title' | 'domain' | 'type' | 'durationMinutes' | 'sequenceOrder' | 'isScheduled' | 'source';
 type SortConfig = { key: SortKey; direction: 'ascending' | 'descending'; };
 
 const MasterResourcePoolViewer: React.FC<MasterResourcePoolViewerProps> = ({ 
