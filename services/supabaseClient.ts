@@ -30,17 +30,17 @@ export interface Database {
         Row: { // The data shape of a row
           id: number;
           created_at: string;
-          // FIX: Changed type to 'any' to resolve 'never' type inference issue in Supabase client.
-          plan_data: any;
+          // FIX: Changed type to 'PlanDataBlob' to resolve 'never' type inference issue in Supabase client.
+          plan_data: PlanDataBlob;
         };
         Insert: { // The data shape for inserting a new row
           id: number;
-          // FIX: Changed type to 'any' to resolve 'never' type inference issue in Supabase client.
-          plan_data: any;
+          // FIX: Changed type to 'PlanDataBlob' to resolve 'never' type inference issue in Supabase client.
+          plan_data: PlanDataBlob;
         };
         Update: { // The data shape for updating a row
-          // FIX: Changed type to 'any' to resolve 'never' type inference issue in Supabase client.
-          plan_data?: any;
+          // FIX: Changed type to 'PlanDataBlob' to resolve 'never' type inference issue in Supabase client.
+          plan_data?: PlanDataBlob;
         };
       };
       // As per the user spec, these tables are required for the solver orchestration

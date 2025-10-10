@@ -45,7 +45,8 @@ interface SidebarContentProps {
     navigatePeriod: (direction: 'next' | 'prev', viewMode: 'Weekly' | 'Monthly') => void;
     highlightedDates: string[];
     todayInNewYork: string;
-    handleRebalance: (options: RebalanceOptions, planToUse?: StudyPlan) => void;
+    // FIX: Updated signature to reflect that handleRebalance takes no arguments.
+    handleRebalance: () => void;
     isLoading: boolean;
     handleToggleCramMode: (isActive: boolean) => void;
     handleUpdateDeadlines: (newDeadlines: DeadlineSettings) => void;
@@ -111,7 +112,8 @@ const SidebarContent = React.memo(({
                     </div>
                     
                     <AdvancedControls
-                        onRebalance={(options) => { handleRebalance(options); if(options.type === 'topic-time') setSelectedDate(options.date); }} 
+                        // FIX: Changed call to handleRebalance to pass no arguments to match its definition.
+                        onRebalance={(options) => { handleRebalance(); if(options.type === 'topic-time') setSelectedDate(options.date); }} 
                         isLoading={isLoading} 
                         selectedDate={selectedDate} 
                         isCramModeActive={studyPlan.isCramModeActive ?? false}
@@ -395,7 +397,8 @@ const App: React.FC = () => {
   const onDayTasksSave = useCallback((updatedTasks: ScheduledTask[]) => {
     handleSaveModifiedDayTasks(updatedTasks, selectedDate);
     closeModal('isModifyDayTasksModalOpen');
-    setTimeout(() => handleRebalance({ type: 'standard' }), 100);
+    // FIX: Changed call to handleRebalance to not pass an argument, matching the function's definition.
+    setTimeout(() => handleRebalance(), 100);
   }, [handleSaveModifiedDayTasks, selectedDate, closeModal, handleRebalance]);
   
   const handlePomodoroSessionComplete = useCallback((sessionType: 'study' | 'rest', durationMinutes: number) => {
@@ -445,8 +448,8 @@ const App: React.FC = () => {
     updatePreviousStudyPlan(studyPlan);
     const updatedPlan = { ...studyPlan, deadlines: newDeadlines };
     setStudyPlan(updatedPlan);
-    // FIX: Removed second argument from handleRebalance call to match its definition.
-    handleRebalance({ type: 'standard' });
+    // FIX: Removed argument from handleRebalance call to match its definition which expects zero arguments.
+    handleRebalance();
   }, [studyPlan, updatePreviousStudyPlan, setStudyPlan, handleRebalance]);
 
   const scheduledResourceIds = useMemo(() => {
