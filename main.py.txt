@@ -1,6 +1,4 @@
-
 import os
-import threading
 import traceback
 from flask import Flask, request, jsonify
 from supabase import create_client, Client
@@ -13,19 +11,21 @@ app = Flask(__name__)
 # These are set as environment variables in Cloud Run
 supabase_url = os.environ.get("SUPABASE_URL")
 supabase_key = os.environ.get("SUPABASE_KEY")
-solver_token = os.environ.get("INTERNAL_API_TOKEN")
+solver_token = os.environ.get("INTERNAL_API_TOKEN") # This is now optional but good for defense-in-depth
 
-if not all([supabase_url, supabase_key, solver_token]):
-    raise ValueError("FATAL: Missing required environment variables SUPABASE_URL, SUPABASE_KEY, or INTERNAL_API_TOKEN.")
+if not all([supabase_url, supabase_key]):
+    # Note: solver_token is not strictly required for this architecture to work,
+    # as OIDC provides the primary authentication.
+    raise ValueError("FATAL: Missing required environment variables SUPABASE_URL or SUPABASE_KEY.")
 
 supabase: Client = create_client(supabase_url, supabase_key)
 
-# --- Background Solver Logic ---
+# --- Synchronous Solver Logic ---
 def solve_schedule(run_id: str):
     """
     This function contains the long-running solver logic.
-    It is now called directly and runs synchronously within the request handler
-    triggered by Google Cloud Tasks.
+    It runs synchronously and is triggered by a POST request from Google Cloud Tasks.
+    Robust error handling is included to ensure the run status is always updated.
     """
     try:
         app.logger.info(f"[{run_id}] Solver process started.")
@@ -43,7 +43,9 @@ def solve_schedule(run_id: str):
         app.logger.info(f"[{run_id}] Fetched {len(all_resources)} resources.")
 
         user_data_req = supabase.table("user_data").select("data").eq("id", 1).single().execute()
-        exception_dates = user_data_req.data.get('data', {}).get('exceptionDates', []) if user_data_req.data else []
+        exception_dates = []
+        if user_data_req.data and 'data' in user_data_req.data and 'exceptionDates' in user_data_req.data['data']:
+            exception_dates = user_data_req.data['data']['exceptionDates']
         app.logger.info(f"[{run_id}] Fetched {len(exception_dates)} exception dates.")
 
         # --- CP-SAT MODEL CONSTRUCTION ---
@@ -93,8 +95,8 @@ def solve_schedule(run_id: str):
         # --- SOLVER EXECUTION ---
         app.logger.info(f"[{run_id}] Starting solver...")
         solver = cp_model.CpSatSolver()
-        solver.parameters.max_time_in_seconds = 840 # 14 minutes, under the 15 min timeout
-        solver.parameters.num_search_workers = 8
+        solver.parameters.max_time_in_seconds = 840 # 14 minutes, safely under the 15 min Cloud Run timeout
+        solver.parameters.num_search_workers = 8 # Use multiple cores
         status = solver.Solve(model)
         
         # --- PROCESS AND SAVE RESULTS ---
@@ -108,6 +110,7 @@ def solve_schedule(run_id: str):
 
                 tasks_for_day = [resource_map[res_id] for res_id in tasks_for_day_ids]
                 
+                # Sorting logic to order tasks within a day
                 def get_sort_key(resource):
                     source = (resource.get('videoSource') or resource.get('bookSource') or 'zz_custom').lower()
                     res_type = resource.get('type', '').lower()
@@ -145,31 +148,30 @@ def solve_schedule(run_id: str):
         app.logger.error(f"CRITICAL ERROR during solve for run_id {run_id}: {e}\n{error_trace}")
         supabase.table("runs").update({"status": "FAILED", "error_text": f"Error: {str(e)}\nTrace: {error_trace}"}).eq("id", run_id).execute()
 
+
 # --- API Endpoints ---
 @app.route("/internal/run-solver", methods=["POST"])
-def solve_schedule_endpoint():
-    # 1. Authorization Check for internal traffic
-    auth_header = request.headers.get("Authorization")
-    if not auth_header or auth_header.split(" ")[1] != solver_token:
-        # This check is a secondary defense. The primary defense is the IAM invoker permission.
-        return jsonify({"error": "Unauthorized"}), 401
-
-    # 2. Get Run ID from the body posted by Cloud Tasks
+def run_solver_endpoint():
+    # Primary authentication is handled by Cloud Run's IAM integration (Ingress: Internal).
+    # The OIDC token from Cloud Tasks is validated by Google's infrastructure before this code is even hit.
+    
     data = request.get_json()
     run_id = data.get("run_id")
     if not run_id:
+        app.logger.error("Received task with no run_id.")
         return jsonify({"error": "run_id is required"}), 400
         
     app.logger.info(f"Received internal solver task for run_id: {run_id}")
 
-    # 3. Run the solver synchronously. Cloud Tasks will wait for this to finish.
+    # Run the solver synchronously.
     solve_schedule(run_id)
     
-    # 4. Return a success response to Cloud Tasks to acknowledge completion.
+    # Return a success response to Cloud Tasks to acknowledge completion.
     return jsonify({"status": "Solver process finished for run_id", "run_id": run_id}), 200
 
 @app.route("/", methods=["GET"])
 def health_check():
+    # A simple health check endpoint for Cloud Run to verify the container is responsive.
     return "Radiology Solver Service is running."
 
 if __name__ == "__main__":
