@@ -133,7 +133,6 @@ const createQBankChunks = (
 // Corrected Chapter to Domain mapping for Core Radiology
 const coreRadiologyChapterMap: Record<number, Domain> = {
     1: Domain.THORACIC_IMAGING, 2: Domain.GASTROINTESTINAL_IMAGING, 3: Domain.GENITOURINARY_IMAGING,
-    // FIX: Mapped chapter 4 (Obstetrics) to GENITOURINARY_IMAGING as OBSTETRIC_IMAGING does not exist in the Domain enum.
     4: Domain.GENITOURINARY_IMAGING, 5: Domain.CARDIOVASCULAR_IMAGING, 6: Domain.INTERVENTIONAL_RADIOLOGY,
     7: Domain.NEURORADIOLOGY, 8: Domain.NEURORADIOLOGY, 9: Domain.NEURORADIOLOGY,
     10: Domain.MUSCULOSKELETAL_IMAGING, 11: Domain.PEDIATRIC_RADIOLOGY, 12: Domain.PHYSICS,

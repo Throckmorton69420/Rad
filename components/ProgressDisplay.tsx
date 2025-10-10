@@ -10,7 +10,6 @@ interface ProgressDisplayProps {
 const ProgressDisplay: React.FC<ProgressDisplayProps> = ({ studyPlan }) => {
   const { progressPerDomain } = studyPlan;
 
-  // FIX: Add explicit types for 'domain' parameter in reduce callbacks to avoid it being inferred as 'unknown'.
   const totalCompletedMinutes = Object.values(progressPerDomain).reduce((acc, domain: { completedMinutes: number; } | undefined) => acc + (domain?.completedMinutes || 0), 0);
   const totalMinutes = Object.values(progressPerDomain).reduce((acc, domain: { totalMinutes: number; } | undefined) => acc + (domain?.totalMinutes || 0), 0);
   const overallProgress = totalMinutes > 0 ? (totalCompletedMinutes / totalMinutes) * 100 : 0;
@@ -34,7 +33,6 @@ const ProgressDisplay: React.FC<ProgressDisplayProps> = ({ studyPlan }) => {
         <div className="space-y-4">
           {Object.entries(progressPerDomain)
             .sort(([domainA], [domainB]) => domainA.localeCompare(domainB))
-            // FIX: Add explicit type for 'progress' parameter in map callback to avoid it being inferred as 'unknown'.
             .map(([domain, progress]: [string, { completedMinutes: number; totalMinutes: number; } | undefined]) => {
             if (!progress || progress.totalMinutes === 0) return null;
             const percentage = (progress.completedMinutes / progress.totalMinutes) * 100;
