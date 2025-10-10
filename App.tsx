@@ -32,6 +32,8 @@ import PrintModal from './components/PrintModal';
 import ProgressReport from './components/ProgressReport';
 import ContentReport from './components/ContentReport';
 import { formatDuration, getTodayInNewYork, parseDateString } from './utils/timeFormatter';
+import LoadingOverlay from './components/LoadingOverlay';
+
 
 interface SidebarContentProps {
   isSidebarOpen: boolean;
@@ -45,6 +47,7 @@ durationMinutes: number) => void;
   currentPomodoroTask: ScheduledTask | null;
   studyPlan: StudyPlan;
   selectedDate: string;
+  // FIX: Corrected the type for setSelectedDate to accept a string, matching the state it modifies.
   setSelectedDate: React.Dispatch<React.SetStateAction<string>>;
   isMobile: boolean;
   navigatePeriod: (direction: 'next' | 'prev', viewMode: 'Weekly' | 'Monthly')
@@ -185,6 +188,7 @@ const App: React.FC = () => {
     studyPlan, setStudyPlan, previousStudyPlan,
     globalMasterResourcePool, setGlobalMasterResourcePool,
     isLoading, systemNotification, setSystemNotification, isNewUser,
+    progress, progressMessage,
     loadSchedule, handleRebalance, handleUpdatePlanDates, handleUpdateTopicOrderAndRebalance, handleUpdateCramTopicOrderAndRebalance,
     handleToggleCramMode,
     handleToggleSpecialTopicsInterleaving,
@@ -218,8 +222,12 @@ const App: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    loadSchedule();
-  }, [loadSchedule]);
+    // Initial load is now handled by the hook which sets an initial state.
+    // If studyPlan is null, the component will show the loading state.
+    if (!studyPlan) {
+      loadSchedule();
+    }
+  }, [loadSchedule, studyPlan]);
 
   useEffect(() => {
     if (isNewUser) {
@@ -508,18 +516,22 @@ const App: React.FC = () => {
   
   if (!studyPlan) {
     return (
-      <div className="flex items-center justify-center h-dvh bg-black text-white">
-        <div className="text-center">
-          <i className="fas fa-spinner fa-spin fa-3x mb-4"></i>
-          <p>{systemNotification?.message || (isLoading ? 'Loading...' : 'Generating initial schedule...')}</p>
-        </div>
-      </div>
+      <LoadingOverlay 
+        progress={progress}
+        message={progressMessage || 'Preparing your study plan...'} 
+      />
     );
   }
 
   return (
     <>
-      <div className={`app-container ${isPrinting ? 'is-printing' : ''}`}>
+      {isLoading && (
+        <LoadingOverlay 
+          progress={progress}
+          message={progressMessage || 'Updating schedule...'} 
+        />
+      )}
+      <div className={`app-container ${isPrinting ? 'is-printing' : ''} ${isLoading ? 'blur-sm pointer-events-none transition-filter duration-300' : ''}`}>
         <div className={`sidebar-container ${isSidebarOpen ? 'open' : ''}`}>
            <SidebarContent
              isSidebarOpen={isSidebarOpen} setIsSidebarOpen={setIsSidebarOpen}

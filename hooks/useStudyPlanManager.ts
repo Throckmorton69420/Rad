@@ -7,8 +7,8 @@ import { usePersistentState } from './usePersistentState';
 import { supabase } from '../services/supabaseClient';
 import { STUDY_START_DATE, STUDY_END_DATE, DEFAULT_TOPIC_ORDER, DEFAULT_DAILY_STUDY_MINS } from '../constants';
 
-const POLLING_INTERVAL = 5000; // 5 seconds
-const MAX_POLLING_ATTEMPTS = 60; // 5 minutes max
+const POLLING_INTERVAL = 3000; // Poll every 3 seconds
+const MAX_POLLING_ATTEMPTS = 120; // Max wait time of 6 minutes
 
 const transformSolverSlotsToSchedule = (
     slots: ScheduleSlot[],
@@ -78,32 +78,173 @@ export const useStudyPlanManager = (showConfirmation: (options: ShowConfirmation
     const [previousStudyPlan, setPreviousStudyPlan] = useState<StudyPlan | null>(null);
     const [globalMasterResourcePool, setGlobalMasterResourcePool] = usePersistentState<StudyResource[]>('radiology_master_resources', []);
     const [exceptionDates, setExceptionDates] = usePersistentState<ExceptionDateRule[]>('radiology_exception_dates', []);
-    const [isLoading, setIsLoading] = useState(true);
+    const [isLoading, setIsLoading] = useState(false);
     const [systemNotification, setSystemNotification] = useState<{ type: 'info' | 'error', message: string } | null>(null);
     const [isNewUser, setIsNewUser] = useState(false);
+    const [progress, setProgress] = useState(0);
+    const [progressMessage, setProgressMessage] = useState('');
+
     const pollingRef = useRef<number | null>(null);
+    const progressIntervalRef = useRef<number | null>(null);
     const pollingAttemptsRef = useRef(0);
 
     const updatePreviousStudyPlan = useCallback((plan: StudyPlan) => {
         setPreviousStudyPlan(JSON.parse(JSON.stringify(plan)));
     }, []);
 
-    const saveDataToCloud = useCallback(async (plan: StudyPlan, resources: StudyResource[], exceptions: ExceptionDateRule[]) => {
-        const dataBlob: PlanDataBlob = { plan, resources, exceptions };
-        const { error } = await supabase.from('user_data').upsert({ id: 1, data: dataBlob }, { onConflict: 'id' });
-        if (error) {
-            setSystemNotification({ type: 'error', message: `Cloud sync failed: ${error.message}` });
+    const stopProgressSimulation = useCallback(() => {
+        if (progressIntervalRef.current) {
+            clearInterval(progressIntervalRef.current);
+            progressIntervalRef.current = null;
         }
     }, []);
 
-    const handleUndo = useCallback(() => {
-        if (previousStudyPlan) {
-            setStudyPlan(previousStudyPlan);
-            setPreviousStudyPlan(null);
-            setSystemNotification({ type: 'info', message: 'Last change undone.' });
-        }
-    }, [previousStudyPlan, setStudyPlan]);
+    const startProgressSimulation = useCallback(() => {
+        stopProgressSimulation();
+        setProgress(0);
+        let elapsed = 0;
+        const totalDuration = 5 * 60 * 1000; // 5 minutes simulation
+        const interval = 100; // ms
 
+        progressIntervalRef.current = window.setInterval(() => {
+            elapsed += interval;
+            
+            let currentProgress = 0;
+            if (elapsed < 5000) {
+                setProgressMessage('Analyzing resources and constraints...');
+                currentProgress = (elapsed / 5000) * 20;
+            } else if (elapsed < totalDuration * 0.5) {
+                setProgressMessage('Optimizing daily tasks across the timeline...');
+                const phaseDuration = totalDuration * 0.5 - 5000;
+                const phaseElapsed = elapsed - 5000;
+                currentProgress = 20 + (phaseElapsed / phaseDuration) * 50;
+            } else if (elapsed < totalDuration) {
+                setProgressMessage('Finalizing schedule... almost there!');
+                const phaseDuration = totalDuration * 0.5;
+                const phaseElapsed = elapsed - totalDuration * 0.5;
+                currentProgress = 70 + (phaseElapsed / phaseDuration) * 25;
+            } else {
+                setProgressMessage('Still working... The solver is handling a complex schedule.');
+                currentProgress = 95;
+            }
+
+            setProgress(Math.min(95, currentProgress));
+        }, interval);
+    }, [stopProgressSimulation]);
+
+
+    const pollRunStatus = useCallback(async (run_id: string, resources: StudyResource[], exceptions: ExceptionDateRule[], startDate: string, endDate: string) => {
+        if (pollingAttemptsRef.current >= MAX_POLLING_ATTEMPTS) {
+            setSystemNotification({ type: 'error', message: 'Solver timed out. The server is taking too long to respond. Please try again later.' });
+            setIsLoading(false);
+            if(pollingRef.current) clearInterval(pollingRef.current);
+            stopProgressSimulation();
+            return;
+        }
+        pollingAttemptsRef.current++;
+
+        try {
+            const res = await fetch(`/api/runs/${run_id}`);
+            if (!res.ok) throw new Error(`Server returned status ${res.status}`);
+            
+            const data = await res.json();
+            
+            if (data.status === 'COMPLETE') {
+                if (pollingRef.current) clearInterval(pollingRef.current);
+                stopProgressSimulation();
+                setProgress(100);
+                setProgressMessage('Schedule complete! Loading...');
+                
+                const newSchedule = transformSolverSlotsToSchedule(data.slots, resources, startDate, endDate, exceptions);
+                
+                setTimeout(() => {
+                    setStudyPlan(plan => ({
+                        ...(plan || {
+                            startDate,
+                            endDate,
+                            progressPerDomain: {},
+                            topicOrder: DEFAULT_TOPIC_ORDER,
+                            cramTopicOrder: [],
+                            deadlines: {},
+                            areSpecialTopicsInterleaved: true,
+                        }),
+                        schedule: newSchedule,
+                    }));
+                    setSystemNotification({ type: 'info', message: 'New schedule generated successfully!' });
+                    setIsLoading(false);
+                }, 500);
+            } else if (data.status === 'FAILED') {
+                if(pollingRef.current) clearInterval(pollingRef.current);
+                stopProgressSimulation();
+                setSystemNotification({ type: 'error', message: `Solver failed: ${data.error_text || 'An unknown error occurred.'}` });
+                setIsLoading(false);
+            }
+        } catch (error: any) {
+            if(pollingRef.current) clearInterval(pollingRef.current);
+            stopProgressSimulation();
+            setSystemNotification({ type: 'error', message: `Error checking status: ${error.message}` });
+            setIsLoading(false);
+        }
+    }, [setStudyPlan, stopProgressSimulation]);
+
+    const triggerSolver = useCallback(async (isInitialGeneration: boolean, startDate: string, endDate: string) => {
+        setIsLoading(true);
+        startProgressSimulation();
+        if (pollingRef.current) clearInterval(pollingRef.current);
+        pollingAttemptsRef.current = 0;
+
+        try {
+            const res = await fetch('/api/solve', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ startDate, endDate })
+            });
+
+            if (!res.ok) throw new Error(`Server responded with ${res.status}`);
+            
+            const { run_id } = await res.json();
+            setProgressMessage(`Solver initiated (ID: ${run_id.slice(0,8)})... This may take several minutes.`);
+            pollingRef.current = window.setInterval(() => pollRunStatus(run_id, globalMasterResourcePool, exceptionDates, startDate, endDate), POLLING_INTERVAL);
+        } catch (error: any) {
+            setSystemNotification({ type: 'error', message: `Failed to start solver: ${error.message}` });
+            setIsLoading(false);
+            stopProgressSimulation();
+        }
+    }, [globalMasterResourcePool, exceptionDates, pollRunStatus, startProgressSimulation, stopProgressSimulation]);
+
+
+    const loadSchedule = useCallback(async (regenerate = false) => {
+        setIsLoading(true);
+        if(regenerate) {
+            triggerSolver(true, studyPlan?.startDate || STUDY_START_DATE, studyPlan?.endDate || STUDY_END_DATE);
+            return;
+        }
+
+        try {
+            const localPlan = localStorage.getItem('radiology_study_plan');
+            if (localPlan) {
+                setStudyPlan(JSON.parse(localPlan));
+                setSystemNotification({ type: 'info', message: 'Loaded schedule from local storage.' });
+                setIsLoading(false);
+            } else {
+                setIsNewUser(true);
+                triggerSolver(true, STUDY_START_DATE, STUDY_END_DATE);
+            }
+        } catch (error: any) {
+            setSystemNotification({ type: 'error', message: `Failed to load data: ${error.message}` });
+            setIsLoading(false);
+        }
+    }, [triggerSolver, setStudyPlan]);
+
+    const handleRebalance = useCallback(async (options: RebalanceOptions = { type: 'standard' }) => {
+        showConfirmation({
+            title: "Rebalance Schedule?",
+            message: "This will re-calculate and overwrite all future, non-completed tasks based on your current progress and settings. Proceed?",
+            confirmText: "Rebalance",
+            onConfirm: () => triggerSolver(false, studyPlan?.startDate || STUDY_START_DATE, studyPlan?.endDate || STUDY_END_DATE)
+        });
+    }, [showConfirmation, triggerSolver, studyPlan]);
+    
     const handleTaskToggle = useCallback((taskId: string, date: string) => {
         setStudyPlan(plan => {
             if (!plan) return null;
@@ -114,8 +255,8 @@ export const useStudyPlanManager = (showConfirmation: (options: ShowConfirmation
                         ...day,
                         tasks: day.tasks.map(task => {
                             if (task.id === taskId) {
-                                const newStatus: ScheduledTask['status'] = task.status === 'completed' ? 'pending' : 'completed';
-                                return { ...task, status: newStatus };
+                                const newStatus = task.status === 'completed' ? 'pending' : 'completed';
+                                return { ...task, status: newStatus as 'pending' | 'completed' };
                             }
                             return task;
                         })
@@ -141,109 +282,17 @@ export const useStudyPlanManager = (showConfirmation: (options: ShowConfirmation
         });
     }, [setStudyPlan, updatePreviousStudyPlan]);
     
-    const pollRunStatus = useCallback(async (run_id: string, resources: StudyResource[], exceptions: ExceptionDateRule[], startDate: string, endDate: string) => {
-        if (pollingAttemptsRef.current >= MAX_POLLING_ATTEMPTS) {
-            setSystemNotification({ type: 'error', message: 'Solver timed out. Please try again later.' });
-            setIsLoading(false);
-            if(pollingRef.current) clearInterval(pollingRef.current);
-            return;
+    // FIX: Define the handleUndo function to restore the previous state of the study plan.
+    const handleUndo = useCallback(() => {
+        if (previousStudyPlan) {
+            setStudyPlan(previousStudyPlan);
+            setPreviousStudyPlan(null); // Prevent multiple undos from the same state.
+            setSystemNotification({ type: 'info', message: 'Last action undone.' });
+        } else {
+            setSystemNotification({ type: 'info', message: 'No action to undo.' });
         }
-        pollingAttemptsRef.current++;
+    }, [previousStudyPlan, setStudyPlan]);
 
-        try {
-            const res = await fetch(`/api/runs/${run_id}`);
-            const data = await res.json();
-            
-            if(data.status === 'COMPLETE') {
-                if(pollingRef.current) clearInterval(pollingRef.current);
-                const newSchedule = transformSolverSlotsToSchedule(data.slots, resources, startDate, endDate, exceptions);
-                const newPlan: StudyPlan = {
-                    startDate,
-                    endDate,
-                    schedule: newSchedule,
-                    progressPerDomain: {},
-                    topicOrder: DEFAULT_TOPIC_ORDER,
-                    cramTopicOrder: [],
-                    deadlines: {},
-                    areSpecialTopicsInterleaved: true,
-                };
-                setStudyPlan(newPlan);
-                setSystemNotification({ type: 'info', message: 'New schedule generated successfully!' });
-                setIsLoading(false);
-            } else if (data.status === 'FAILED') {
-                if(pollingRef.current) clearInterval(pollingRef.current);
-                setSystemNotification({ type: 'error', message: `Solver failed: ${data.error_text}` });
-                setIsLoading(false);
-            }
-        } catch (error: any) {
-            if(pollingRef.current) clearInterval(pollingRef.current);
-            setSystemNotification({ type: 'error', message: `Error checking status: ${error.message}` });
-            setIsLoading(false);
-        }
-    }, [setStudyPlan]);
-
-    const triggerSolver = useCallback(async (isInitialGeneration: boolean, startDate: string, endDate: string) => {
-        setIsLoading(true);
-        setSystemNotification({ type: 'info', message: 'Requesting a new schedule from the solver...'});
-        if (pollingRef.current) clearInterval(pollingRef.current);
-        pollingAttemptsRef.current = 0;
-
-        try {
-            const res = await fetch('/api/solve', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ startDate, endDate })
-            });
-
-            if (!res.ok) throw new Error(`Server responded with ${res.status}`);
-            
-            const { run_id } = await res.json();
-            setSystemNotification({ type: 'info', message: `Solver is working (ID: ${run_id.slice(0,8)})... This may take a few minutes.`});
-            pollingRef.current = window.setInterval(() => pollRunStatus(run_id, globalMasterResourcePool, exceptionDates, startDate, endDate), POLLING_INTERVAL);
-        } catch (error: any) {
-            setSystemNotification({ type: 'error', message: `Failed to start solver: ${error.message}` });
-            setIsLoading(false);
-        }
-    }, [globalMasterResourcePool, exceptionDates, pollRunStatus]);
-
-
-    const loadSchedule = useCallback(async (regenerate = false) => {
-        setIsLoading(true);
-        if(regenerate) {
-            triggerSolver(true, studyPlan?.startDate || STUDY_START_DATE, studyPlan?.endDate || STUDY_END_DATE);
-            return;
-        }
-
-        try {
-            const { data, error } = await supabase.from('user_data').select('data').single();
-            if (error || !data) {
-                setIsNewUser(true);
-                // This is where you might load default resources
-                // For now, we assume user adds them.
-                triggerSolver(true, STUDY_START_DATE, STUDY_END_DATE);
-            } else {
-                const planData = data.data as PlanDataBlob;
-                setStudyPlan(planData.plan);
-                setGlobalMasterResourcePool(planData.resources);
-                setExceptionDates(planData.exceptions);
-                setSystemNotification({ type: 'info', message: 'Loaded schedule from the cloud.' });
-            }
-        } catch (error: any) {
-            setSystemNotification({ type: 'error', message: `Failed to load data: ${error.message}` });
-        } finally {
-            setIsLoading(false);
-        }
-    }, [triggerSolver, studyPlan, setStudyPlan, setGlobalMasterResourcePool, setExceptionDates]);
-
-    const handleRebalance = useCallback(async (options: RebalanceOptions = { type: 'standard' }) => {
-        showConfirmation({
-            title: "Rebalance Schedule?",
-            message: "This will re-calculate and overwrite all future, non-completed tasks based on your current progress and settings. Proceed?",
-            confirmText: "Rebalance",
-            onConfirm: () => triggerSolver(false, studyPlan?.startDate || STUDY_START_DATE, studyPlan?.endDate || STUDY_END_DATE)
-        });
-    }, [showConfirmation, triggerSolver, studyPlan]);
-    
     // Placeholder implementations for other handlers
     const handleUpdatePlanDates = useCallback((startDate: string, endDate: string) => {
         showConfirmation({
@@ -309,17 +358,11 @@ export const useStudyPlanManager = (showConfirmation: (options: ShowConfirmation
         setSystemNotification({type: 'info', message: 'All task progress has been reset.'});
     }, [setStudyPlan, updatePreviousStudyPlan]);
 
-    useEffect(() => {
-      if (studyPlan && globalMasterResourcePool && exceptionDates) {
-        saveDataToCloud(studyPlan, globalMasterResourcePool, exceptionDates);
-      }
-    }, [studyPlan, globalMasterResourcePool, exceptionDates, saveDataToCloud]);
-
     return {
         studyPlan, setStudyPlan, previousStudyPlan,
         globalMasterResourcePool, setGlobalMasterResourcePool,
         isLoading, systemNotification, setSystemNotification,
-        isNewUser,
+        isNewUser, progress, progressMessage,
         loadSchedule, handleRebalance, handleUpdatePlanDates, handleUpdateTopicOrderAndRebalance, handleUpdateCramTopicOrderAndRebalance,
         handleToggleCramMode,
         handleToggleSpecialTopicsInterleaving,
