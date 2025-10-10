@@ -250,12 +250,12 @@ const App: React.FC = () => {
       currentDateObj.setUTCMonth(currentDateObj.getUTCMonth() + (direction === 'next' ? 1 : -1));
     }
     const newDateStr = currentDateObj.toISOString().split('T')[0];
-    if (!studyPlan) return;
-    if (newDateStr >= studyPlan.startDate && newDateStr <= studyPlan.endDate) {
-      setSelectedDate(newDateStr);
-    }
+    
+    // Set the date regardless of whether it's inside the study plan range.
+    // The calendar component can handle displaying it correctly.
+    setSelectedDate(newDateStr);
     setHighlightedDates([]);
-  }, [selectedDate, studyPlan]);
+  }, [selectedDate]);
 
   const handleUpdateTimeForDay = useCallback((newTotalMinutes: number) => {
     const newRule: ExceptionDateRule = {

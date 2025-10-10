@@ -60,6 +60,15 @@ const MasterResourcePoolViewer: React.FC<MasterResourcePoolViewerProps> = ({
     return Object.entries(groups).sort(([a], [b]) => a.localeCompare(b));
   }, [unscheduledResources]);
 
+  const getResourceDetails = (resource: StudyResource) => {
+    const details = [];
+    details.push(formatDuration(resource.durationMinutes));
+    if (resource.chapterNumber) details.push(`Ch. ${resource.chapterNumber}`);
+    if (resource.pages) details.push(`${resource.pages} pgs`);
+    if (resource.questionCount) details.push(`${resource.questionCount} q's`);
+    return details.join(', ');
+  };
+
   const filteredAndSortedResources = useMemo(() => {
     let filtered = resourcesWithStatus.filter(resource => {
       const isArchivedMatch = showArchived ? resource.isArchived : !resource.isArchived;
@@ -147,8 +156,7 @@ const MasterResourcePoolViewer: React.FC<MasterResourcePoolViewerProps> = ({
                       <li key={item.id}>
                         {item.title}
                         <span className="text-red-200/70 ml-2">
-                          ({formatDuration(item.durationMinutes)}
-                          {item.questionCount ? `, ${item.questionCount} q's` : ''})
+                          ({getResourceDetails(item)})
                         </span>
                       </li>
                     ))}

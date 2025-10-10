@@ -135,138 +135,25 @@ const sortResources = (
     });
 };
 
-// FIX: Replaced the front-loading `distributeDeficitTime` with a more holistic `globallyBalanceStudyTime` function. This new function first calculates the average time needed per day and sets that as a baseline for all days, resulting in a much more even and sustainable schedule distribution, addressing the user's core feedback.
-const globallyBalanceStudyTime = (studyDays: DailySchedule[], totalMinutesNeeded: number): void => {
-    if (studyDays.length === 0 || totalMinutesNeeded <= 0) return;
-
-    const initialAvailableTime = studyDays.reduce((acc, d) => acc + d.totalStudyTimeMinutes, 0);
-
-    if (totalMinutesNeeded <= initialAvailableTime) {
-        return;
-    }
-
-    const averageMinutesPerDay = Math.ceil(totalMinutesNeeded / studyDays.length);
-
-    studyDays.forEach(day => {
-        const newTarget = Math.max(day.totalStudyTimeMinutes, averageMinutesPerDay);
-        day.totalStudyTimeMinutes = Math.min(newTarget, HARD_CAP_MINUTES);
-    });
-
-    let deficit = totalMinutesNeeded - studyDays.reduce((acc, d) => acc + d.totalStudyTimeMinutes, 0);
-
-    while (deficit > 0) {
-        const daysWithCapacity = studyDays.filter(d => d.totalStudyTimeMinutes < HARD_CAP_MINUTES);
-        if (daysWithCapacity.length === 0) {
-            break;
-        }
-        
-        const timeToAddPerDay = Math.ceil(deficit / daysWithCapacity.length);
-        let deficitReducedInLoop = 0;
-
-        for (const day of daysWithCapacity) {
-            const currentDeficit = deficit - deficitReducedInLoop;
-            if (currentDeficit <= 0) break;
-            
-            const roomOnDay = HARD_CAP_MINUTES - day.totalStudyTimeMinutes;
-            const amountToAdd = Math.min(timeToAddPerDay, roomOnDay, currentDeficit);
-            
-            day.totalStudyTimeMinutes += amountToAdd;
-            deficitReducedInLoop += amountToAdd;
-        }
-
-        deficit -= deficitReducedInLoop;
-        
-        if (deficitReducedInLoop === 0) break;
-    }
-};
-
-const adjustBudgetsForDeadlines = (
-    scheduleShell: DailySchedule[],
-    resourcePool: StudyResource[],
-    deadlines: DeadlineSettings
-): GeneratedStudyPlanOutcome['notifications'] => {
-    if (!deadlines || Object.values(deadlines).every(d => !d)) {
-        return [];
-    }
-    
-    const notifications: GeneratedStudyPlanOutcome['notifications'] = [];
-    const primaryResources = resourcePool.filter(r => r.isPrimaryMaterial);
-
-    const resourceToDeadlineMap = new Map<StudyResource, string>();
-    for (const resource of primaryResources) {
-        let earliestDeadline: string | null = deadlines.allContent || null;
-
-        const isPhysics = resource.domain === Domain.PHYSICS;
-        const isNucMed = resource.domain === Domain.NUCLEAR_MEDICINE;
-
-        if (isPhysics && deadlines.physicsContent) {
-            if (!earliestDeadline || deadlines.physicsContent < earliestDeadline) {
-                earliestDeadline = deadlines.physicsContent;
-            }
-        }
-        if (isNucMed && deadlines.nucMedContent) {
-            if (!earliestDeadline || deadlines.nucMedContent < earliestDeadline) {
-                earliestDeadline = deadlines.nucMedContent;
-            }
-        }
-        if (!isPhysics && !isNucMed && deadlines.otherContent) {
-            if (!earliestDeadline || deadlines.otherContent < earliestDeadline) {
-                earliestDeadline = deadlines.otherContent;
-            }
-        }
-
-        if (earliestDeadline) {
-            resourceToDeadlineMap.set(resource, earliestDeadline);
-        }
-    }
-
-    const deadlineToResourcesMap = new Map<string, StudyResource[]>();
-    for (const [resource, deadline] of resourceToDeadlineMap.entries()) {
-        if (!deadlineToResourcesMap.has(deadline)) {
-            deadlineToResourcesMap.set(deadline, []);
-        }
-        deadlineToResourcesMap.get(deadline)!.push(resource);
-    }
-
-    const sortedDeadlines = Array.from(deadlineToResourcesMap.keys()).sort();
-
-    for (const deadlineStr of sortedDeadlines) {
-        const resourcesForDeadline = deadlineToResourcesMap.get(deadlineStr)!;
-        const totalMinutesNeeded = resourcesForDeadline.reduce((acc, r) => acc + r.durationMinutes, 0);
-
-        const daysUntilDeadline = scheduleShell.filter(d => d.date <= deadlineStr && !d.isRestDay);
-        
-        if (daysUntilDeadline.length === 0) {
-            if (totalMinutesNeeded > 0) {
-                notifications.push({ type: 'error', message: `Cannot meet deadline ${deadlineStr}. No study days available before this date.` });
-            }
-            continue;
-        }
-
-        const totalMinutesAvailable = daysUntilDeadline.reduce((acc, d) => acc + d.totalStudyTimeMinutes, 0);
-        
-        if (totalMinutesNeeded > totalMinutesAvailable) {
-            globallyBalanceStudyTime(daysUntilDeadline, totalMinutesNeeded);
-            
-            const newTotalMinutesAvailable = daysUntilDeadline.reduce((acc, d) => acc + d.totalStudyTimeMinutes, 0);
-            if (totalMinutesNeeded > newTotalMinutesAvailable) {
-                 notifications.push({ type: 'warning', message: `Could not fit all content for deadline ${deadlineStr} even after maximizing daily study time.` });
-            }
-        }
-    }
-    
-    return notifications;
-};
-
 const runSchedulingEngine = (
     scheduleShell: DailySchedule[], 
     resourcePool: StudyResource[], 
     config: Partial<StudyPlan>,
 ): GeneratedStudyPlanOutcome['notifications'] => {
     
-    const deadlineNotifications = adjustBudgetsForDeadlines(scheduleShell, resourcePool, config.deadlines || {});
-    const notifications: GeneratedStudyPlanOutcome['notifications'] = [...deadlineNotifications];
+    const notifications: GeneratedStudyPlanOutcome['notifications'] = [];
 
+    const studyDays = scheduleShell.filter(d => !d.isRestDay);
+    
+    // Per user request, max out all default workday study days to the hard cap.
+    // This forces the scheduler to utilize all available time.
+    for (const day of studyDays) {
+        // Only override default workdays, not days with user-defined exceptions.
+        if (day.dayType === 'workday') {
+            day.totalStudyTimeMinutes = HARD_CAP_MINUTES;
+        }
+    }
+    
     const { topicOrder = [], isCramModeActive = false, cramTopicOrder = [], areSpecialTopicsInterleaved = true } = config;
     
     const activeResources = resourcePool.filter(r => !r.isArchived);
@@ -280,20 +167,6 @@ const runSchedulingEngine = (
     }
     
     let tasksToSchedule = sortResources(nonOptionalResources, topicOrder, isCramModeActive, cramTopicOrder);
-    const totalMinutesNeeded = [...tasksToSchedule, ...physicsAndNucsPool].reduce((acc, r) => acc + r.durationMinutes, 0);
-    
-    const studyDays = scheduleShell.filter(d => !d.isRestDay);
-    if (studyDays.length > 0) {
-        globallyBalanceStudyTime(studyDays, totalMinutesNeeded);
-        
-        const totalMinutesAvailable = studyDays.reduce((acc, d) => acc + d.totalStudyTimeMinutes, 0);
-        if (totalMinutesNeeded > totalMinutesAvailable) {
-            notifications.push({
-                type: 'error',
-                message: `Could not fit all content. ${formatDuration(totalMinutesNeeded - totalMinutesAvailable)} remains. Please extend your end date or add more study time on exception days.`
-            });
-        }
-    }
     
     for (const day of scheduleShell) {
         if (day.isRestDay || tasksToSchedule.length === 0) continue;
