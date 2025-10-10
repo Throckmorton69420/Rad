@@ -4,26 +4,29 @@ import traceback
 from flask import Flask, request, jsonify
 from supabase import create_client, Client
 from ortools.sat.python import cp_model
-from datetime import date, timedelta
+from datetime import date, timedelta, datetime
 
+# --- Initialization ---
 app = Flask(__name__)
 
-# --- Supabase Initialization ---
-url: str = os.environ.get("SUPABASE_URL")
-key: str = os.environ.get("SUPABASE_KEY")
-supabase: Client = create_client(url, key)
-INTERNAL_API_TOKEN: str = os.environ.get("INTERNAL_API_TOKEN")
+supabase_url = os.environ.get("SUPABASE_URL")
+supabase_key = os.environ.get("SUPABASE_KEY")
+solver_token = os.environ.get("INTERNAL_API_TOKEN")
 
-# --- Health Check Endpoint ---
-@app.route("/", methods=["GET"])
-def health_check():
-    return jsonify({"status": "healthy"}), 200
+if not all([supabase_url, supabase_key, solver_token]):
+    raise ValueError("FATAL: Missing required environment variables SUPABASE_URL, SUPABASE_KEY, or INTERNAL_API_TOKEN.")
 
-# --- Solver Logic ---
-def solve_schedule(run_id, start_date_str, end_date_str, resources, all_exception_rules):
+supabase: Client = create_client(supabase_url, supabase_key)
+
+# --- Background Solver Logic ---
+def solve_schedule(run_id: str, start_date_str: str, end_date_str: str, resources: list, all_exception_rules: list):
+    """
+    This function contains the long-running solver logic.
+    It is wrapped in comprehensive error handling to ensure it never crashes silently.
+    """
     try:
-        print(f"[{run_id}] Solver thread started. Updating status to SOLVING.")
-        supabase.from_("runs").update({"status": "SOLVING"}).eq("id", run_id).execute()
+        app.logger.info(f"[{run_id}] Solver thread started. Updating status to SOLVING.")
+        supabase.table("runs").update({"status": "SOLVING"}).eq("id", run_id).execute()
 
         start_dt = date.fromisoformat(start_date_str)
         end_dt = date.fromisoformat(end_date_str)
@@ -36,23 +39,27 @@ def solve_schedule(run_id, start_date_str, end_date_str, resources, all_exceptio
             date_str = current_dt.isoformat()
             day_config = exception_map.get(date_str)
             
+            day_of_week = current_dt.weekday() # Monday is 0 and Sunday is 6
+            is_weekend = day_of_week >= 5
+
             if day_config:
+                day_type = day_config.get('dayType', 'exception')
                 all_days.append({
                     'date': date_str,
                     'isRestDay': day_config.get('isRestDayOverride', False),
-                    'targetMinutes': day_config.get('targetMinutes', 0)
+                    'targetMinutes': day_config.get('targetMinutes', 0),
+                    'dayType': day_type
                 })
             else:
-                day_of_week = current_dt.weekday()
-                is_weekend = day_of_week >= 5
                 all_days.append({
                     'date': date_str,
                     'isRestDay': False,
-                    'targetMinutes': 480 if is_weekend else 330
+                    'targetMinutes': 480 if is_weekend else 330, # Default times
+                    'dayType': 'high-capacity' if is_weekend else 'workday'
                 })
             current_dt += timedelta(days=1)
         
-        print(f"[{run_id}] Processed {len(all_days)} days. Creating model...")
+        app.logger.info(f"[{run_id}] Processed {len(all_days)} days. Creating model...")
 
         model = cp_model.CpModel()
         on_day_vars = {}
@@ -61,6 +68,7 @@ def solve_schedule(run_id, start_date_str, end_date_str, resources, all_exceptio
                 on_day_vars[(r['id'], day_index)] = model.NewBoolVar(f"on_day_{r['id']}_{day_index}")
 
         for r in resources:
+            # All primary materials must be scheduled exactly once
             if r.get('isPrimaryMaterial', False):
                 model.AddExactlyOne(on_day_vars[(r['id'], day_index)] for day_index in range(len(all_days)))
 
@@ -69,50 +77,73 @@ def solve_schedule(run_id, start_date_str, end_date_str, resources, all_exceptio
                 for r in resources:
                     model.Add(on_day_vars[(r['id'], day_index)] == 0)
             else:
-                daily_work = sum(on_day_vars[(r['id'], day_index)] * r['durationMinutes'] for r in resources)
+                daily_work = sum(r['durationMinutes'] * on_day_vars[(r['id'], day_index)] for r in resources)
                 model.Add(daily_work <= day['targetMinutes'])
 
-        print(f"[{run_id}] Model created. Starting solver...")
+        # --- Objectives ---
+        priority_map = {'high': 1000, 'medium': 100, 'low': 10}
+        model.Maximize(sum(
+            priority_map.get(r.get('schedulingPriority', 'medium'), 100) * sum(on_day_vars[(r['id'], d)] for d in range(len(all_days)))
+            for r in resources if not r.get('isPrimaryMaterial', False) # Maximize optional tasks
+        ))
         
+        app.logger.info(f"[{run_id}] Model created. Starting solver...")
         solver = cp_model.CpSolver()
         solver.parameters.max_time_in_seconds = 840.0
+        solver.parameters.num_search_workers = 8 # Use multiple cores
         status = solver.Solve(model)
 
         if status == cp_model.OPTIMAL or status == cp_model.FEASIBLE:
-            print(f"[{run_id}] Solution found. Processing results...")
+            app.logger.info(f"[{run_id}] Solution found. Processing results...")
             schedule_slots = []
-            for day_index, day in enumerate(all_days):
-                start_minute = 0
-                day_tasks = [r for r in resources if solver.Value(on_day_vars[(r['id'], day_index)]['endPage'])]
-                
-                day_tasks.sort(key=lambda r: r.get('sequenceOrder', 9999))
-
-                for r in day_tasks:
-                    end_minute = start_minute + r['durationMinutes']
-                    slot = {
-                        "run_id": run_id, "resource_id": r['id'], "date": day['date'],
-                        "start_minute": start_minute, "end_minute": end_minute,
-                        "title": r['title'], "domain": r['domain'], "type": r['type']
-                    }
-                    schedule_slots.append(slot)
-                    start_minute = end_minute
+            resource_map = {res['id']: res for res in resources}
             
-            print(f"[{run_id}] Inserting {len(schedule_slots)} slots.")
-            supabase.from_("schedule_slots").insert(schedule_slots).execute()
-            supabase.from_("runs").update({"status": "COMPLETE"}).eq("id", run_id).execute()
-            print(f"[{run_id}] Run complete.")
+            for day_index, day in enumerate(all_days):
+                tasks_for_day_ids = [
+                    r['id'] for r in resources 
+                    if solver.Value(on_day_vars[(r['id'], day_index)])
+                ]
+                
+                if not tasks_for_day_ids:
+                    continue
+
+                tasks_for_day = [resource_map[res_id] for res_id in tasks_for_day_ids]
+                
+                # Sort tasks within the day for a logical order
+                tasks_for_day.sort(key=lambda r: (r.get('sequenceOrder', 99999), r['title']))
+                
+                current_minute = 0
+                for resource in tasks_for_day:
+                    start_minute = current_minute
+                    end_minute = current_minute + resource['durationMinutes']
+                    schedule_slots.append({
+                        "run_id": run_id, "resource_id": resource['id'], "date": day['date'],
+                        "start_minute": start_minute, "end_minute": end_minute,
+                        "title": resource['title'], "domain": resource['domain'], "type": resource['type']
+                    })
+                    current_minute = end_minute
+            
+            app.logger.info(f"[{run_id}] Generated {len(schedule_slots)} slots. Inserting into database...")
+            if schedule_slots:
+                supabase.table("schedule_slots").delete().eq('run_id', run_id).execute()
+                supabase.table("schedule_slots").insert(schedule_slots).execute()
+            
+            supabase.table("runs").update({"status": "COMPLETE"}).eq("id", run_id).execute()
+            app.logger.info(f"[{run_id}] Run marked as COMPLETE.")
         else:
-            raise Exception("Solver could not find a feasible solution. Check constraints.")
+            raise Exception(f"Solver failed with status: {solver.StatusName(status)}. Could not find a feasible solution. Check constraints and resource durations vs daily budgets.")
 
     except Exception as e:
         error_trace = traceback.format_exc()
-        error_message = f"Error in solver thread for run {run_id}: {e}\n{error_trace}"
-        print(error_message)
+        error_message = f"Error in solver thread for run {run_id}: {str(e)}\n\nTraceback:\n{error_trace}"
+        app.logger.error(error_message)
         try:
-            supabase.from_("runs").update({"status": "FAILED", "error_text": error_message}).eq("id", run_id).execute()
+            supabase.table("runs").update({"status": "FAILED", "error_text": error_message}).eq("id", run_id).execute()
         except Exception as db_e:
-            print(f"[{run_id}] CRITICAL: Failed to write error status to DB: {db_e}")
+            app.logger.error(f"[{run_id}] CRITICAL: Failed to write error status to DB after solver failure: {db_e}")
 
+
+# --- API Endpoints ---
 @app.route("/internal/run-solver", methods=["POST"])
 def run_solver_endpoint():
     auth_header = request.headers.get('Authorization')
@@ -126,20 +157,20 @@ def run_solver_endpoint():
         return jsonify({"error": "run_id is required"}), 400
 
     try:
-        print(f"[{run_id}] Received task. Fetching data.")
-        run_data = supabase.from_("runs").select("start_date, end_date").eq("id", run_id).single().execute().data
+        app.logger.info(f"[{run_id}] Received task via Cloud Tasks. Fetching data.")
+        run_data = supabase.table("runs").select("start_date, end_date").eq("id", run_id).single().execute().data
         if not run_data:
-            raise Exception(f"Run ID {run_id} not found.")
+            raise Exception(f"Run ID {run_id} not found in database.")
 
-        resources_response = supabase.from_("resources").select("*").eq("isArchived", False).execute()
+        resources_response = supabase.table("resources").select("*").eq("isArchived", False).execute()
         resources = resources_response.data or []
         
         exceptions_data = []
-        user_data_response = supabase.from_("user_data").select("data").eq("id", 1).maybe_single().execute()
-        if user_data_response.data and 'data' in user_data_response.data and 'exceptionDates' in user_data_response.data['data']:
-            exceptions_data = user_data_response.data['data']['exceptionDates']
+        user_data_response = supabase.table("user_data").select("data").eq("id", 1).maybe_single().execute()
+        if user_data_response.data and 'data' in user_data_response.data and user_data_response.data['data'] and 'exceptionDates' in user_data_response.data['data']:
+             exceptions_data = user_data_response.data['data']['exceptionDates']
         
-        print(f"[{run_id}] Data fetch complete. Starting solver thread.")
+        app.logger.info(f"[{run_id}] Data fetch complete. Starting solver thread with {len(resources)} resources and {len(exceptions_data)} exceptions.")
         
         solver_thread = threading.Thread(
             target=solve_schedule,
@@ -147,14 +178,21 @@ def run_solver_endpoint():
         )
         solver_thread.start()
 
+        # Acknowledge the task has been received and is being processed
         return jsonify({"message": f"Solver thread started for run_id: {run_id}"}), 200
 
     except Exception as e:
         error_trace = traceback.format_exc()
-        error_message = f"Failed to prepare solver: {e}\n{error_trace}"
-        print(error_message)
-        supabase.from_("runs").update({"status": "FAILED", "error_text": error_message}).eq("id", run_id).execute()
+        error_message = f"Failed to prepare solver for run {run_id}: {str(e)}\n\nTraceback:\n{error_trace}"
+        app.logger.error(error_message)
+        try:
+            supabase.table("runs").update({"status": "FAILED", "error_text": error_message}).eq("id", run_id).execute()
+        except Exception as db_e:
+            app.logger.error(f"[{run_id}] CRITICAL: Failed to write preparation error status to DB: {db_e}")
+        # Return 500 so Cloud Tasks knows the invocation failed and can retry if configured.
         return jsonify({"error": error_message}), 500
 
+
 if __name__ == "__main__":
+    # Use debug=True for local development for better error messages
     app.run(debug=True, host="0.0.0.0", port=int(os.environ.get("PORT", 8080)))
