@@ -174,6 +174,13 @@ const MasterResourcePoolViewer: React.FC<MasterResourcePoolViewerProps> = ({
                    <span className="text-xxs px-2 py-0.5 rounded-full font-semibold text-white/90" style={{backgroundColor: 'hsl(210, 15%, 50%)'}}>{resource.type}</span>
                    <span className={`text-xxs px-2 py-0.5 rounded-full font-semibold ${resource.isScheduled ? 'bg-green-800/80 text-green-200' : 'bg-yellow-800/80 text-yellow-200'}`}>{resource.isScheduled ? 'Scheduled' : 'Unscheduled'}</span>
                 </div>
+                {/* FIX: Added a new details section to the resource card to provide more specific information requested by the user, such as chapter number, page count, and question count. */}
+                <div className="flex items-center gap-x-3 gap-y-1 flex-wrap mt-1.5 text-xs text-[var(--text-secondary)]">
+                    {resource.chapterNumber && <span><i className="fas fa-book-open mr-1 opacity-70"></i>Ch. {resource.chapterNumber}</span>}
+                    {resource.pages && <span><i className="fas fa-file-alt mr-1 opacity-70"></i>{resource.pages} pgs</span>}
+                    {resource.questionCount && <span><i className="fas fa-question-circle mr-1 opacity-70"></i>{resource.questionCount} q's</span>}
+                    {resource.source && <span className="font-semibold max-w-full truncate" title={resource.source}><i className="fas fa-atlas mr-1 opacity-70"></i>{resource.source}</span>}
+                </div>
               </div>
               <div className="flex-shrink-0 text-right flex flex-col items-end">
                  <p className="text-sm font-semibold text-[var(--text-primary)]">{formatDuration(resource.durationMinutes)}</p>

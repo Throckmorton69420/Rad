@@ -135,42 +135,48 @@ const sortResources = (
     });
 };
 
-const distributeDeficitTime = (studyDays: DailySchedule[], totalMinutesNeeded: number): void => {
-    if (studyDays.length === 0) return;
+// FIX: Replaced the front-loading `distributeDeficitTime` with a more holistic `globallyBalanceStudyTime` function. This new function first calculates the average time needed per day and sets that as a baseline for all days, resulting in a much more even and sustainable schedule distribution, addressing the user's core feedback.
+const globallyBalanceStudyTime = (studyDays: DailySchedule[], totalMinutesNeeded: number): void => {
+    if (studyDays.length === 0 || totalMinutesNeeded <= 0) return;
 
-    let totalMinutesAvailable = studyDays.reduce((acc, d) => acc + d.totalStudyTimeMinutes, 0);
-    let deficit = totalMinutesNeeded - totalMinutesAvailable;
+    const initialAvailableTime = studyDays.reduce((acc, d) => acc + d.totalStudyTimeMinutes, 0);
 
-    if (deficit <= 0) return;
+    if (totalMinutesNeeded <= initialAvailableTime) {
+        return;
+    }
 
-    // Iteratively distribute the deficit to ensure even loading and a balanced schedule.
+    const averageMinutesPerDay = Math.ceil(totalMinutesNeeded / studyDays.length);
+
+    studyDays.forEach(day => {
+        const newTarget = Math.max(day.totalStudyTimeMinutes, averageMinutesPerDay);
+        day.totalStudyTimeMinutes = Math.min(newTarget, HARD_CAP_MINUTES);
+    });
+
+    let deficit = totalMinutesNeeded - studyDays.reduce((acc, d) => acc + d.totalStudyTimeMinutes, 0);
+
     while (deficit > 0) {
-        // Find days that are not yet at the hard cap
-        const daysBelowHardCap = studyDays.filter(d => d.totalStudyTimeMinutes < HARD_CAP_MINUTES);
-        if (daysBelowHardCap.length === 0) {
-            // All available days are maxed out, cannot add more time.
+        const daysWithCapacity = studyDays.filter(d => d.totalStudyTimeMinutes < HARD_CAP_MINUTES);
+        if (daysWithCapacity.length === 0) {
             break;
         }
+        
+        const timeToAddPerDay = Math.ceil(deficit / daysWithCapacity.length);
+        let deficitReducedInLoop = 0;
 
-        // Distribute the remaining deficit evenly among the available days
-        const timeToAddPerDay = Math.ceil(deficit / daysBelowHardCap.length);
-
-        let deficitReducedInThisLoop = 0;
-        for (const day of daysBelowHardCap) {
-            const currentDeficit = deficit - deficitReducedInThisLoop;
+        for (const day of daysWithCapacity) {
+            const currentDeficit = deficit - deficitReducedInLoop;
             if (currentDeficit <= 0) break;
             
-            const canAdd = HARD_CAP_MINUTES - day.totalStudyTimeMinutes;
-            const amountToAdd = Math.min(timeToAddPerDay, canAdd, currentDeficit);
+            const roomOnDay = HARD_CAP_MINUTES - day.totalStudyTimeMinutes;
+            const amountToAdd = Math.min(timeToAddPerDay, roomOnDay, currentDeficit);
             
             day.totalStudyTimeMinutes += amountToAdd;
-            deficitReducedInThisLoop += amountToAdd;
+            deficitReducedInLoop += amountToAdd;
         }
 
-        deficit -= deficitReducedInThisLoop;
+        deficit -= deficitReducedInLoop;
         
-        // If we couldn't add any time in a loop, it means all days are capped.
-        if (deficitReducedInThisLoop === 0) break;
+        if (deficitReducedInLoop === 0) break;
     }
 };
 
@@ -240,7 +246,7 @@ const adjustBudgetsForDeadlines = (
         const totalMinutesAvailable = daysUntilDeadline.reduce((acc, d) => acc + d.totalStudyTimeMinutes, 0);
         
         if (totalMinutesNeeded > totalMinutesAvailable) {
-            distributeDeficitTime(daysUntilDeadline, totalMinutesNeeded);
+            globallyBalanceStudyTime(daysUntilDeadline, totalMinutesNeeded);
             
             const newTotalMinutesAvailable = daysUntilDeadline.reduce((acc, d) => acc + d.totalStudyTimeMinutes, 0);
             if (totalMinutesNeeded > newTotalMinutesAvailable) {
@@ -278,7 +284,7 @@ const runSchedulingEngine = (
     
     const studyDays = scheduleShell.filter(d => !d.isRestDay);
     if (studyDays.length > 0) {
-        distributeDeficitTime(studyDays, totalMinutesNeeded);
+        globallyBalanceStudyTime(studyDays, totalMinutesNeeded);
         
         const totalMinutesAvailable = studyDays.reduce((acc, d) => acc + d.totalStudyTimeMinutes, 0);
         if (totalMinutesNeeded > totalMinutesAvailable) {
