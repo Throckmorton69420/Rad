@@ -4,8 +4,9 @@ import { createClient } from '@supabase/supabase-js';
 // These variables are expected to be set in the environment,
 // typically through a .env file locally or in Vercel project settings.
 // Vite exposes env vars prefixed with VITE_ to the client-side code.
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+// FIX: Cast import.meta to any to resolve TypeScript error in Vite environment.
+const supabaseUrl = (import.meta as any).env.VITE_SUPABASE_URL;
+const supabaseAnonKey = (import.meta as any).env.VITE_SUPABASE_ANON_KEY;
 
 if (!supabaseUrl || !supabaseAnonKey) {
   // This error is thrown during initialization to ensure the app doesn't
