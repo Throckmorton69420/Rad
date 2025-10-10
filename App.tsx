@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { DailySchedule, StudyPlan, ScheduledTask, PomodoroSettings, ViewMode, Domain, ResourceType, AddTaskModalProps, StudyResource, ResourceEditorModalProps, ExceptionDateRule, DeadlineSettings, RebalanceOptions, ShowConfirmationOptions } from './types';
+import { DailySchedule, StudyPlan, ScheduledTask, PomodoroSettings, ViewMode, Domain, ResourceType, AddTaskModalProps, StudyResource, ResourceEditorModalProps, ExceptionDateRule, DeadlineSettings, RebalanceOptions, ShowConfirmationOptions, PrintOptions } from './types';
 import { EXAM_DATE_START, APP_TITLE, ALL_DOMAINS, POMODORO_DEFAULT_STUDY_MINS, POMODORO_DEFAULT_REST_MINS } from './constants';
 import { addResourceToGlobalPool } from './services/studyResources';
 import { generateGlassMaps } from './utils/glassEffectGenerator';
@@ -24,6 +24,9 @@ import TopicOrderManager from './components/TopicOrderManager';
 import ModifyDayTasksModal from './components/ModifyDayTasksModal';
 import MasterResourcePoolViewer from './components/MasterResourcePoolViewer';
 import ScheduleReport from './components/ScheduleReport';
+import PrintModal from './components/PrintModal';
+import ProgressReport from './components/ProgressReport';
+import ContentReport from './components/ContentReport';
 import { formatDuration, getTodayInNewYork, parseDateString } from './utils/timeFormatter';
 
 interface SidebarContentProps {
@@ -193,6 +196,9 @@ const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'schedule' | 'progress' | 'content'>('schedule');
   const [highlightedDates, setHighlightedDates] = useState<string[]>([]);
   const [isPomodoroCollapsed, setIsPomodoroCollapsed] = usePersistentState('radiology_pomodoro_collapsed', true);
+  
+  const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
+  const [printableContent, setPrintableContent] = useState<React.ReactNode | null>(null);
 
   useEffect(() => {
     // Generate maps for a generic square size. This scales better across
@@ -230,6 +236,25 @@ const App: React.FC = () => {
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
+
+  useEffect(() => {
+    if (printableContent) {
+      const handleAfterPrint = () => {
+        setPrintableContent(null);
+        window.removeEventListener('afterprint', handleAfterPrint);
+      };
+      window.addEventListener('afterprint', handleAfterPrint);
+      
+      // Delay printing slightly to ensure content is rendered
+      setTimeout(() => {
+        window.print();
+        // Fallback for browsers that don't support afterprint
+        setTimeout(() => {
+          handleAfterPrint();
+        }, 500);
+      }, 100);
+    }
+  }, [printableContent]);
 
   const navigateDate = useCallback((direction: 'next' | 'prev') => {
     const currentDateObj = parseDateString(selectedDate);
@@ -437,6 +462,50 @@ const App: React.FC = () => {
         if (isMobile) setIsSidebarOpen(false);
     }
   }, [studyPlan, isMobile]);
+  
+  const handleGenerateReport = useCallback((activeTab: 'schedule' | 'progress' | 'content', options: PrintOptions) => {
+    if (!studyPlan) return;
+    setIsPrintModalOpen(false);
+
+    let reportComponent = null;
+
+    if (activeTab === 'schedule') {
+        const { startDate, endDate } = options.schedule;
+        const filteredSchedule = studyPlan.schedule.filter(day => day.date >= (startDate || '0') && day.date <= (endDate || 'Z'));
+        reportComponent = <ScheduleReport studyPlan={studyPlan} schedule={filteredSchedule} />;
+    } else if (activeTab === 'progress') {
+        reportComponent = <ProgressReport studyPlan={studyPlan} />;
+    } else { // content
+        const { filter, sortBy } = options.content;
+        
+        let resourcesToPrint = globalMasterResourcePool.map(r => ({
+          ...r,
+          isScheduled: scheduledResourceIds.has(r.id),
+          source: r.bookSource || r.videoSource || 'Custom',
+        }));
+
+        let title = "All Resources";
+        if (filter === 'scheduled') { resourcesToPrint = resourcesToPrint.filter(r => r.isScheduled); title = "Scheduled Resources"; }
+        if (filter === 'unscheduled') { resourcesToPrint = resourcesToPrint.filter(r => !r.isScheduled && !r.isArchived); title = "Unscheduled Resources"; }
+        if (filter === 'archived') { resourcesToPrint = resourcesToPrint.filter(r => r.isArchived); title = "Archived Resources"; }
+
+        resourcesToPrint.sort((a, b) => {
+          switch (sortBy) {
+            case 'title': return a.title.localeCompare(b.title);
+            case 'domain': return a.domain.localeCompare(b.domain);
+            case 'durationMinutesAsc': return a.durationMinutes - b.durationMinutes;
+            case 'durationMinutesDesc': return b.durationMinutes - a.durationMinutes;
+            case 'sequenceOrder':
+            default: return (a.sequenceOrder ?? 9999) - (b.sequenceOrder ?? 9999);
+          }
+        });
+
+        reportComponent = <ContentReport resources={resourcesToPrint} title={title} />;
+    }
+
+    setPrintableContent(reportComponent);
+  }, [studyPlan, globalMasterResourcePool, scheduledResourceIds]);
+
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -517,6 +586,9 @@ const App: React.FC = () => {
                   <div className="hidden sm:block">
                       <SaveStatusIndicator />
                   </div>
+                  <Button onClick={() => setIsPrintModalOpen(true)} variant="secondary" size="sm" className="!px-2.5 !text-sm" aria-label="Print Reports">
+                    <i className="fas fa-print"></i>
+                  </Button>
                   <div className="p-2 rounded-lg flex flex-col md:flex-row md:items-center md:space-x-4 gap-y-1">
                     {studyPlan.firstPassEndDate && (
                       <div className="text-right">
@@ -610,14 +682,15 @@ const App: React.FC = () => {
         {modalStates.isModifyDayTasksModalOpen && selectedDaySchedule && <ModifyDayTasksModal isOpen={modalStates.isModifyDayTasksModalOpen} onClose={() => closeModal('isModifyDayTasksModalOpen')} onSave={onDayTasksSave} tasksForDay={selectedDaySchedule.tasks} allResources={globalMasterResourcePool} selectedDate={selectedDate} showConfirmation={showConfirmation} onEditResource={openResourceEditor} onArchiveResource={handleRequestArchive} onRestoreResource={handleRestoreResource} onPermanentDeleteResource={handlePermanentDelete} openAddResourceModal={() => openResourceEditor(null)} isCramModeActive={studyPlan.isCramModeActive ?? false} />}
         {modalStates.isResourceEditorOpen && <ResourceEditorModal isOpen={modalStates.isResourceEditorOpen} onClose={closeResourceEditor} onSave={handleSaveResource} onRequestArchive={handleRequestArchive} initialResource={modalData.editingResource} availableDomains={ALL_DOMAINS} availableResourceTypes={Object.values(ResourceType)}/>}
         <ConfirmationModal {...modalStates.confirmationState} onConfirm={handleConfirm} onClose={modalStates.confirmationState.onClose} />
+        {isPrintModalOpen && <PrintModal isOpen={isPrintModalOpen} onClose={() => setIsPrintModalOpen(false)} onGenerateReport={handleGenerateReport} studyPlan={studyPlan} currentDate={selectedDate} activeFilters={{domain: 'all', type: 'all', source: 'all'}} />}
       </div>
   );
   
   return (
     <>
-      {MainAppContent}
-      <div className="hidden print:block">
-        {studyPlan && <ScheduleReport studyPlan={studyPlan} />}
+      <div className="main-app-container">{MainAppContent}</div>
+      <div className="print-only-container">
+        {printableContent}
       </div>
     </>
   );

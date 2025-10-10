@@ -190,9 +190,6 @@ const ProgressDisplay: React.FC<ProgressDisplayProps> = ({ studyPlan }) => {
     <div className="text-[var(--text-primary)] pb-[calc(3rem+env(safe-area-inset-bottom))]">
       <div className="flex justify-between items-center border-b border-[var(--separator-primary)] pb-3">
         <h2 className="text-2xl font-bold text-[var(--text-primary)]">Study Progress</h2>
-        <Button onClick={() => window.print()} variant="secondary" size="sm">
-          <i className="fas fa-print mr-2"></i> Print Report
-        </Button>
       </div>
       
       <div className="mt-8">

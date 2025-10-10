@@ -314,3 +314,42 @@ export interface MasterResourcePoolViewerProps {
   onHighlightDates: (resourceId: string) => void;
   onClearHighlights: () => void;
 }
+
+export interface PrintScheduleOptions {
+  reportType: 'full' | 'range' | 'currentDay' | 'currentWeek';
+  startDate?: string;
+  endDate?: string;
+  pageBreakPerWeek: boolean;
+}
+
+export interface PrintProgressOptions {
+  includeSummary: boolean;
+  includeDeadlines: boolean;
+  includeTopic: boolean;
+  includeType: boolean;
+  includeSource: boolean;
+}
+
+export interface PrintContentOptions {
+  filter: 'all' | 'scheduled' | 'unscheduled' | 'archived';
+  sortBy: 'sequenceOrder' | 'title' | 'domain' | 'durationMinutesAsc' | 'durationMinutesDesc';
+}
+
+export interface PrintOptions {
+  schedule: PrintScheduleOptions;
+  progress: PrintProgressOptions;
+  content: PrintContentOptions;
+}
+
+export interface PrintModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onGenerateReport: (activeTab: 'schedule' | 'progress' | 'content', options: PrintOptions) => void;
+  studyPlan: StudyPlan;
+  currentDate: string;
+  activeFilters: {
+    domain: Domain | 'all';
+    type: ResourceType | 'all';
+    source: string | 'all';
+  };
+}

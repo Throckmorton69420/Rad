@@ -262,11 +262,83 @@ div.glass-chrome {
 .text-xxs { font-size: 0.65rem; line-height: 0.9rem; }
 
 /* --- Printing Styles --- */
+.print-only-container {
+  display: none;
+  position: absolute;
+  left: -9999px;
+  top: -9999px;
+}
+
 @media print {
-  body { background-image: none; background-color: white; color: black; }
-  .print\:hidden { display: none; } .hidden.print\:block { display: block; }
-  @page { size: letter; margin: 0.75in; }
-  .schedule-report-container { font-family: 'Times New Roman', Times, serif; font-size: 10pt; }
-  .schedule-report-day { break-inside: avoid-page; }
-  .new-week-page-break { break-before: page; }
+  body {
+    background: white;
+    color: black;
+    font-size: 10pt;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  
+  /* Hide everything except the container for the printable report */
+  body > *:not(.print-only-container) {
+    display: none !important;
+  }
+  
+  .print-only-container, .print-only-container * {
+    visibility: visible;
+  }
+  
+  .print-only-container {
+    display: block !important;
+    position: static;
+    width: 100%;
+    height: auto;
+  }
+
+  /* Styles for the report components themselves */
+  .printable-report {
+    padding: 0;
+    margin: 0;
+    font-family: 'Times New Roman', Times, serif;
+  }
+
+  .printable-report h1, .printable-report h2, .printable-report h3, .printable-report h4 {
+    color: black;
+    page-break-after: avoid;
+    font-family: 'Helvetica', 'Arial', sans-serif;
+  }
+  
+  .printable-report table {
+    width: 100%;
+    border-collapse: collapse;
+    page-break-inside: auto;
+  }
+
+  .printable-report th, .printable-report td {
+    border: 1px solid #ccc;
+    padding: 6px 8px;
+    text-align: left;
+    word-break: break-word;
+  }
+  
+  .printable-report thead th {
+    background-color: #f2f2f2 !important;
+    font-weight: bold;
+  }
+
+  .printable-report tr {
+    page-break-inside: avoid;
+  }
+
+  .printable-report a {
+    text-decoration: none;
+    color: #000;
+  }
+  
+  .print-page-break {
+    page-break-before: always;
+  }
+
+  .print-no-break {
+    page-break-inside: avoid;
+  }
 }

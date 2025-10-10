@@ -1,16 +1,18 @@
 import React from 'react';
-import { StudyPlan } from '../types';
+import { StudyPlan, DailySchedule } from '../types';
 import { formatDuration, parseDateString } from '../utils/timeFormatter';
 
 interface ScheduleReportProps {
   studyPlan: StudyPlan;
+  schedule?: DailySchedule[]; // Optional override for printing subsets
 }
 
-const ScheduleReport: React.FC<ScheduleReportProps> = ({ studyPlan }) => {
-  const totalPlannedMinutes = studyPlan.schedule.reduce((acc, day) => acc + (day.isRestDay ? 0 : day.totalStudyTimeMinutes), 0);
+const ScheduleReport: React.FC<ScheduleReportProps> = ({ studyPlan, schedule }) => {
+  const scheduleToRender = schedule || studyPlan.schedule;
+  const totalPlannedMinutes = scheduleToRender.reduce((acc, day) => acc + (day.isRestDay ? 0 : day.totalStudyTimeMinutes), 0);
 
   return (
-    <div className="p-8 font-sans text-black bg-white schedule-report-container">
+    <div className="p-8 font-sans text-black bg-white printable-report">
       <header className="mb-8 text-center border-b pb-4">
         <div className="flex justify-between items-end">
           <span className="text-sm text-gray-500">Radiology Core Exam Study Planner</span>
@@ -19,19 +21,19 @@ const ScheduleReport: React.FC<ScheduleReportProps> = ({ studyPlan }) => {
         <div className="mt-4">
           <h1 className="text-3xl font-bold">Radiology Core Exam - Study Schedule Report</h1>
           <p className="text-lg text-gray-600">
-            {parseDateString(studyPlan.startDate).toLocaleDateString('en-US', { timeZone: 'UTC' })} - {parseDateString(studyPlan.endDate).toLocaleDateString('en-US', { timeZone: 'UTC' })}
+            {parseDateString(scheduleToRender[0].date).toLocaleDateString('en-US', { timeZone: 'UTC' })} - {parseDateString(scheduleToRender[scheduleToRender.length - 1].date).toLocaleDateString('en-US', { timeZone: 'UTC' })}
           </p>
           <p className="text-md text-gray-500 mt-1">Total Planned Study Time: {formatDuration(totalPlannedMinutes)}</p>
         </div>
       </header>
       
       <div className="space-y-6">
-        {studyPlan.schedule.map((day, index) => {
+        {scheduleToRender.map((day, index) => {
             const dayOfWeek = parseDateString(day.date).getUTCDay(); // Sunday = 0
             const isFirstDayOfWeek = dayOfWeek === 0;
 
             return (
-              <div key={day.date} className={`schedule-report-day ${isFirstDayOfWeek && index > 0 ? 'new-week-page-break' : ''}`}>
+              <div key={day.date} className={`print-no-break ${isFirstDayOfWeek && index > 0 ? 'print-page-break' : ''}`}>
                 <h2 className="text-xl font-semibold mb-3 border-b pb-2">
                   {parseDateString(day.date).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' })}
                 </h2>
