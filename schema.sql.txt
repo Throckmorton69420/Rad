@@ -34,6 +34,7 @@ CREATE TABLE public.runs (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     created_at TIMESTAMPTZ DEFAULT NOW(),
     status TEXT DEFAULT 'PENDING',
+    progress INTEGER DEFAULT 0,
     start_date DATE,
     end_date DATE,
     objective_values JSONB,
