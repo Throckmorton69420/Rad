@@ -32,6 +32,7 @@ const MasterResourcePoolViewer: React.FC<MasterResourcePoolViewerProps> = ({
   const [sourceFilter, setSourceFilter] = useState<string | 'all'>('all');
   const [statusFilter, setStatusFilter] = useState<'all' | 'scheduled' | 'unscheduled'>('all');
   const [showArchived, setShowArchived] = useState(false);
+  const [isSummaryExpanded, setIsSummaryExpanded] = useState(true);
   
   const [sortConfig, setSortConfig] = useState<SortConfig>({ key: 'sequenceOrder', direction: 'ascending' });
 
@@ -42,6 +43,22 @@ const MasterResourcePoolViewer: React.FC<MasterResourcePoolViewerProps> = ({
       source: r.bookSource || r.videoSource || 'Custom',
     }));
   }, [resources, scheduledResourceIds]);
+
+  const unscheduledResources = useMemo(() => {
+    return resourcesWithStatus.filter(r => !r.isScheduled && !r.isArchived);
+  }, [resourcesWithStatus]);
+
+  const groupedUnscheduled = useMemo(() => {
+    const groups: Record<string, StudyResource[]> = {};
+    unscheduledResources.forEach(resource => {
+      const source = resource.source || 'Other Custom Tasks';
+      if (!groups[source]) {
+        groups[source] = [];
+      }
+      groups[source].push(resource);
+    });
+    return Object.entries(groups).sort(([a], [b]) => a.localeCompare(b));
+  }, [unscheduledResources]);
 
   const filteredAndSortedResources = useMemo(() => {
     let filtered = resourcesWithStatus.filter(resource => {
@@ -111,6 +128,38 @@ const MasterResourcePoolViewer: React.FC<MasterResourcePoolViewerProps> = ({
         </div>
       </div>
       
+      {unscheduledResources.length > 0 && (
+        <div className="flex-shrink-0 my-4 p-3 rounded-lg glass-panel bg-red-900/20 border border-red-700/50">
+          <button onClick={() => setIsSummaryExpanded(!isSummaryExpanded)} className="w-full flex justify-between items-center text-left">
+            <h3 className="text-md font-semibold text-red-200">
+              <i className="fas fa-exclamation-triangle mr-2"></i>
+              Unscheduled Content Summary ({unscheduledResources.length} items)
+            </h3>
+            <i className={`fas fa-chevron-down transition-transform ${isSummaryExpanded ? 'rotate-180' : ''}`}></i>
+          </button>
+          {isSummaryExpanded && (
+            <div className="mt-3 pt-3 border-t border-red-700/30 text-xs text-red-100/90 space-y-3 max-h-48 overflow-y-auto pr-2 isolated-scroll">
+              {groupedUnscheduled.map(([source, items]) => (
+                <div key={source}>
+                  <p className="font-bold text-red-100 mb-1">{source}</p>
+                  <ul className="list-disc list-inside pl-2 space-y-1">
+                    {items.map(item => (
+                      <li key={item.id}>
+                        {item.title}
+                        <span className="text-red-200/70 ml-2">
+                          ({formatDuration(item.durationMinutes)}
+                          {item.questionCount ? `, ${item.questionCount} q's` : ''})
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       <div className="flex-grow overflow-y-auto pr-2 -mr-2 mt-4 space-y-2 isolated-scroll" onMouseLeave={onClearHighlights}>
         {filteredAndSortedResources.map((resource) => (
           <div key={resource.id} 
