@@ -1,79 +1,111 @@
-# Radiology Core Exam Study Planner
+# Radiology Study Planner
 
-This is an interactive, day-by-day study planner for radiology residents preparing for their Core Exam. It uses a powerful backend solver to generate an optimized schedule based on your resources and constraints.
+This is an interactive, day-by-day study planner for radiology residents preparing for their Core Exam. It uses a sophisticated CP-SAT solver running on Google Cloud Run to generate an optimal schedule based on a comprehensive list of study resources.
 
-## Architecture Overview
+## Architecture
 
-This project has two main parts:
-1.  **Frontend (This Repo):** A React application built with Vite and deployed on Vercel.
-2.  **Backend Solver:** A Python/Flask service using Google OR-Tools, designed to be deployed as a container on a service like Google Cloud Run.
+This project uses a modern serverless architecture:
 
-The flow is as follows: The user requests a schedule generation/rebalance from the frontend. The frontend calls a Vercel API route, which creates a "run" job in a Supabase database and triggers the backend solver. The solver fetches data from Supabase, calculates the optimal schedule, and writes the results back to the database. The frontend polls the database for the results and displays them when ready.
+-   **Frontend**: Vite + React + TypeScript, deployed on Vercel.
+-   **Backend Solver**: Python (Flask + Google OR-Tools), containerized and deployed on Google Cloud Run.
+-   **Database**: Supabase (PostgreSQL) for storing resources, solver jobs, and user data.
+-   **Task Queue**: Google Cloud Tasks for reliably triggering long-running solver jobs asynchronously.
+-   **API Layer**: Vercel Serverless Functions act as a bridge between the frontend and backend services.
 
-## Setup & Deployment Guide
+## Setup Instructions
 
-### Step 1: Set Up Supabase
+### 1. Supabase Setup
 
-Your Supabase project is the central hub for all data.
+1.  Create a new project on [Supabase](https://supabase.com/).
+2.  Navigate to the **SQL Editor**.
+3.  Copy the entire contents of `sql/schema.sql` and run it to create the necessary tables (`resources`, `runs`, `schedule_slots`, `user_data`).
+4.  Copy the entire contents of `sql/seed.sql` and run it to populate the `resources` table with the master list of study materials.
+5.  Go to **Project Settings** > **API**.
+    -   Find your **Project URL**.
+    -   Find your **Project API Keys**. You will need the `anon` (public) key and the `service_role` (secret) key.
 
-1.  **Create Tables:** Go to your Supabase project's "SQL Editor". Create a new query, paste the entire content of `sql/schema.sql`, and run it. This will create the `resources`, `runs`, and `schedule_slots` tables.
-2.  **Seed Data:** Create another new query. Paste the entire content of `sql/seed.sql` and run it. This populates your `resources` table with the complete master list of study materials.
+### 2. Google Cloud Setup
 
-### Step 2: Deploy the Backend Python Solver
+This project requires a Google Cloud project to run the Python solver and the task queue.
 
-The solver service needs to be deployed separately. We recommend Google Cloud Run for its scalability and free tier.
+#### Part A: Enable APIs
 
-**1. Set Up Your Local Python Project**
-On your computer (in a separate folder from this React app), create a new folder named `radiology-solver`. Inside it, create three files and paste the content from this project into them:
-- `main.py`
-- `requirements.txt`
-- `Dockerfile`
+1.  Go to the [Google Cloud Console](https://console.cloud.google.com/).
+2.  Select your project (`scheduler-474709`).
+3.  In the search bar, find and **enable** the following APIs:
+    -   **Cloud Run API**
+    -   **Cloud Build API**
+    -   **Cloud Tasks API**
+    -   **IAM Service Account Credentials API**
 
-**2. Install Google Cloud CLI & Configure**
-- If you don't have it, [install the gcloud command-line tool](https://cloud.google.com/sdk/docs/install).
-- Login and set your project:
-  ```bash
-  gcloud auth login
-  gcloud config set project [YOUR_PROJECT_ID]
-  ```
-- Enable the necessary APIs:
-  ```bash
-  gcloud services enable run.googleapis.com
-  gcloud services enable artifactregistry.googleapis.com
-  ```
+#### Part B: Create a Task Queue
 
-**3. Deploy to Cloud Run**
-- In your terminal, navigate into your `radiology-solver` folder.
-- Run the deploy command:
-  ```bash
-  gcloud run deploy radiology-solver --source . --region us-central1 --allow-unauthenticated
-  ```
-- This will take a few minutes. When it's done, it will print a **Service URL**. Copy this URL.
+1.  Navigate to **Cloud Tasks** in the console.
+2.  Click **"Create Queue"**.
+3.  Select queue type **"HTTP"**.
+4.  Give it a **Queue name** (e.g., `solver-queue`).
+5.  Select the same **Region** you will deploy your Cloud Run service to (e.g., `us-central1`).
+6.  Click **"Create"**.
 
-### Step 3: Configure Environment Variables
+#### Part C: Create a Service Account for Vercel
 
-This is the final step to connect everything.
+This service account allows your Vercel functions to securely create tasks in Google Cloud Tasks.
 
-**1. Generate a Secret Token**
-Create a long, random string to act as a password between your Vercel app and your Cloud Run service. Example: `my-super-secret-solver-token-12345`.
+1.  Navigate to **IAM & Admin** > **Service Accounts**.
+2.  Click **"Create Service Account"**.
+3.  Give it a name (e.g., `vercel-task-creator`).
+4.  Click **"Create and Continue"**.
+5.  Grant the following two roles:
+    -   `Cloud Tasks Enqueuer` (allows it to add tasks to a queue)
+    -   `Cloud Run Invoker` (allows it to trigger your private Cloud Run service)
+6.  Click **"Done"**.
 
-**2. Configure Cloud Run Environment Variables**
-- Go to the Google Cloud Run console and find your `radiology-solver` service.
-- Click "Edit & Deploy New Revision".
-- Go to the "Variables & Secrets" tab and add these three environment variables:
-  - `SUPABASE_URL`: Your Supabase project URL.
-  - `SUPABASE_KEY`: Your Supabase **service_role key** (find in Supabase Settings > API).
-  - `INTERNAL_API_TOKEN`: The secret token you just generated.
-- Click "Deploy".
+#### Part D: Generate a JSON Key
 
-**3. Configure Vercel Environment Variables**
-- Go to your Vercel project dashboard > Settings > Environment Variables.
-- Add the following variables:
-  - `VITE_SUPABASE_URL`: Your Supabase project URL.
-  - `VITE_SUPABASE_ANON_KEY`: Your Supabase **anon key** (find in Supabase Settings > API).
-  - `SUPABASE_SERVICE_ROLE_KEY`: Your Supabase **service_role key**.
-  - `SOLVER_URL`: The **Service URL** you copied from your Cloud Run deployment.
-  - `SOLVER_TOKEN`: The same secret token you used for `INTERNAL_API_TOKEN` in Cloud Run.
-- **Redeploy Vercel:** Trigger a new deployment in Vercel to apply the new environment variables.
+1.  Find the `vercel-task-creator` service account in the list and click on it.
+2.  Go to the **"Keys"** tab.
+3.  Click **"Add Key"** -> **"Create new key"**.
+4.  Select **JSON** as the key type and click **"Create"**.
+5.  A JSON file will be downloaded to your computer. **This file is a secret credential. Do not commit it to git.**
 
-Your application is now fully configured and ready to use!
+### 3. Vercel Setup
+
+1.  Create a new project on [Vercel](https://vercel.com/) and link it to your git repository.
+2.  In the project settings, configure the following **Environment Variables**:
+    -   `VITE_SUPABASE_URL`: Your Supabase Project URL.
+    -   `VITE_SUPABASE_ANON_KEY`: Your Supabase `anon` (public) key.
+    -   `SUPABASE_SERVICE_ROLE_KEY`: Your Supabase `service_role` (secret) key.
+    -   `GCP_PROJECT_ID`: Your Google Cloud project ID (e.g., `scheduler-474709`).
+    -   `GCP_QUEUE_LOCATION`: The region of your Cloud Task queue (e.g., `us-central1`).
+    -   `GCP_QUEUE_NAME`: The name of your Cloud Task queue (e.g., `solver-queue`).
+    -   `SOLVER_URL`: The URL of your deployed Google Cloud Run service (you will get this after deploying the backend).
+    -   `GCP_CLIENT_EMAIL`: The `client_email` from the JSON key file you downloaded.
+    -   `GCP_PRIVATE_KEY`: The `private_key` from the JSON key file. Be sure to copy the entire string, including the `-----BEGIN PRIVATE KEY-----` and `-----END PRIVATE KEY-----` markers, and format it correctly for Vercel's multi-line variable input.
+
+### 4. Backend Deployment (Google Cloud Run)
+
+1.  Ensure you have the `gcloud` CLI installed and authenticated.
+2.  Navigate to the root of your project in your terminal.
+3.  Run the following command to build and deploy the solver. Replace `[SERVICE_ACCOUNT_EMAIL]` with the email of the default Compute Engine service account or another account with Supabase access.
+
+    ```bash
+    gcloud run deploy radiology-solver \
+      --source . \
+      --platform managed \
+      --region us-central1 \
+      --allow-unauthenticated \
+      --set-env-vars="SUPABASE_URL=YOUR_SUPABASE_URL" \
+      --set-env-vars="SUPABASE_KEY=YOUR_SUPABASE_SERVICE_ROLE_KEY" \
+      --set-env-vars="INTERNAL_API_TOKEN=SOME_RANDOM_SECRET_STRING" \
+      --timeout=900 \
+      --cpu=1 \
+      --memory=2Gi \
+      --min-instances=1
+    ```
+4. After deployment, Cloud Run will give you a **Service URL**. Copy this URL and set it as the `SOLVER_URL` environment variable in Vercel. You will also need to set the `INTERNAL_API_TOKEN` in your Vercel environment variables to match the one you set here.
+
+5. **IMPORTANT**: After the first deployment, go back to the Cloud Run service, click "Edit & Deploy New Revision", go to the "Security" tab, and change **Ingress control** from "Allow all traffic" to **"Allow internal traffic and traffic from Cloud Load Balancing"**. This secures your internal solver endpoint so that only Google Cloud services (like Cloud Tasks) can call it. Deploy the revision.
+
+### 5. Frontend Deployment (Vercel)
+
+-   With all environment variables configured, push your code to the main branch linked to your Vercel project. Vercel will automatically build and deploy the frontend and serverless functions.
