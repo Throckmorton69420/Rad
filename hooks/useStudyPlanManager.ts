@@ -85,60 +85,17 @@ export const useStudyPlanManager = (showConfirmation: (options: ShowConfirmation
     const [progressMessage, setProgressMessage] = useState('');
 
     const pollingRef = useRef<number | null>(null);
-    const progressIntervalRef = useRef<number | null>(null);
     const pollingAttemptsRef = useRef(0);
 
     const updatePreviousStudyPlan = useCallback((plan: StudyPlan) => {
         setPreviousStudyPlan(JSON.parse(JSON.stringify(plan)));
     }, []);
 
-    const stopProgressSimulation = useCallback(() => {
-        if (progressIntervalRef.current) {
-            clearInterval(progressIntervalRef.current);
-            progressIntervalRef.current = null;
-        }
-    }, []);
-
-    const startProgressSimulation = useCallback(() => {
-        stopProgressSimulation();
-        setProgress(0);
-        let elapsed = 0;
-        const totalDuration = 5 * 60 * 1000; // 5 minutes simulation
-        const interval = 100; // ms
-
-        progressIntervalRef.current = window.setInterval(() => {
-            elapsed += interval;
-            
-            let currentProgress = 0;
-            if (elapsed < 5000) {
-                setProgressMessage('Analyzing resources and constraints...');
-                currentProgress = (elapsed / 5000) * 20;
-            } else if (elapsed < totalDuration * 0.5) {
-                setProgressMessage('Optimizing daily tasks across the timeline...');
-                const phaseDuration = totalDuration * 0.5 - 5000;
-                const phaseElapsed = elapsed - 5000;
-                currentProgress = 20 + (phaseElapsed / phaseDuration) * 50;
-            } else if (elapsed < totalDuration) {
-                setProgressMessage('Finalizing schedule... almost there!');
-                const phaseDuration = totalDuration * 0.5;
-                const phaseElapsed = elapsed - totalDuration * 0.5;
-                currentProgress = 70 + (phaseElapsed / phaseDuration) * 25;
-            } else {
-                setProgressMessage('Still working... The solver is handling a complex schedule.');
-                currentProgress = 95;
-            }
-
-            setProgress(Math.min(95, currentProgress));
-        }, interval);
-    }, [stopProgressSimulation]);
-
-
     const pollRunStatus = useCallback(async (run_id: string, resources: StudyResource[], exceptions: ExceptionDateRule[], startDate: string, endDate: string) => {
         if (pollingAttemptsRef.current >= MAX_POLLING_ATTEMPTS) {
             setSystemNotification({ type: 'error', message: 'Solver timed out. The server is taking too long to respond. Please try again later.' });
             setIsLoading(false);
             if(pollingRef.current) clearInterval(pollingRef.current);
-            stopProgressSimulation();
             return;
         }
         pollingAttemptsRef.current++;
@@ -149,9 +106,21 @@ export const useStudyPlanManager = (showConfirmation: (options: ShowConfirmation
             
             const data = await res.json();
             
+            const currentProgress = data.progress || 0;
+            if(currentProgress >= 0) {
+              setProgress(currentProgress);
+            }
+
+            if (data.status === 'SOLVING') {
+                 if (currentProgress < 15) setProgressMessage('Analyzing resources and constraints...');
+                 else if (currentProgress < 25) setProgressMessage('Building optimization model...');
+                 else if (currentProgress < 85) setProgressMessage('Solving schedule... this is the longest step.');
+                 else if (currentProgress < 95) setProgressMessage('Finalizing results...');
+                 else setProgressMessage('Saving new schedule...');
+            }
+            
             if (data.status === 'COMPLETE') {
                 if (pollingRef.current) clearInterval(pollingRef.current);
-                stopProgressSimulation();
                 setProgress(100);
                 setProgressMessage('Schedule complete! Loading...');
                 
@@ -175,21 +144,20 @@ export const useStudyPlanManager = (showConfirmation: (options: ShowConfirmation
                 }, 500);
             } else if (data.status === 'FAILED') {
                 if(pollingRef.current) clearInterval(pollingRef.current);
-                stopProgressSimulation();
                 setSystemNotification({ type: 'error', message: `Solver failed: ${data.error_text || 'An unknown error occurred.'}` });
                 setIsLoading(false);
             }
         } catch (error: any) {
             if(pollingRef.current) clearInterval(pollingRef.current);
-            stopProgressSimulation();
             setSystemNotification({ type: 'error', message: `Error checking status: ${error.message}` });
             setIsLoading(false);
         }
-    }, [setStudyPlan, stopProgressSimulation]);
+    }, [setStudyPlan]);
 
     const triggerSolver = useCallback(async (isInitialGeneration: boolean, startDate: string, endDate: string) => {
         setIsLoading(true);
-        startProgressSimulation();
+        setProgress(0);
+        setProgressMessage('Initiating solver service...');
         if (pollingRef.current) clearInterval(pollingRef.current);
         pollingAttemptsRef.current = 0;
 
@@ -203,14 +171,13 @@ export const useStudyPlanManager = (showConfirmation: (options: ShowConfirmation
             if (!res.ok) throw new Error(`Server responded with ${res.status}`);
             
             const { run_id } = await res.json();
-            setProgressMessage(`Solver initiated (ID: ${run_id.slice(0,8)})... This may take several minutes.`);
+            setProgressMessage(`Solver initiated... This may take several minutes.`);
             pollingRef.current = window.setInterval(() => pollRunStatus(run_id, globalMasterResourcePool, exceptionDates, startDate, endDate), POLLING_INTERVAL);
         } catch (error: any) {
             setSystemNotification({ type: 'error', message: `Failed to start solver: ${error.message}` });
             setIsLoading(false);
-            stopProgressSimulation();
         }
-    }, [globalMasterResourcePool, exceptionDates, pollRunStatus, startProgressSimulation, stopProgressSimulation]);
+    }, [globalMasterResourcePool, exceptionDates, pollRunStatus]);
 
 
     const loadSchedule = useCallback(async (regenerate = false) => {
