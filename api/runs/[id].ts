@@ -15,10 +15,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    // 1. Fetch the run status
+    // 1. Fetch the run status and progress
     const { data: run, error: runError } = await supabase
       .from('runs')
-      .select('id, status, objective_values, error_text')
+      .select('id, status, objective_values, error_text, progress')
       .eq('id', id)
       .single();
 
@@ -39,7 +39,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(200).json({ ...run, slots });
     }
 
-    // 3. If still pending or solving, just return the current status
+    // 3. If still pending or solving, just return the current status and progress
     return res.status(200).json(run);
 
   } catch (error: any) {
