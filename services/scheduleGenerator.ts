@@ -218,17 +218,17 @@ const runSchedulingEngine = (
         timeUsedOnDay += titanAnchor.durationMinutes;
         const dayTopics = new Set<Domain>([titanAnchor.domain]);
 
-        // Helper to place one matching resource
+        // Helper to place matching resources, now with pairing logic
         const placeMatchingResource = (pool: StudyResource[], primaryResource: StudyResource) => {
             let availableTime = day.totalStudyTimeMinutes - timeUsedOnDay;
             if (availableTime < MIN_DURATION_for_SPLIT_PART) return;
 
             let foundIndex = -1;
-            // Prioritize explicitly paired resources
+            // 1. Prioritize explicitly paired resources
             if (primaryResource.pairedResourceIds) {
                 foundIndex = pool.findIndex(r => primaryResource.pairedResourceIds!.includes(r.id) && r.durationMinutes <= availableTime);
             }
-            // Fallback to topic-matched resources
+            // 2. Fallback to topic-matched resources
             if (foundIndex === -1) {
                 foundIndex = pool.findIndex(r => r.domain === primaryResource.domain && r.durationMinutes <= availableTime);
             }
@@ -240,12 +240,14 @@ const runSchedulingEngine = (
                 dayTopics.add(resourceToPlace.domain);
             }
         };
+        
+        // --- Stricter Hierarchical Pass ---
 
-        // Place pairs
+        // Pass 2: Paired Content (CTC, Case Companion)
         placeMatchingResource(pools.ctc, titanAnchor);
         placeMatchingResource(pools.caseCompanion, titanAnchor);
 
-        // Place NIS/RISC
+        // Pass 3: Secondary Content (NIS/RISC) - These are less topic-specific, so just fit them if possible
         let availableTime = day.totalStudyTimeMinutes - timeUsedOnDay;
         const nisRiscIndex = pools.nisRisc.findIndex(t => t.durationMinutes <= availableTime);
         if (nisRiscIndex !== -1) {
@@ -254,22 +256,39 @@ const runSchedulingEngine = (
              timeUsedOnDay += nisRiscTask.durationMinutes;
         }
         
-        // Place Questions
+        // Pass 4: Questions (must be after content)
+        // The filter ensures questions are only for topics covered today
         const questionFilter = (r: StudyResource) => dayTopics.has(r.domain);
-        availableTime = day.totalStudyTimeMinutes - timeUsedOnDay;
-        if (availableTime >= MIN_DURATION_for_SPLIT_PART) timeUsedOnDay += fillTimeOnDay(day, pools.qevlar, availableTime, questionFilter);
-        
-        availableTime = day.totalStudyTimeMinutes - timeUsedOnDay;
-        if (availableTime >= MIN_DURATION_for_SPLIT_PART) timeUsedOnDay += fillTimeOnDay(day, pools.otherQBanks, availableTime, questionFilter);
-        
-        availableTime = day.totalStudyTimeMinutes - timeUsedOnDay;
-        if (availableTime >= MIN_DURATION_for_SPLIT_PART) timeUsedOnDay += fillTimeOnDay(day, pools.boardVitals, availableTime);
 
-        // Place Fillers
+        // QEVLAR (topic-specific) first
         availableTime = day.totalStudyTimeMinutes - timeUsedOnDay;
-        if (availableTime >= MIN_DURATION_for_SPLIT_PART) timeUsedOnDay += fillTimeOnDay(day, pools.discord, availableTime);
+        if (availableTime >= MIN_DURATION_for_SPLIT_PART) {
+            timeUsedOnDay += fillTimeOnDay(day, pools.qevlar, availableTime, questionFilter);
+        }
+        
+        // Other specific QBanks
         availableTime = day.totalStudyTimeMinutes - timeUsedOnDay;
-        if (availableTime >= MIN_DURATION_for_SPLIT_PART) timeUsedOnDay += fillTimeOnDay(day, pools.coreRadiology, availableTime);
+        if (availableTime >= MIN_DURATION_for_SPLIT_PART) {
+            timeUsedOnDay += fillTimeOnDay(day, pools.otherQBanks, availableTime, questionFilter);
+        }
+        
+        // Board Vitals (broad) can be used to fill remaining time
+        availableTime = day.totalStudyTimeMinutes - timeUsedOnDay;
+        if (availableTime >= MIN_DURATION_for_SPLIT_PART) {
+            timeUsedOnDay += fillTimeOnDay(day, pools.boardVitals, availableTime);
+        }
+
+        // Pass 5: Discord Videos
+        availableTime = day.totalStudyTimeMinutes - timeUsedOnDay;
+        if (availableTime >= MIN_DURATION_for_SPLIT_PART) {
+            timeUsedOnDay += fillTimeOnDay(day, pools.discord, availableTime);
+        }
+        
+        // Pass 6: Core Radiology Filler
+        availableTime = day.totalStudyTimeMinutes - timeUsedOnDay;
+        if (availableTime >= MIN_DURATION_for_SPLIT_PART) {
+            timeUsedOnDay += fillTimeOnDay(day, pools.coreRadiology, availableTime);
+        }
     }
     
     // --- Pass for Leftovers: Fill remaining time in all days up to HARD_CAP ---
