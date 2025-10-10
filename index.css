@@ -1,4 +1,3 @@
-
 :root {
   /* --- Colors --- */
   --background-primary: #000000;
@@ -268,41 +267,40 @@ div.glass-chrome {
 }
 
 @media print {
+  @page {
+    size: letter;
+    margin: 0.75in;
+  }
+
   body, #root {
     background: white !important;
     color: black !important;
-    font-size: 10pt;
-    overflow: visible !important;
-    height: auto !important;
+    font-size: 9pt;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
   }
-  
-  /* Hide the main interactive app content */
+
+  /* Hide the main interactive app and show the print container */
   .main-app-container {
     display: none !important;
   }
   
-  /* Show only the container for the printable report */
   .print-only-container {
     display: block !important;
-    position: static !important;
-    width: 100%;
-    height: auto;
   }
 
-  /* Styles for the report components themselves */
   .printable-report {
-    padding: 0;
-    margin: 0;
     font-family: 'Times New Roman', Times, serif;
-    visibility: visible;
-  }
-
-  .printable-report h1, .printable-report h2, .printable-report h3, .printable-report h4 {
-    color: black;
-    page-break-after: avoid;
-    font-family: 'Helvetica', 'Arial', sans-serif;
   }
   
+  .printable-report header {
+    page-break-after: avoid;
+  }
+
+  .printable-report h1, .printable-report h2, .printable-report h3, .printable-report h4, .printable-report th {
+    font-family: 'Helvetica', 'Arial', sans-serif;
+  }
+
   .printable-report table {
     width: 100%;
     border-collapse: collapse;
@@ -311,7 +309,7 @@ div.glass-chrome {
 
   .printable-report th, .printable-report td {
     border: 1px solid #ccc;
-    padding: 6px 8px;
+    padding: 4px 6px;
     text-align: left;
     word-break: break-word;
   }
@@ -319,17 +317,10 @@ div.glass-chrome {
   .printable-report thead th {
     background-color: #f2f2f2 !important;
     font-weight: bold;
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
   }
 
   .printable-report tr {
     page-break-inside: avoid;
-  }
-
-  .printable-report a {
-    text-decoration: none;
-    color: #000;
   }
   
   .print-page-break {

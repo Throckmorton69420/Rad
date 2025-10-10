@@ -1,5 +1,3 @@
-
-// FIX: Removed CDATA wrapper from the file content.
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { DailySchedule, StudyPlan, ScheduledTask, PomodoroSettings, ViewMode, Domain, ResourceType, AddTaskModalProps, StudyResource, ResourceEditorModalProps, ExceptionDateRule, DeadlineSettings, RebalanceOptions, ShowConfirmationOptions, PrintOptions } from './types';
 import { EXAM_DATE_START, APP_TITLE, ALL_DOMAINS, POMODORO_DEFAULT_STUDY_MINS, POMODORO_DEFAULT_REST_MINS } from './constants';
@@ -251,8 +249,6 @@ const App: React.FC = () => {
       };
       window.addEventListener('afterprint', handleAfterPrint);
       
-      // FIX: Delay printing to allow React to render the content first.
-      // This prevents blank pages.
       setTimeout(() => window.print(), 100);
     }
   }, [printableContent]);
@@ -560,7 +556,7 @@ const App: React.FC = () => {
   const currentPomodoroTask = currentPomodoroTaskId ? studyPlan.schedule.flatMap(d => d.tasks).find(t => t.id === currentPomodoroTaskId) : null;
   
   const MainAppContent = (
-      <div className="h-full w-full bg-transparent text-[var(--text-primary)] flex print:hidden">
+      <div className="h-full w-full bg-transparent text-[var(--text-primary)] flex flex-col print:hidden">
         <div className={`lg:hidden fixed inset-y-0 left-0 z-[var(--z-sidebar-mobile)] transform transition-transform duration-300 ease-in-out ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
             <SidebarContent 
                 isSidebarOpen={isSidebarOpen} setIsSidebarOpen={setIsSidebarOpen} isPomodoroCollapsed={isPomodoroCollapsed} setIsPomodoroCollapsed={setIsPomodoroCollapsed}
@@ -574,7 +570,7 @@ const App: React.FC = () => {
             />
         </div>
         <div className={`lg:hidden fixed inset-0 bg-black/60 z-[var(--z-sidebar-mobile-backdrop)] transition-opacity ${isSidebarOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`} onClick={() => setIsSidebarOpen(false)} aria-hidden="true"></div>
-        <div className="hidden lg:block flex-shrink-0">
+        <div className="hidden lg:block fixed inset-y-0 left-0 z-30">
           <SidebarContent 
                 isSidebarOpen={isSidebarOpen} setIsSidebarOpen={setIsSidebarOpen} isPomodoroCollapsed={isPomodoroCollapsed} setIsPomodoroCollapsed={setIsPomodoroCollapsed}
                 pomodoroSettings={pomodoroSettings} setPomodoroSettings={setPomodoroSettings} handlePomodoroSessionComplete={handlePomodoroSessionComplete} currentPomodoroTask={currentPomodoroTask}
@@ -587,107 +583,107 @@ const App: React.FC = () => {
             />
         </div>
 
-        {/* --- MAIN CONTENT AREA - SCROLLING FIX --- */}
-        <div className="flex-1 flex flex-col min-h-0">
-          <header className="flex-shrink-0 text-[var(--text-primary)] px-3 md:px-4 pb-3 md:pb-4 flex justify-between items-center sticky top-0 z-[var(--z-header)] pt-[calc(0.75rem+env(safe-area-inset-top))] md:pt-[calc(1rem+env(safe-area-inset-top))] pl-[calc(0.75rem+env(safe-area-inset-left))] pr-[calc(0.75rem+env(safe-area-inset-right))] glass-chrome">
-            <div className="flex items-center">
-                <button className="lg:hidden p-2 -ml-2 mr-2 text-[var(--text-primary)] hover:bg-[var(--background-tertiary-hover)] rounded-full" onClick={() => setIsSidebarOpen(p => !p)} aria-label="Toggle menu">
-                    <i className="fas fa-bars fa-lg"></i>
-                </button>
-                <h1 className="text-base sm:text-lg md:text-xl font-bold flex items-center"><i className="fas fa-brain mr-2 text-[var(--accent-purple)]"></i> {APP_TITLE}</h1>
-            </div>
-            
-            {pomodoroSettings.isActive && (
-                <div className="absolute left-1/2 -translate-x-1/2 flex items-center flex-col pointer-events-none">
-                    <div className={`hidden sm:block text-xs uppercase tracking-wider ${pomodoroSettings.isStudySession ? 'text-[var(--accent-purple)]' : 'text-[var(--accent-green)]'}`}>{pomodoroSettings.isStudySession ? 'Study Time' : 'Break Time'}</div>
-                    <div className="text-2xl font-mono font-bold text-[var(--text-primary)] hidden sm:block">
-                        {formatTime(pomodoroSettings.timeLeft)}
-                    </div>
-                    <div className={`sm:hidden h-8 w-8 rounded-full flex items-center justify-center text-xs ${pomodoroSettings.isStudySession ? 'bg-[var(--accent-purple)] text-white' : 'bg-[var(--accent-green)] text-black'}`}>
-                        <i className="fas fa-stopwatch"></i>
-                    </div>
-                </div>
-            )}
-            <div className="flex items-center space-x-2 md:space-x-4">
-                <div className="hidden sm:block">
-                    <SaveStatusIndicator />
-                </div>
-                <Button onClick={() => setIsPrintModalOpen(true)} variant="secondary" size="sm" className="!px-2.5 !text-sm" aria-label="Print Reports">
-                  <i className="fas fa-print"></i>
-                </Button>
-                <div className="p-2 rounded-lg flex flex-col md:flex-row md:items-center md:space-x-4 gap-y-1">
-                  {studyPlan.firstPassEndDate && (
-                    <div className="text-right">
-                      <div className="text-xs text-slate-400">First Pass Ends</div>
-                      <div className="text-sm font-medium text-[var(--accent-purple)] interactive-glow-border">
-                        {parseDateString(studyPlan.firstPassEndDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' })}
+        <div className="flex-grow lg:pl-80 flex flex-col min-h-0">
+          <div className={`relative flex-1 overflow-y-auto min-h-0 ${isMobile && isSidebarOpen ? 'overflow-hidden' : ''}`}>
+            <header className="flex-shrink-0 text-[var(--text-primary)] px-3 md:px-4 pb-3 md:pb-4 flex justify-between items-center sticky top-0 z-[var(--z-header)] pt-[calc(0.75rem+env(safe-area-inset-top))] md:pt-[calc(1rem+env(safe-area-inset-top))] pl-[calc(0.75rem+env(safe-area-inset-left))] pr-[calc(0.75rem+env(safe-area-inset-right))] glass-chrome">
+              <div className="flex items-center">
+                  <button className="lg:hidden p-2 -ml-2 mr-2 text-[var(--text-primary)] hover:bg-[var(--background-tertiary-hover)] rounded-full" onClick={() => setIsSidebarOpen(p => !p)} aria-label="Toggle menu">
+                      <i className="fas fa-bars fa-lg"></i>
+                  </button>
+                  <h1 className="text-base sm:text-lg md:text-xl font-bold flex items-center"><i className="fas fa-brain mr-2 text-[var(--accent-purple)]"></i> {APP_TITLE}</h1>
+              </div>
+              
+              {pomodoroSettings.isActive && (
+                  <div className="absolute left-1/2 -translate-x-1/2 flex items-center flex-col pointer-events-none">
+                      <div className={`hidden sm:block text-xs uppercase tracking-wider ${pomodoroSettings.isStudySession ? 'text-[var(--accent-purple)]' : 'text-[var(--accent-green)]'}`}>{pomodoroSettings.isStudySession ? 'Study Time' : 'Break Time'}</div>
+                      <div className="text-2xl font-mono font-bold text-[var(--text-primary)] hidden sm:block">
+                          {formatTime(pomodoroSettings.timeLeft)}
                       </div>
-                    </div>
-                  )}
-                  <CountdownTimer examDate={EXAM_DATE_START} />
-                </div>
-            </div>
-          </header>
-          
-          {/* This is now the ONE AND ONLY scrolling container */}
-          <main className="flex-1 overflow-y-auto">
-              <div className="pt-3 md:pt-6 pl-[calc(0.75rem+env(safe-area-inset-left))] pr-[calc(0.75rem+env(safe-area-inset-right))]">
-                <div className="mb-6 flex-shrink-0 px-3 md:px-6">
-                      <div className="inline-flex bg-[var(--background-secondary)] p-1 rounded-lg space-x-1">
-                          <button onClick={() => setActiveTab('schedule')} className={`py-1.5 px-4 font-semibold text-sm rounded-md flex-1 transition-colors ${activeTab === 'schedule' ? 'bg-[var(--glass-bg-active)] shadow text-[var(--text-primary)]' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}>
-                              <i className="fa-regular fa-calendar-days mr-2"></i> Schedule
-                          </button>
-                          <button onClick={() => setActiveTab('progress')} className={`py-1.5 px-4 font-semibold text-sm rounded-md flex-1 transition-colors ${activeTab === 'progress' ? 'bg-[var(--glass-bg-active)] shadow text-[var(--text-primary)]' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}>
-                              <i className="fa-solid fa-chart-pie mr-2"></i> Progress
-                          </button>
-                          <button onClick={() => setActiveTab('content')} className={`py-1.5 px-4 font-semibold text-sm rounded-md flex-1 transition-colors ${activeTab === 'content' ? 'bg-[var(--glass-bg-active)] shadow text-[var(--text-primary)]' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}>
-                              <i className="fa-solid fa-book-bookmark mr-2"></i> Content
-                          </button>
+                      <div className={`sm:hidden h-8 w-8 rounded-full flex items-center justify-center text-xs ${pomodoroSettings.isStudySession ? 'bg-[var(--accent-purple)] text-white' : 'bg-[var(--accent-green)] text-black'}`}>
+                          <i className="fas fa-stopwatch"></i>
                       </div>
                   </div>
-
-                  <div className="px-3 md:px-6">
-                      {isLoading && <div className="flex flex-col items-center justify-center p-10"> <i className="fas fa-spinner fa-spin fa-2x text-[var(--accent-purple)] mb-3"></i> <span className="text-[var(--text-primary)]">Loading...</span> </div>}
-                      
-                      {!isLoading && activeTab === 'schedule' && (
-                        <div>
-                            {selectedDaySchedule ?
-                              <DailyTaskList 
-                                  dailySchedule={selectedDaySchedule} 
-                                  onTaskToggle={(taskId) => handleTaskToggle(taskId, selectedDate)} 
-                                  onOpenAddTaskModal={() => openModal('isAddTaskModalOpen')} 
-                                  onOpenModifyDayModal={() => openModal('isModifyDayTasksModalOpen')}
-                                  currentPomodoroTaskId={currentPomodoroTaskId} 
-                                  onPomodoroTaskSelect={handlePomodoroTaskSelect} 
-                                  onNavigateDay={navigateDate} 
-                                  isPomodoroActive={pomodoroSettings.isActive}
-                                  onToggleRestDay={(isRest) => handleToggleRestDay(selectedDate, isRest)}
-                                  onUpdateTimeForDay={handleUpdateTimeForDay}
-                                  isLoading={isLoading}
-                              /> : <div className="text-center text-[var(--text-secondary)] py-10">No schedule for this day.</div>
-                            }
+              )}
+              <div className="flex items-center space-x-2 md:space-x-4">
+                  <div className="hidden sm:block">
+                      <SaveStatusIndicator />
+                  </div>
+                  <Button onClick={() => setIsPrintModalOpen(true)} variant="secondary" size="sm" className="!px-2.5 !text-sm" aria-label="Print Reports">
+                    <i className="fas fa-print"></i>
+                  </Button>
+                  <div className="p-2 rounded-lg flex flex-col md:flex-row md:items-center md:space-x-4 gap-y-1">
+                    {studyPlan.firstPassEndDate && (
+                      <div className="text-right">
+                        <div className="text-xs text-slate-400">First Pass Ends</div>
+                        <div className="text-sm font-medium text-[var(--accent-purple)] interactive-glow-border">
+                          {parseDateString(studyPlan.firstPassEndDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' })}
                         </div>
-                      )}
-                      
-                      {!isLoading && activeTab === 'progress' && <ProgressDisplay studyPlan={studyPlan} />}
-
-                      {!isLoading && activeTab === 'content' && (
-                          <MasterResourcePoolViewer 
-                              resources={globalMasterResourcePool}
-                              onOpenAddResourceModal={() => openResourceEditor(null)}
-                              onEditResource={openResourceEditor}
-                              onArchiveResource={handleRequestArchive}
-                              onRestoreResource={handleRestoreResource}
-                              onPermanentDeleteResource={handlePermanentDelete}
-                              scheduledResourceIds={scheduledResourceIds}
-                              onGoToDate={handleGoToDateForResource}
-                              onHighlightDates={handleHighlightDatesForResource}
-                              onClearHighlights={() => setHighlightedDates([])}
-                          />
-                      )}
+                      </div>
+                    )}
+                    <CountdownTimer examDate={EXAM_DATE_START} />
                   </div>
               </div>
-          </main>
+            </header>
+            
+            <main>
+                <div className="pt-3 md:pt-6 pl-[calc(0.75rem+env(safe-area-inset-left))] pr-[calc(0.75rem+env(safe-area-inset-right))]">
+                  <div className="mb-6 px-3 md:px-6">
+                        <div className="inline-flex bg-[var(--background-secondary)] p-1 rounded-lg space-x-1">
+                            <button onClick={() => setActiveTab('schedule')} className={`py-1.5 px-4 font-semibold text-sm rounded-md flex-1 transition-colors ${activeTab === 'schedule' ? 'bg-[var(--glass-bg-active)] shadow text-[var(--text-primary)]' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}>
+                                <i className="fa-regular fa-calendar-days mr-2"></i> Schedule
+                            </button>
+                            <button onClick={() => setActiveTab('progress')} className={`py-1.5 px-4 font-semibold text-sm rounded-md flex-1 transition-colors ${activeTab === 'progress' ? 'bg-[var(--glass-bg-active)] shadow text-[var(--text-primary)]' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}>
+                                <i className="fa-solid fa-chart-pie mr-2"></i> Progress
+                            </button>
+                            <button onClick={() => setActiveTab('content')} className={`py-1.5 px-4 font-semibold text-sm rounded-md flex-1 transition-colors ${activeTab === 'content' ? 'bg-[var(--glass-bg-active)] shadow text-[var(--text-primary)]' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}>
+                                <i className="fa-solid fa-book-bookmark mr-2"></i> Content
+                            </button>
+                        </div>
+                    </div>
+
+                    <div className="px-3 md:px-6">
+                        {isLoading && <div className="flex flex-col items-center justify-center p-10"> <i className="fas fa-spinner fa-spin fa-2x text-[var(--accent-purple)] mb-3"></i> <span className="text-[var(--text-primary)]">Loading...</span> </div>}
+                        
+                        {!isLoading && activeTab === 'schedule' && (
+                          <div>
+                              {selectedDaySchedule ?
+                                <DailyTaskList 
+                                    dailySchedule={selectedDaySchedule} 
+                                    onTaskToggle={(taskId) => handleTaskToggle(taskId, selectedDate)} 
+                                    onOpenAddTaskModal={() => openModal('isAddTaskModalOpen')} 
+                                    onOpenModifyDayModal={() => openModal('isModifyDayTasksModalOpen')}
+                                    currentPomodoroTaskId={currentPomodoroTaskId} 
+                                    onPomodoroTaskSelect={handlePomodoroTaskSelect} 
+                                    onNavigateDay={navigateDate} 
+                                    isPomodoroActive={pomodoroSettings.isActive}
+                                    onToggleRestDay={(isRest) => handleToggleRestDay(selectedDate, isRest)}
+                                    onUpdateTimeForDay={handleUpdateTimeForDay}
+                                    isLoading={isLoading}
+                                /> : <div className="text-center text-[var(--text-secondary)] py-10">No schedule for this day.</div>
+                              }
+                          </div>
+                        )}
+                        
+                        {!isLoading && activeTab === 'progress' && <ProgressDisplay studyPlan={studyPlan} />}
+
+                        {!isLoading && activeTab === 'content' && (
+                            <MasterResourcePoolViewer 
+                                resources={globalMasterResourcePool}
+                                onOpenAddResourceModal={() => openResourceEditor(null)}
+                                onEditResource={openResourceEditor}
+                                onArchiveResource={handleRequestArchive}
+                                onRestoreResource={handleRestoreResource}
+                                onPermanentDeleteResource={handlePermanentDelete}
+                                scheduledResourceIds={scheduledResourceIds}
+                                onGoToDate={handleGoToDateForResource}
+                                onHighlightDates={handleHighlightDatesForResource}
+                                onClearHighlights={() => setHighlightedDates([])}
+                            />
+                        )}
+                    </div>
+                </div>
+            </main>
+          </div>
           
           {systemNotification && (
             <div 
@@ -697,7 +693,7 @@ const App: React.FC = () => {
                   backgroundColor: `color-mix(in srgb, var(--notification-color) 25%, var(--glass-bg-chrome))`,
                 } as React.CSSProperties}
             >
-              <span className="text-left whitespace-pre-wrap"><i className={`fas ${systemNotification.type === 'error' ? 'fa-exclamation-circle' : 'fa-info-circle'} mr-2`}></i>{systemNotification.message}</span>
+              <span className="text-left"><i className={`fas ${systemNotification.type === 'error' ? 'fa-exclamation-circle' : 'fa-info-circle'} mr-2`}></i>{systemNotification.message}</span>
               <button onClick={() => setSystemNotification(null)} className="ml-4 font-bold text-xl leading-none" aria-label="Dismiss notification">&times;</button>
             </div>
           )}

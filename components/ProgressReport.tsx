@@ -4,7 +4,6 @@ import { formatDuration, parseDateString } from '../utils/timeFormatter';
 
 interface ProgressReportProps {
   studyPlan: StudyPlan;
-  // Add more props here based on options from a print modal, e.g., which sections to include
 }
 
 const ProgressReport: React.FC<ProgressReportProps> = ({ studyPlan }) => {
@@ -40,19 +39,25 @@ const ProgressReport: React.FC<ProgressReportProps> = ({ studyPlan }) => {
 
       <section className="mb-8 print-no-break">
         <h2 className="text-2xl font-semibold mb-3">Overall Progress</h2>
-        <table className="w-full">
+        <table className="w-full text-left text-sm border-collapse">
+          <thead>
+            <tr>
+              <th className="py-1 pr-2 w-1/3 font-semibold">Metric</th>
+              <th className="py-1 pl-2 font-semibold">Value</th>
+            </tr>
+          </thead>
           <tbody>
-            <tr>
-              <td className="w-1/3 py-1 font-semibold">Total Completion</td>
-              <td className="py-1">{Math.round(overallPercentage)}%</td>
+            <tr className="border-b border-gray-200">
+              <td className="py-1 pr-2 font-semibold">Total Completion</td>
+              <td className="py-1 pl-2">{Math.round(overallPercentage)}%</td>
             </tr>
-            <tr>
-              <td className="py-1 font-semibold">Time Completed</td>
-              <td className="py-1">{formatDuration(totalCompletedMinutes)}</td>
+            <tr className="border-b border-gray-200">
+              <td className="py-1 pr-2 font-semibold">Time Completed</td>
+              <td className="py-1 pl-2">{formatDuration(totalCompletedMinutes)}</td>
             </tr>
-            <tr>
-              <td className="py-1 font-semibold">Total Time Scheduled</td>
-              <td className="py-1">{formatDuration(totalScheduledMinutes)}</td>
+            <tr className="border-b border-gray-200">
+              <td className="py-1 pr-2 font-semibold">Total Time Scheduled</td>
+              <td className="py-1 pl-2">{formatDuration(totalScheduledMinutes)}</td>
             </tr>
           </tbody>
         </table>
@@ -60,20 +65,20 @@ const ProgressReport: React.FC<ProgressReportProps> = ({ studyPlan }) => {
 
       <section className="mb-8 print-no-break">
         <h2 className="text-2xl font-semibold mb-3">Progress by Topic</h2>
-        <table className="w-full">
+        <table className="w-full text-left text-sm border-collapse">
           <thead>
             <tr>
-              <th className="w-1/3">Topic</th>
-              <th>Progress</th>
-              <th>Time (Completed / Total)</th>
+              <th className="py-1 pr-2 w-1/3 font-semibold">Topic</th>
+              <th className="py-1 px-2 font-semibold">Progress</th>
+              <th className="py-1 pl-2 font-semibold">Time (Completed / Total)</th>
             </tr>
           </thead>
           <tbody>
             {progressByTopic.map(p => p && (
-              <tr key={p.name}>
-                <td>{p.name}</td>
-                <td>{p.total > 0 ? `${Math.round((p.completed / p.total) * 100)}%` : 'N/A'}</td>
-                <td>{formatDuration(p.completed)} / {formatDuration(p.total)}</td>
+              <tr key={p.name} className="border-b border-gray-200">
+                <td className="py-1 pr-2">{p.name}</td>
+                <td className="py-1 px-2">{p.total > 0 ? `${Math.round((p.completed / p.total) * 100)}%` : 'N/A'}</td>
+                <td className="py-1 pl-2">{formatDuration(p.completed)} / {formatDuration(p.total)}</td>
               </tr>
             ))}
           </tbody>

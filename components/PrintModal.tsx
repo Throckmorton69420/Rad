@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { PrintModalProps, PrintOptions, StudyPlan } from '../types';
 import { Button } from './Button';
@@ -61,8 +60,8 @@ const PrintModal: React.FC<PrintModalProps> = ({ isOpen, onClose, onGenerateRepo
                     const type = val as PrintOptions['schedule']['reportType'];
                     const { start, end } = getWeekStartEnd(currentDate);
                     setPrintOptions(p => ({...p, schedule: {...p.schedule, reportType: type,
-                        startDate: type === 'full' ? studyPlan.startDate : type === 'currentDay' ? currentDate : type === 'currentWeek' ? start : p.schedule.startDate,
-                        endDate: type === 'full' ? studyPlan.endDate : type === 'currentDay' ? currentDate : type === 'currentWeek' ? end : p.schedule.endDate,
+                        startDate: type === 'full' || type === 'range' ? studyPlan.startDate : type === 'currentDay' ? currentDate : start,
+                        endDate: type === 'full' || type === 'range' ? studyPlan.endDate : type === 'currentDay' ? currentDate : end,
                     }}));
                   }}
                   options={[
@@ -89,7 +88,7 @@ const PrintModal: React.FC<PrintModalProps> = ({ isOpen, onClose, onGenerateRepo
             {activeTab === 'progress' && (
               <div className="space-y-2">
                  <h3 className="font-semibold">Progress Report Options</h3>
-                 <p className="text-xs text-[var(--text-secondary)]">Report will reflect currently active filters on the main Progress tab.</p>
+                 <p className="text-xs text-[var(--text-secondary)]">This report provides a high-level summary of your completed study time versus the total scheduled time, broken down by topic.</p>
               </div>
             )}
             {activeTab === 'content' && (

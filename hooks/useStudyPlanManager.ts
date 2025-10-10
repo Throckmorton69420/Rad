@@ -100,7 +100,6 @@ export const useStudyPlanManager = () => {
             }
 
             const currentTopicOrder = planStateRef.current.studyPlan?.topicOrder;
-            // FIX: Updated the default deadlines as per the user's request to better utilize the entire study period. Physics/Nucs are due 10/26, other content 10/31, leaving the final week for question banks and review.
             const defaultDeadlines: DeadlineSettings = {
                 allContent: '2025-11-05',
                 physicsContent: '2025-10-26',
