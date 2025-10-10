@@ -279,7 +279,6 @@ div.glass-chrome {
   body, #root {
     overflow: visible !important;
     height: auto !important;
-    width: auto !important;
     background: white !important;
     color: black !important;
     font-size: 9pt;

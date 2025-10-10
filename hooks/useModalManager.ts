@@ -30,7 +30,6 @@ export const useModalManager = () => {
     setModalStates(prev => ({ ...prev, [modalName]: true }));
   }, []);
 
-  // FIX: The type signature for `closeModal` was too restrictive, preventing the Welcome Modal from being closed. Removed `isWelcomeModalOpen` from the Omit type to allow it to be closed with this generic handler.
   const closeModal = useCallback((modalName: keyof Omit<ModalStates, 'confirmationState'>) => {
     setModalStates(prev => ({ ...prev, [modalName]: false }));
   }, []);

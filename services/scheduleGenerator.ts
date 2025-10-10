@@ -92,15 +92,15 @@ const sourcePriorityMap: Record<string, number> = {
     'Crack the Core Volume 1': 2,
     'Crack the Core Volume 2': 2,
     'Crack the Core Case Companion': 3,
-    'Core Radiology': 4,
-    'Discord Review Sessions': 5,
-    'RISC Study Guide': 6,
-    'NIS Study Guide': 6,
-    'QEVLAR': 10,
-    'Board Vitals': 11,
-    'Physics Qbank (Categorized)': 12,
-    'NIS Question Bank': 13,
-    'NucApp': 14,
+    'Core Radiology': 9,
+    'Discord Review Sessions': 8,
+    'RISC Study Guide': 4,
+    'NIS Study Guide': 4,
+    'QEVLAR': 5,
+    'Board Vitals': 6,
+    'Physics Qbank (Categorized)': 7,
+    'NIS Question Bank': 7,
+    'NucApp': 7,
 };
 
 const getSourcePriority = (r: StudyResource): number => {
@@ -169,147 +169,142 @@ const runSchedulingEngine = (
     const notifications: GeneratedStudyPlanOutcome['notifications'] = [];
     const { topicOrder = [] } = config;
 
-    scheduleShell.forEach(day => {
-        day.tasks = []; 
-    });
+    scheduleShell.forEach(day => { day.tasks = []; });
 
-    const activeResources: StudyResource[] = JSON.parse(JSON.stringify(resourcePool.filter((r: StudyResource) => !r.isArchived)));
-    const resourceMap = new Map<string, StudyResource>(activeResources.map((r: StudyResource) => [r.id, r]));
+    const activeResources = JSON.parse(JSON.stringify(resourcePool.filter((r) => !r.isArchived))) as StudyResource[];
     const isQuestion = (r: StudyResource) => r.type === ResourceType.QUESTIONS || r.type === ResourceType.REVIEW_QUESTIONS || r.type === ResourceType.QUESTION_REVIEW;
-    
+
     const pools = {
         titan: sortResourcesForScheduling(activeResources.filter(r => r.videoSource === 'Titan Radiology Videos' && !r.isOptional), topicOrder),
-        ctc: sortResourcesForScheduling(activeResources.filter(r => r.bookSource?.includes('Crack the Core Volume') && !r.isOptional), topicOrder),
+        ctc: sortResourcesForScheduling(activeResources.filter(r => r.bookSource?.includes('Crack the Core') && !r.bookSource.includes('Companion') && !r.isOptional), topicOrder),
         caseCompanion: sortResourcesForScheduling(activeResources.filter(r => r.bookSource === 'Crack the Core Case Companion' && !r.isOptional), topicOrder),
-        nisRisc: sortResourcesForScheduling(activeResources.filter(r => (r.domain === Domain.NIS || r.domain === Domain.RISC) && !r.isOptional), topicOrder),
-        boardVitals: sortResourcesForScheduling(activeResources.filter(r => r.bookSource === 'Board Vitals' && isQuestion(r) && !r.isOptional), topicOrder),
+        nisRisc: sortResourcesForScheduling(activeResources.filter(r => (r.domain === Domain.NIS || r.domain === Domain.RISC) && !isQuestion(r) && !r.isOptional), topicOrder),
         qevlar: sortResourcesForScheduling(activeResources.filter(r => r.bookSource === 'QEVLAR' && isQuestion(r) && !r.isOptional), topicOrder),
-        otherQBanks: sortResourcesForScheduling(activeResources.filter(r => (r.bookSource === 'Physics Qbank (Categorized)' || r.bookSource === 'NucApp' || r.bookSource === 'NIS Question Bank') && isQuestion(r) && !r.isOptional), topicOrder),
-        discord: sortResourcesForScheduling(activeResources.filter(r => r.videoSource === 'Discord Review Sessions'), topicOrder),
+        boardVitals: sortResourcesForScheduling(activeResources.filter(r => r.bookSource === 'Board Vitals' && isQuestion(r) && !r.isOptional), topicOrder),
+        otherQBanks: sortResourcesForScheduling(activeResources.filter(r => isQuestion(r) && !r.isOptional && !['QEVLAR', 'Board Vitals'].includes(r.bookSource || '')), topicOrder),
+        discord: sortResourcesForScheduling(activeResources.filter(r => r.videoSource === 'Discord Review Sessions' && !r.isOptional), topicOrder),
         coreRadiology: sortResourcesForScheduling(activeResources.filter(r => r.bookSource === 'Core Radiology' && !r.isOptional), topicOrder),
     };
 
-    const findDayForResource = (resource: StudyResource, schedule: DailySchedule[], startingDayIndex = 0): { day: DailySchedule, dayIndex: number } | null => {
-        for (let i = startingDayIndex; i < schedule.length; i++) {
-            const day = schedule[i];
-            const timeUsed = day.tasks.reduce((sum, t) => sum + t.durationMinutes, 0);
-            if (!day.isRestDay && (day.totalStudyTimeMinutes - timeUsed) >= resource.durationMinutes) {
-                return { day, dayIndex: i };
-            }
-        }
-        return null;
-    };
-
-    const placeResourceOnDay = (resource: StudyResource, day: DailySchedule) => {
-        day.tasks.push(mapResourceToTask(resource, day.tasks.length));
-    };
-
-    const placeMatchingResource = (day: DailySchedule, primaryResource: StudyResource, pool: StudyResource[]) => {
-        const availableTime = day.totalStudyTimeMinutes - day.tasks.reduce((sum, t) => sum + t.durationMinutes, 0);
-        if (availableTime < MIN_DURATION_for_SPLIT_PART) return;
-
-        if (primaryResource.pairedResourceIds) {
-            for (const pairedId of primaryResource.pairedResourceIds) {
-                const idx = pool.findIndex(r => r.id === pairedId);
-                if (idx !== -1 && pool[idx].durationMinutes <= availableTime) {
-                    const [pairedResource] = pool.splice(idx, 1);
-                    placeResourceOnDay(pairedResource, day);
-                    return; 
-                }
-            }
-        }
-        const idx = pool.findIndex(r => r.domain === primaryResource.domain && r.durationMinutes <= availableTime);
-        if (idx !== -1) {
-            const [pairedResource] = pool.splice(idx, 1);
-            placeResourceOnDay(pairedResource, day);
-        }
-    };
-
-    // --- Pass 1: Titan Videos and their direct pairs ---
-    const titanMasterList = [...pools.titan];
+    let dayIndex = 0;
     const unscheduledTitan: StudyResource[] = [];
 
-    for (const titanResource of titanMasterList) {
-        const foundDay = findDayForResource(titanResource, scheduleShell);
-        if (foundDay) {
-            placeResourceOnDay(titanResource, foundDay.day);
-            placeMatchingResource(foundDay.day, titanResource, pools.ctc);
-            placeMatchingResource(foundDay.day, titanResource, pools.caseCompanion);
-        } else {
-            unscheduledTitan.push(titanResource);
-        }
-    }
-
-    // --- Pass 2: Standalone high-priority (NIS/RISC) ---
-    const nisRiscMasterList = [...pools.nisRisc];
-    const unscheduledNisRisc: StudyResource[] = [];
-    for (const resource of nisRiscMasterList) {
-        const foundDay = findDayForResource(resource, scheduleShell);
-        if (foundDay) {
-            placeResourceOnDay(resource, foundDay.day);
-        } else {
-            unscheduledNisRisc.push(resource);
-        }
-    }
-    
-    // --- Pass 3: Questions ---
-    for (const day of scheduleShell) {
-        if(day.isRestDay) continue;
-        let availableTime = day.totalStudyTimeMinutes - day.tasks.reduce((s,t)=>s+t.durationMinutes,0);
-        if (availableTime < MIN_DURATION_for_SPLIT_PART) continue;
-
-        const topicsOnDay = new Set(day.tasks.map(t => t.originalTopic));
-        if (topicsOnDay.size === 0) continue;
+    // Main Loop: Iterate through Titan videos and build days around them
+    while (pools.titan.length > 0) {
+        const titanAnchor = pools.titan.shift()!;
         
-        const questionFilter = (r: StudyResource) => topicsOnDay.has(r.domain);
-        availableTime -= fillTimeOnDay(day, pools.qevlar, availableTime, questionFilter);
-        availableTime -= fillTimeOnDay(day, pools.otherQBanks, availableTime, questionFilter);
-        availableTime -= fillTimeOnDay(day, pools.boardVitals, availableTime);
-    }
-
-    // --- Pass 4: Fillers ---
-    const fillerPool = sortResourcesForScheduling([
-        ...pools.discord, ...pools.coreRadiology, ...pools.ctc, ...pools.caseCompanion,
-        ...unscheduledTitan, ...unscheduledNisRisc
-    ], topicOrder);
-
-    for (const day of scheduleShell) {
-        if(day.isRestDay) continue;
-        const timeUsed = day.tasks.reduce((s,t)=>s+t.durationMinutes,0);
-        const timeToFill = HARD_CAP_MINUTES - timeUsed;
-        if (timeToFill > MIN_DURATION_for_SPLIT_PART) {
-            const timeFilled = fillTimeOnDay(day, fillerPool, timeToFill);
-            if (timeFilled > 0 && (timeUsed + timeFilled) > day.totalStudyTimeMinutes) {
-                 day.totalStudyTimeMinutes = timeUsed + timeFilled;
+        // Find the earliest day with enough space
+        let foundDayInfo = null;
+        for (let i = dayIndex; i < scheduleShell.length; i++) {
+            const day = scheduleShell[i];
+            const timeUsed = day.tasks.reduce((sum, t) => sum + t.durationMinutes, 0);
+            if (!day.isRestDay && (day.totalStudyTimeMinutes - timeUsed) >= titanAnchor.durationMinutes) {
+                foundDayInfo = { day, index: i };
+                break;
             }
         }
+
+        if (!foundDayInfo) {
+            unscheduledTitan.push(titanAnchor);
+            continue;
+        }
+
+        const { day, index } = foundDayInfo;
+        dayIndex = index; // Start search for next titan from this day for efficiency
+        let timeUsedOnDay = day.tasks.reduce((sum, t) => sum + t.durationMinutes, 0);
+
+        // --- Build Thematic Block for the Day ---
+        day.tasks.push(mapResourceToTask(titanAnchor, day.tasks.length));
+        timeUsedOnDay += titanAnchor.durationMinutes;
+        const dayTopics = new Set<Domain>([titanAnchor.domain]);
+
+        // Helper to place one matching resource
+        const placeMatchingResource = (pool: StudyResource[], primaryResource: StudyResource) => {
+            let availableTime = day.totalStudyTimeMinutes - timeUsedOnDay;
+            if (availableTime < MIN_DURATION_for_SPLIT_PART) return;
+
+            let foundIndex = -1;
+            // Prioritize explicitly paired resources
+            if (primaryResource.pairedResourceIds) {
+                foundIndex = pool.findIndex(r => primaryResource.pairedResourceIds!.includes(r.id) && r.durationMinutes <= availableTime);
+            }
+            // Fallback to topic-matched resources
+            if (foundIndex === -1) {
+                foundIndex = pool.findIndex(r => r.domain === primaryResource.domain && r.durationMinutes <= availableTime);
+            }
+
+            if (foundIndex !== -1) {
+                const [resourceToPlace] = pool.splice(foundIndex, 1);
+                day.tasks.push(mapResourceToTask(resourceToPlace, day.tasks.length));
+                timeUsedOnDay += resourceToPlace.durationMinutes;
+                dayTopics.add(resourceToPlace.domain);
+            }
+        };
+
+        // Place pairs
+        placeMatchingResource(pools.ctc, titanAnchor);
+        placeMatchingResource(pools.caseCompanion, titanAnchor);
+
+        // Place NIS/RISC
+        let availableTime = day.totalStudyTimeMinutes - timeUsedOnDay;
+        const nisRiscIndex = pools.nisRisc.findIndex(t => t.durationMinutes <= availableTime);
+        if (nisRiscIndex !== -1) {
+             const [nisRiscTask] = pools.nisRisc.splice(nisRiscIndex, 1);
+             day.tasks.push(mapResourceToTask(nisRiscTask, day.tasks.length));
+             timeUsedOnDay += nisRiscTask.durationMinutes;
+        }
+        
+        // Place Questions
+        const questionFilter = (r: StudyResource) => dayTopics.has(r.domain);
+        availableTime = day.totalStudyTimeMinutes - timeUsedOnDay;
+        if (availableTime >= MIN_DURATION_for_SPLIT_PART) timeUsedOnDay += fillTimeOnDay(day, pools.qevlar, availableTime, questionFilter);
+        
+        availableTime = day.totalStudyTimeMinutes - timeUsedOnDay;
+        if (availableTime >= MIN_DURATION_for_SPLIT_PART) timeUsedOnDay += fillTimeOnDay(day, pools.otherQBanks, availableTime, questionFilter);
+        
+        availableTime = day.totalStudyTimeMinutes - timeUsedOnDay;
+        if (availableTime >= MIN_DURATION_for_SPLIT_PART) timeUsedOnDay += fillTimeOnDay(day, pools.boardVitals, availableTime);
+
+        // Place Fillers
+        availableTime = day.totalStudyTimeMinutes - timeUsedOnDay;
+        if (availableTime >= MIN_DURATION_for_SPLIT_PART) timeUsedOnDay += fillTimeOnDay(day, pools.discord, availableTime);
+        availableTime = day.totalStudyTimeMinutes - timeUsedOnDay;
+        if (availableTime >= MIN_DURATION_for_SPLIT_PART) timeUsedOnDay += fillTimeOnDay(day, pools.coreRadiology, availableTime);
     }
     
-    // --- Final Task Sorting within each day ---
-    const taskTypePriority: Partial<Record<ResourceType, number>> = {
-        [ResourceType.VIDEO_LECTURE]: 1,
-        [ResourceType.READING_TEXTBOOK]: 2,
-        [ResourceType.READING_GUIDE]: 2,
-        [ResourceType.CASES]: 3,
-        [ResourceType.QUESTIONS]: 4,
-        [ResourceType.QUESTION_REVIEW]: 5,
-    };
+    // --- Pass for Leftovers: Fill remaining time in all days up to HARD_CAP ---
+    const leftoverPool = sortResourcesForScheduling([
+        ...unscheduledTitan, ...pools.ctc, ...pools.caseCompanion, ...pools.nisRisc,
+        ...pools.qevlar, ...pools.boardVitals, ...pools.otherQBanks,
+        ...pools.discord, ...pools.coreRadiology
+    ], topicOrder);
 
     scheduleShell.forEach(day => {
-        day.tasks.sort((a, b) => {
-            const prioA = taskTypePriority[a.type] ?? 99;
-            const prioB = taskTypePriority[b.type] ?? 99;
-            if (prioA !== prioB) return prioA - prioB;
-            return a.order - b.order;
-        });
+        if (day.isRestDay) return;
+        const timeUsed = day.tasks.reduce((sum, t) => sum + t.durationMinutes, 0);
+        const timeToFill = HARD_CAP_MINUTES - timeUsed;
+        if (timeToFill >= MIN_DURATION_for_SPLIT_PART) {
+            const filledTime = fillTimeOnDay(day, leftoverPool, timeToFill);
+            if (timeUsed + filledTime > day.totalStudyTimeMinutes) {
+                day.totalStudyTimeMinutes = Math.min(HARD_CAP_MINUTES, timeUsed + filledTime);
+            }
+        }
+    });
+
+    // --- Final Task Sorting and Validation within each day ---
+    const getTaskSourcePriority = (task: ScheduledTask): number => {
+        const source = task.bookSource || task.videoSource;
+        if (!source) return 99; // Custom tasks last
+        const priorityKey = Object.keys(sourcePriorityMap).find(key => source.includes(key));
+        return priorityKey ? sourcePriorityMap[priorityKey] : 90; // other known sources
+    };
+    
+    scheduleShell.forEach(day => {
+        day.tasks.sort((a, b) => getTaskSourcePriority(a) - getTaskSourcePriority(b));
         day.tasks.forEach((task, index) => task.order = index);
     });
 
-    const unscheduledPrimary = [
-        ...unscheduledTitan, ...unscheduledNisRisc, 
-        ...pools.ctc, ...pools.caseCompanion, ...pools.qevlar, ...pools.boardVitals,
-        ...pools.otherQBanks, ...pools.coreRadiology
-    ].filter(r => !r.isOptional);
+    const unscheduledPrimary = leftoverPool.filter(r => !r.isOptional);
 
     if (unscheduledPrimary.length > 0) {
         const time = unscheduledPrimary.reduce((acc, task) => acc + task.durationMinutes, 0);
