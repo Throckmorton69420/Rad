@@ -3,17 +3,19 @@ import { createClient } from '@supabase/supabase-js';
 import { CloudTasksClient } from '@google-cloud/tasks';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
-// This function is now responsible for:
-// 1. Creating a 'run' record in Supabase.
-// 2. Creating a Google Cloud Task to trigger the solver WITH PROPER AUTHENTICATION.
-// 3. Returning the run_id immediately to the frontend.
-
 const supabase = createClient(
   process.env.VITE_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-const tasksClient = new CloudTasksClient();
+// Initialize the Cloud Tasks client using credentials from environment variables
+const tasksClient = new CloudTasksClient({
+  credentials: {
+    client_email: process.env.GCP_CLIENT_EMAIL,
+    // Vercel handles multi-line env vars by replacing \n with \\n, so we need to fix it back.
+    private_key: process.env.GCP_PRIVATE_KEY?.replace(/\\n/g, '\n'),
+  }
+});
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
@@ -45,26 +47,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const queue = process.env.GCP_QUEUE_NAME!;
     const location = process.env.GCP_QUEUE_LOCATION!;
     const solverUrl = process.env.SOLVER_URL!;
-    // This is the email of the service account Vercel uses to create tasks
-    const serviceAccountEmail = process.env.GCP_CLIENT_EMAIL!; 
+    const serviceAccountEmail = process.env.GCP_CLIENT_EMAIL!;
 
     const parent = tasksClient.queuePath(project, location, queue);
 
     const task = {
       httpRequest: {
         httpMethod: 'POST' as const,
-        url: `${solverUrl}/internal/run-solver`,
+        url: `${solverUrl}/internal/run-solver`, // Targeting the new internal endpoint
         headers: {
           'Content-Type': 'application/json',
         },
-        // Add the OIDC token for authentication. This is the critical change.
+        // OIDC token provides secure authentication between Google services
         oidcToken: {
           serviceAccountEmail,
         },
         body: Buffer.from(JSON.stringify({ run_id: newRunId })).toString('base64'),
       },
-      // Give the task a long time to be dispatched, just in case.
-      dispatchDeadline: { seconds: 60 * 15 },
     };
 
     const [taskResponse] = await tasksClient.createTask({ parent, task });
@@ -75,7 +74,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   } catch (error: any) {
     console.error('Critical Error in /api/solve:', error);
-    // If a run was created but task creation failed, delete the orphaned run
     if (newRunId) {
         await supabase.from('runs').delete().eq('id', newRunId);
     }
