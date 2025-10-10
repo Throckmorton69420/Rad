@@ -1,50 +1,40 @@
-// /api/runs/[id].ts
-import { createClient } from '@supabase/supabase-js';
+// MOCK API - In a real application, this would fetch the status of a solver job from a database.
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
-// These env vars are set in Vercel project settings, NOT prefixed with VITE_
-const supabase = createClient(
-  process.env.SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
-
-export default async function handler(req: VercelRequest, res: VercelResponse) {
+export default function handler(
+  req: VercelRequest,
+  res: VercelResponse,
+) {
   const { id } = req.query;
+  const runId = Array.isArray(id) ? id[0] : id;
 
-  if (!id || typeof id !== 'string') {
-    return res.status(400).json({ error: 'A valid run ID is required.' });
+  if (!runId || !runId.startsWith('run_')) {
+    return res.status(400).json({ error: 'Invalid run ID format.' });
   }
 
   try {
-    // 1. Fetch the run status
-    const { data: run, error: runError } = await supabase
-      .from('runs')
-      .select('id, status, objective_values, error_text')
-      .eq('id', id)
-      .single();
-
-    if (runError) throw runError;
-    if (!run) return res.status(404).json({ error: 'Run not found.' });
-
-    // 2. If complete, fetch the associated schedule slots
-    if (run.status === 'COMPLETE') {
-      const { data: slots, error: slotsError } = await supabase
-        .from('schedule_slots')
-        .select('*')
-        .eq('run_id', id)
-        .order('date', { ascending: true })
-        .order('start_minute', { ascending: true });
-
-      if (slotsError) throw slotsError;
-      
-      return res.status(200).json({ ...run, slots });
+    const startTime = parseInt(runId.split('_')[1], 10);
+    if (isNaN(startTime)) {
+        throw new Error('Invalid timestamp in run ID');
     }
+    const elapsed = Date.now() - startTime;
+    const mockSolveTime = 10000; // 10-second mock solve time
 
-    // 3. If still pending or solving, just return the current status
-    return res.status(200).json(run);
-
-  } catch (error: any) {
-    console.error(`Error in /api/runs/${id}:`, error);
-    return res.status(500).json({ error: error.message });
+    if (elapsed < mockSolveTime) {
+      // If not enough time has passed, report that the job is still solving.
+      res.status(200).json({ id: runId, status: 'SOLVING' });
+    } else {
+      // After the mock solve time, report completion.
+      // A real implementation would return the schedule slots from the solver.
+      // Here, we return an empty array, which the frontend can handle.
+      res.status(200).json({
+        id: runId,
+        status: 'COMPLETE',
+        slots: [], // No tasks generated in this mock response.
+        error_text: null,
+      });
+    }
+  } catch (error) {
+    return res.status(400).json({ error: 'Invalid run ID.' });
   }
 }

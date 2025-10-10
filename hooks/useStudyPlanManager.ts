@@ -296,17 +296,14 @@ export const useStudyPlanManager = (showConfirmation: (options: ShowConfirmation
         if (day.date === date) {
             return {
                 ...day,
+                // FIX: Add type assertion to the result of .map() to prevent TypeScript from widening
+                // the `status` property to `string`, which happens with data from JSON.parse().
                 tasks: day.tasks.map(task => {
                     if (task.id === taskId) {
-                        // FIX: Destructuring status from task to prevent TypeScript from widening the
-                        // 'status' property to `string` when using the spread operator on an object
-                        // that comes from JSON.parse(). This ensures the new object has a correctly
-                        // typed 'status' property.
-                        const { status, ...restOfTask } = task;
-                        return { ...restOfTask, status: status === 'completed' ? 'pending' : 'completed' };
+                        return { ...task, status: task.status === 'completed' ? 'pending' : 'completed' };
                     }
                     return task;
-                })
+                }) as ScheduledTask[]
             };
         }
         return day;
@@ -365,14 +362,9 @@ export const useStudyPlanManager = (showConfirmation: (options: ShowConfirmation
       if (!studyPlan) return;
       const newSchedule = studyPlan.schedule.map(day => ({
           ...day,
-          tasks: day.tasks.map(t => {
-            // FIX: Destructuring status from task to prevent TypeScript from widening the
-            // 'status' property to `string` when using the spread operator on an object
-            // that comes from JSON.parse(). This ensures the new object has a correctly
-            // typed 'status' property.
-            const { status, ...restOfTask } = t;
-            return {...restOfTask, status: 'pending', actualStudyTimeMinutes: 0};
-          })
+          // FIX: Add type assertion to the result of .map() to prevent TypeScript from widening
+          // the `status` property to `string`. This ensures the new array of tasks is correctly typed.
+          tasks: day.tasks.map(t => ({...t, status: 'pending', actualStudyTimeMinutes: 0})) as ScheduledTask[]
       }));
       updatePlanAndProgress(newSchedule);
   };
