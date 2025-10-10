@@ -94,7 +94,8 @@ const DailyTaskList: React.FC<DailyTaskListProps> = ({
 
 
   return (
-    <div className="relative">
+    // This root div no longer has any flex or height constraints, allowing it to grow.
+    <div className="relative"> 
       <div className="flex-shrink-0">
         <div className="flex justify-between items-center mb-1">
           <Button onClick={() => onNavigateDay('prev')} variant="ghost" size="sm" className="!px-2.5" aria-label="Previous Day"><i className="fas fa-chevron-left"></i></Button>
@@ -129,8 +130,9 @@ const DailyTaskList: React.FC<DailyTaskListProps> = ({
         </div>
       </div>
       
+      {/* This container also has no height constraints. */}
       <div>
-        <div className="min-h-[200px] transition-colors p-1 rounded-lg pb-32">
+        <div className="transition-colors p-1 rounded-lg pb-32">
           {isRestDay ? (
             <div className="h-full flex flex-col justify-center items-center text-center p-6 glass-panel rounded-lg">
               <i className="fas fa-coffee fa-2x text-[var(--text-secondary)] mb-3"></i>
