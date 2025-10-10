@@ -105,7 +105,8 @@ const ModifyDayTasksModal: React.FC<ModifyDayTasksModalProps> = ({
             (typeFilter === 'all' || r.type === typeFilter) &&
             (sourceFilter === 'all' || (r.bookSource || r.videoSource) === sourceFilter)
         );
-        return Array.from(new Set(tasksForDomainFilter.map(t => t.domain))).sort((a,b) => ALL_DOMAINS.indexOf(a) - ALL_DOMAINS.indexOf(b));
+        // FIX: Add explicit types to sort callback parameters to avoid 'unknown' type inference.
+        return Array.from(new Set(tasksForDomainFilter.map(t => t.domain))).sort((a: Domain, b: Domain) => ALL_DOMAINS.indexOf(a) - ALL_DOMAINS.indexOf(b));
     }, [availableResources, typeFilter, sourceFilter]);
 
     const availableResourceTypes = useMemo(() => {

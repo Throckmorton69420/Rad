@@ -16,7 +16,8 @@ interface CalendarViewProps {
 
 const CalendarView: React.FC<CalendarViewProps> = ({ schedule, selectedDate, onDateSelect, viewMode, currentDisplayDate, onNavigatePeriod, highlightedDates = [], today }) => {
   const displayDateObj = parseDateString(currentDisplayDate);
-  const scheduleMap = new Map(schedule.map(day => [day.date, day]));
+  // FIX: Explicitly type scheduleMap to resolve downstream type inference errors for 'daySchedule'.
+  const scheduleMap: Map<string, DailySchedule> = new Map(schedule.map(day => [day.date, day]));
   const gridRef = useRef<HTMLDivElement>(null);
 
   // FIX: Changed parameter type to allow for undefined day schedules.

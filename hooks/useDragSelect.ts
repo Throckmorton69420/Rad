@@ -96,7 +96,8 @@ export const useDragSelect = () => {
       
       if (currentId && state.anchorId) {
         const children = Array.from(listEl.children);
-        const visibleIds = children.map(child => child.getAttribute('data-resource-id')!);
+        // FIX: Add explicit 'Element' type to child to resolve getAttribute error on type 'unknown'.
+        const visibleIds = children.map((child: Element) => child.getAttribute('data-resource-id')!);
         const anchorIndex = visibleIds.indexOf(state.anchorId);
         const currentIndex = visibleIds.indexOf(currentId);
 

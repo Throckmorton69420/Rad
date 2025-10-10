@@ -131,6 +131,10 @@ body {
   overflow: hidden;
 }
 
+.main-app-container {
+  height: 100%;
+}
+
 /* --- Base Panel Styling (Liquid Glass) --- */
 .glass-panel, .glass-chrome, .modal-panel, .input-base, .button-secondary, .button-ghost, .progress-bar-track {
   border: 1px solid var(--glass-border-color);
