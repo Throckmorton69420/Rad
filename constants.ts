@@ -7,7 +7,7 @@ export const EXAM_DATE_START = "2025-11-11";
 // while the initial generation will always create a plan for the full period.
 // This prevents errors if the app is opened after the study period has ended.
 export const STUDY_START_DATE = "2025-10-02";
-export const STUDY_END_DATE = "2025-11-03"; 
+export const STUDY_END_DATE = "2025-11-05"; 
 
 export const DEFAULT_DAILY_STUDY_MINS = 330; // 5.5 hours baseline
 

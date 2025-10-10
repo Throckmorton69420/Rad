@@ -101,10 +101,10 @@ export const useStudyPlanManager = () => {
 
             const currentTopicOrder = planStateRef.current.studyPlan?.topicOrder;
             const defaultDeadlines: DeadlineSettings = {
-                allContent: '2025-11-03',
-                physicsContent: '2025-10-09',
-                nucMedContent: '2025-10-09',
-                otherContent: '2025-10-09',
+                allContent: '2025-11-05',
+                physicsContent: '2025-10-20',
+                nucMedContent: '2025-10-20',
+                otherContent: '2025-10-20',
             };
             const outcome: GeneratedStudyPlanOutcome = generateInitialSchedule(poolForGeneration, exceptionsForGeneration, currentTopicOrder, defaultDeadlines);
 

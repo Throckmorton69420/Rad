@@ -11,6 +11,7 @@ import {
 import { getTodayInNewYork, formatDuration, parseDateString } from '../utils/timeFormatter';
 
 const SOFT_CAP_MINUTES = 10 * 60; // 10 hours
+// Per user feedback, the hard cap is set to 14 hours.
 const HARD_CAP_MINUTES = 14 * 60; // 14 hours
 
 const getDayName = (dateStr: string): string => {
@@ -138,31 +139,38 @@ const distributeDeficitTime = (studyDays: DailySchedule[], totalMinutesNeeded: n
     if (studyDays.length === 0) return;
 
     let totalMinutesAvailable = studyDays.reduce((acc, d) => acc + d.totalStudyTimeMinutes, 0);
-    if (totalMinutesNeeded <= totalMinutesAvailable) return;
-
     let deficit = totalMinutesNeeded - totalMinutesAvailable;
-
-    // Phase 1: Fill all days up to the soft cap
-    for (const day of studyDays) {
-        if (deficit <= 0) break;
-        const potentialIncrease = SOFT_CAP_MINUTES - day.totalStudyTimeMinutes;
-        if (potentialIncrease > 0) {
-            const increase = Math.min(deficit, potentialIncrease);
-            day.totalStudyTimeMinutes += increase;
-            deficit -= increase;
-        }
-    }
 
     if (deficit <= 0) return;
 
-    // Phase 2: Distribute remaining deficit evenly up to the hard cap
-    const daysBelowHardCap = studyDays.filter(d => d.totalStudyTimeMinutes < HARD_CAP_MINUTES);
-    if (daysBelowHardCap.length > 0) {
-        const extraTimePerDay = Math.ceil(deficit / daysBelowHardCap.length);
-        for (const day of daysBelowHardCap) {
-            const increase = Math.min(extraTimePerDay, HARD_CAP_MINUTES - day.totalStudyTimeMinutes);
-            day.totalStudyTimeMinutes += increase;
+    // Iteratively distribute the deficit to ensure even loading and a balanced schedule.
+    while (deficit > 0) {
+        // Find days that are not yet at the hard cap
+        const daysBelowHardCap = studyDays.filter(d => d.totalStudyTimeMinutes < HARD_CAP_MINUTES);
+        if (daysBelowHardCap.length === 0) {
+            // All available days are maxed out, cannot add more time.
+            break;
         }
+
+        // Distribute the remaining deficit evenly among the available days
+        const timeToAddPerDay = Math.ceil(deficit / daysBelowHardCap.length);
+
+        let deficitReducedInThisLoop = 0;
+        for (const day of daysBelowHardCap) {
+            const currentDeficit = deficit - deficitReducedInThisLoop;
+            if (currentDeficit <= 0) break;
+            
+            const canAdd = HARD_CAP_MINUTES - day.totalStudyTimeMinutes;
+            const amountToAdd = Math.min(timeToAddPerDay, canAdd, currentDeficit);
+            
+            day.totalStudyTimeMinutes += amountToAdd;
+            deficitReducedInThisLoop += amountToAdd;
+        }
+
+        deficit -= deficitReducedInThisLoop;
+        
+        // If we couldn't add any time in a loop, it means all days are capped.
+        if (deficitReducedInThisLoop === 0) break;
     }
 };
 
@@ -431,8 +439,18 @@ export const generateInitialSchedule = (
         areSpecialTopicsInterleaved: true,
     };
 
-    const schedule = createScheduleShell(STUDY_START_DATE, STUDY_END_DATE, userAddedExceptions);
-    const notifications = runSchedulingEngine(schedule, schedulingPool, planConfig);
+    // Create the shell for the entire period for UI rendering
+    const fullScheduleShell = createScheduleShell(STUDY_START_DATE, STUDY_END_DATE, userAddedExceptions);
+    
+    // For initial generation or regeneration, only schedule tasks from today onwards.
+    const today = getTodayInNewYork();
+    const futureSchedulingDays = fullScheduleShell.filter(day => day.date >= today);
+
+    // Run the engine ONLY on future days.
+    const notifications = runSchedulingEngine(futureSchedulingDays, schedulingPool, planConfig);
+    
+    // The final schedule in the plan should contain all days (past and future) for UI consistency.
+    const schedule = fullScheduleShell;
 
     const progressPerDomain: StudyPlan['progressPerDomain'] = {};
     const activeResources = masterResourcePool.filter(r => !r.isArchived);
