@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { PrintModalProps, PrintOptions, StudyPlan } from '../types';
 import { Button } from './Button';
@@ -34,7 +35,7 @@ const PrintModal: React.FC<PrintModalProps> = ({ isOpen, onClose, onGenerateRepo
   return (
     <FocusTrap active={isOpen}>
       <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-[var(--z-modal)]" role="dialog" aria-modal="true" aria-labelledby="print-modal-title">
-        <div className="modal-panel p-0 w-full max-w-lg text-[var(--text-primary)] max-h-[90vh] flex flex-col">
+        <div className="modal-panel p-0 w-full max-w-lg text-[var(--text-primary)] flex flex-col">
           <header className="flex justify-between items-center p-4 border-b border-[var(--separator-primary)]">
             <h2 id="print-modal-title" className="text-xl font-semibold">Print Options</h2>
             <Button onClick={onClose} variant="ghost" size="sm" className="!p-1" aria-label="Close">

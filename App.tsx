@@ -1,3 +1,4 @@
+
 // FIX: Removed CDATA wrapper from the file content.
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { DailySchedule, StudyPlan, ScheduledTask, PomodoroSettings, ViewMode, Domain, ResourceType, AddTaskModalProps, StudyResource, ResourceEditorModalProps, ExceptionDateRule, DeadlineSettings, RebalanceOptions, ShowConfirmationOptions, PrintOptions } from './types';
@@ -630,7 +631,7 @@ const App: React.FC = () => {
           
           {/* This is now the ONE AND ONLY scrolling container */}
           <main className="flex-1 overflow-y-auto">
-              <div className="pt-3 md:pt-6 pl-[calc(0.75rem+env(safe-area-inset-left))] pr-[calc(0.75rem+env(safe-area-inset-right))] flex flex-col">
+              <div className="pt-3 md:pt-6 pl-[calc(0.75rem+env(safe-area-inset-left))] pr-[calc(0.75rem+env(safe-area-inset-right))]">
                 <div className="mb-6 flex-shrink-0 px-3 md:px-6">
                       <div className="inline-flex bg-[var(--background-secondary)] p-1 rounded-lg space-x-1">
                           <button onClick={() => setActiveTab('schedule')} className={`py-1.5 px-4 font-semibold text-sm rounded-md flex-1 transition-colors ${activeTab === 'schedule' ? 'bg-[var(--glass-bg-active)] shadow text-[var(--text-primary)]' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}>
