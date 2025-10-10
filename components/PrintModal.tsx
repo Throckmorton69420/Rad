@@ -50,7 +50,7 @@ const PrintModal: React.FC<PrintModalProps> = ({ isOpen, onClose, onGenerateRepo
             </div>
           </div>
           
-          <main className="p-4 overflow-y-auto space-y-4">
+          <main className="p-4 space-y-4">
             {activeTab === 'schedule' && (
               <div className="space-y-4">
                 <h3 className="font-semibold">Schedule Report Options</h3>

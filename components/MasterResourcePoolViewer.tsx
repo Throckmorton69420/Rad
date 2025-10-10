@@ -147,7 +147,7 @@ const MasterResourcePoolViewer: React.FC<MasterResourcePoolViewerProps> = ({
             <i className={`fas fa-chevron-down transition-transform ${isSummaryExpanded ? 'rotate-180' : ''}`}></i>
           </button>
           {isSummaryExpanded && (
-            <div className="mt-3 pt-3 border-t border-red-700/30 text-xs text-red-100/90 space-y-3 pr-2 isolated-scroll">
+            <div className="mt-3 pt-3 border-t border-red-700/30 text-xs text-red-100/90 space-y-3 pr-2">
               {groupedUnscheduled.map(([source, items]) => (
                 <div key={source}>
                   <p className="font-bold text-red-100 mb-1">{source}</p>

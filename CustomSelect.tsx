@@ -60,7 +60,7 @@ const CustomSelect: React.FC<CustomSelectProps> = ({ options, value, onChange, i
 
       {isOpen && (
         <div 
-          className="absolute z-10 mt-1 w-full max-h-60 overflow-auto p-1.5 modal-panel"
+          className="absolute z-20 mt-1 w-full max-h-60 overflow-auto p-1.5 modal-panel"
           role="listbox"
         >
           {options.map(option => (

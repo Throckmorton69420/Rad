@@ -250,8 +250,9 @@ const App: React.FC = () => {
       };
       window.addEventListener('afterprint', handleAfterPrint);
       
-      // The robust printing fix: just call print(). CSS handles visibility.
-      window.print();
+      // FIX: Delay printing to allow React to render the content first.
+      // This prevents blank pages.
+      setTimeout(() => window.print(), 100);
     }
   }, [printableContent]);
 
