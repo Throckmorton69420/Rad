@@ -4,18 +4,17 @@ from flask import Flask, request, jsonify
 from supabase import create_client, Client
 from ortools.sat.python import cp_model
 from datetime import date, timedelta, datetime
+import logging
 
 # --- Initialization ---
 app = Flask(__name__)
+app.logger.setLevel(logging.INFO)
 
 # These are set as environment variables in Cloud Run
 supabase_url = os.environ.get("SUPABASE_URL")
 supabase_key = os.environ.get("SUPABASE_KEY")
-solver_token = os.environ.get("INTERNAL_API_TOKEN") # This is now optional but good for defense-in-depth
 
 if not all([supabase_url, supabase_key]):
-    # Note: solver_token is not strictly required for this architecture to work,
-    # as OIDC provides the primary authentication.
     raise ValueError("FATAL: Missing required environment variables SUPABASE_URL or SUPABASE_KEY.")
 
 supabase: Client = create_client(supabase_url, supabase_key)
@@ -42,11 +41,16 @@ def solve_schedule(run_id: str):
         all_resources = all_resources_req.data
         app.logger.info(f"[{run_id}] Fetched {len(all_resources)} resources.")
 
-        user_data_req = supabase.table("user_data").select("data").eq("id", 1).single().execute()
         exception_dates = []
-        if user_data_req.data and 'data' in user_data_req.data and 'exceptionDates' in user_data_req.data['data']:
-            exception_dates = user_data_req.data['data']['exceptionDates']
-        app.logger.info(f"[{run_id}] Fetched {len(exception_dates)} exception dates.")
+        try:
+            user_data_req = supabase.table("user_data").select("data").eq("id", 1).single().execute()
+            if user_data_req.data and 'data' in user_data_req.data and isinstance(user_data_req.data['data'], dict) and 'exceptionDates' in user_data_req.data['data']:
+                exception_dates = user_data_req.data['data']['exceptionDates'] or []
+            app.logger.info(f"[{run_id}] Fetched {len(exception_dates)} exception dates.")
+        except Exception as user_data_error:
+            app.logger.warning(f"[{run_id}] Could not fetch or parse user_data for exceptions, continuing without them. Error: {user_data_error}")
+            exception_dates = []
+
 
         # --- CP-SAT MODEL CONSTRUCTION ---
         model = cp_model.CpModel()
@@ -67,7 +71,7 @@ def solve_schedule(run_id: str):
 
         # 2. Add Constraints
         app.logger.info(f"[{run_id}] Adding constraints...")
-        exception_map = {e['date']: e for e in exception_dates}
+        exception_map = {e['date']: e for e in exception_dates if isinstance(e, dict) and 'date' in e}
         for d, current_date in enumerate(all_dates):
             date_str = str(current_date)
             exception = exception_map.get(date_str)
@@ -95,7 +99,7 @@ def solve_schedule(run_id: str):
         # --- SOLVER EXECUTION ---
         app.logger.info(f"[{run_id}] Starting solver...")
         solver = cp_model.CpSatSolver()
-        solver.parameters.max_time_in_seconds = 840 # 14 minutes, safely under the 15 min Cloud Run timeout
+        solver.parameters.max_time_in_seconds = 840 # 14 minutes
         solver.parameters.num_search_workers = 8 # Use multiple cores
         status = solver.Solve(model)
         
@@ -105,12 +109,13 @@ def solve_schedule(run_id: str):
             schedule_slots = []
             
             for d, current_date in enumerate(all_dates):
+                # CORRECTED LOGIC
                 tasks_for_day_ids = [res_id for res_id, task_vars in tasks.items() if solver.Value(task_vars['days'][d])]
                 if not tasks_for_day_ids: continue
 
                 tasks_for_day = [resource_map[res_id] for res_id in tasks_for_day_ids]
                 
-                # Sorting logic to order tasks within a day
+                # Sorting logic
                 def get_sort_key(resource):
                     source = (resource.get('videoSource') or resource.get('bookSource') or 'zz_custom').lower()
                     res_type = resource.get('type', '').lower()
@@ -152,9 +157,6 @@ def solve_schedule(run_id: str):
 # --- API Endpoints ---
 @app.route("/internal/run-solver", methods=["POST"])
 def run_solver_endpoint():
-    # Primary authentication is handled by Cloud Run's IAM integration (Ingress: Internal).
-    # The OIDC token from Cloud Tasks is validated by Google's infrastructure before this code is even hit.
-    
     data = request.get_json()
     run_id = data.get("run_id")
     if not run_id:
@@ -163,15 +165,15 @@ def run_solver_endpoint():
         
     app.logger.info(f"Received internal solver task for run_id: {run_id}")
 
-    # Run the solver synchronously.
+    # Run the solver synchronously in the main request thread.
+    # Cloud Tasks will wait for this to complete.
     solve_schedule(run_id)
     
-    # Return a success response to Cloud Tasks to acknowledge completion.
     return jsonify({"status": "Solver process finished for run_id", "run_id": run_id}), 200
 
 @app.route("/", methods=["GET"])
 def health_check():
-    # A simple health check endpoint for Cloud Run to verify the container is responsive.
+    # Health check for Cloud Run startup probe.
     return "Radiology Solver Service is running."
 
 if __name__ == "__main__":
