@@ -20,6 +20,6 @@ EXPOSE 8080
 ENV PORT 8080
 
 # Run main.py when the container launches using gunicorn
-# --workers 1 --threads 8: Use a single worker with 8 threads for async tasks.
-# --timeout 900: Allow workers up to 15 minutes (900s) to complete tasks, preventing premature shutdowns.
-CMD ["gunicorn", "--bind", "0.0.0.0:8080", "--workers", "1", "--threads", "8", "--timeout", "900", "main:app"]
+# --worker-class gevent: Use an asynchronous worker for better I/O performance.
+# --timeout 900: Allow workers up to 15 minutes (900s) to complete tasks.
+CMD ["gunicorn", "--bind", "0.0.0.0:8080", "--workers", "1", "--worker-class", "gevent", "--timeout", "900", "main:app"]
