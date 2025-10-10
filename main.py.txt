@@ -1,0 +1,164 @@
+import os
+from flask import Flask, request, jsonify
+from supabase import create_client, Client
+from ortools.sat.python import cp_model
+from datetime import date, timedelta, datetime
+import collections
+
+# --- Initialization ---
+app = Flask(__name__)
+
+# These will be set as environment variables in Cloud Run
+supabase_url = os.environ.get("SUPABASE_URL")
+supabase_key = os.environ.get("SUPABASE_KEY")
+solver_token = os.environ.get("INTERNAL_API_TOKEN")
+
+if not all([supabase_url, supabase_key, solver_token]):
+    raise ValueError("FATAL: Missing required environment variables SUPABASE_URL, SUPABASE_KEY, or INTERNAL_API_TOKEN.")
+
+supabase: Client = create_client(supabase_url, supabase_key)
+
+# --- The Main Solver Endpoint ---
+@app.route("/solve", methods=["POST"])
+def solve_schedule():
+    auth_header = request.headers.get("Authorization")
+    if not auth_header or auth_header.split(" ")[1] != solver_token:
+        return jsonify({"error": "Unauthorized"}), 401
+
+    data = request.get_json()
+    run_id = data.get("run_id")
+    if not run_id:
+        return jsonify({"error": "run_id is required"}), 400
+
+    try:
+        supabase.table("runs").update({"status": "SOLVING"}).eq("id", run_id).execute()
+
+        # 1. Fetch all necessary data from Supabase
+        run_data = supabase.table("runs").select("start_date, end_date").eq("id", run_id).single().execute().data
+        all_resources = supabase.table("resources").select("*").eq("isArchived", False).execute().data
+        # Note: You will need to create and populate a 'pairings' table in Supabase
+        # pairings_data = supabase.table("pairings").select("*").execute().data
+        
+        # --- CP-SAT MODEL CONSTRUCTION ---
+        model = cp_model.CpModel()
+        
+        start_date = datetime.fromisoformat(run_data['start_date']).date()
+        end_date = datetime.fromisoformat(run_data['end_date']).date()
+        num_days = (end_date - start_date).days + 1
+        all_dates = [start_date + timedelta(days=i) for i in range(num_days)]
+
+        tasks = {}
+        resource_map = {res['id']: res for res in all_resources}
+
+        for res in all_resources:
+            task_days = [model.NewBoolVar(f"on_day_{res['id']}_{d}") for d in range(num_days)]
+            tasks[res['id']] = { 'days': task_days, 'duration': res['durationMinutes'], 'resource': res }
+            model.AddAtMostOne(task_days)
+
+        # 2. Add Constraints
+        # Daily capacity: <= 15 hours (900 minutes)
+        for d in range(num_days):
+            daily_duration = sum(tasks[res_id]['duration'] * tasks[res_id]['days'][d] for res_id in tasks)
+            model.Add(daily_duration <= 15 * 60)
+            
+        # Add pairing constraints (e.g., Titan and its paired CTC must be on the same day)
+        # This part assumes you have a 'pairings' table with 'titan_id' and 'paired_ids' (array)
+        # for pairing_info in pairings_data:
+        #     titan_id = pairing_info['titan_id']
+        #     if titan_id in tasks:
+        #         for paired_id in pairing_info['paired_ids']:
+        #             if paired_id in tasks:
+        #                 for d in range(num_days):
+        #                     # This ensures if titan_id is on day d, paired_id must also be on day d
+        #                     model.AddImplication(tasks[titan_id]['days'][d], tasks[paired_id]['days'][d])
+        #                     model.AddImplication(tasks[paired_id]['days'][d], tasks[titan_id]['days'][d])
+        
+        # Questions must happen after their topic is covered (simplified to same day)
+        # for res_id, task_vars in tasks.items():
+        #     res = task_vars['resource']
+        #     if res['type'] in ['Question Bank', 'Review Questions', 'Question Review']:
+        #         # Find the corresponding primary content for this topic
+        #         primary_content_id = find_primary_content_for_topic(res['domain']) # You'd implement this
+        #         if primary_content_id and primary_content_id in tasks:
+        #             for d in range(num_days):
+        #                 # Enforce that if this question is on day d, its content must also be on day d
+        #                 model.AddImplication(task_vars['days'][d], tasks[primary_content_id]['days'][d])
+
+
+        # 3. Add Objectives (Prioritized Goals)
+        # We give higher scores to more important tasks to guide the solver.
+        model.Maximize(sum(
+            (1000 if task['resource'].get('schedulingPriority') == 'high' else 100) * sum(task['days'])
+            for task in tasks.values()
+        ))
+
+        # --- SOLVER EXECUTION ---
+        solver = cp_model.CpSatSolver()
+        solver.parameters.max_time_in_seconds = 55.0
+        solver.parameters.num_search_workers = 8
+        status = solver.Solve(model)
+        
+        # --- PROCESS AND SAVE RESULTS ---
+        if status == cp_model.OPTIMAL or status == cp_model.FEASIBLE:
+            schedule_slots = []
+            
+            for d, current_date in enumerate(all_dates):
+                tasks_for_day_ids = [res_id for res_id, task_vars in tasks.items() if solver.Value(task_vars['days'][d])]
+                if not tasks_for_day_ids:
+                    continue
+
+                tasks_for_day = [resource_map[res_id] for res_id in tasks_for_day_ids]
+                
+                # Enforce intra-day hierarchy by sorting
+                def get_sort_key(resource):
+                    source = resource.get('videoSource') or resource.get('bookSource') or ''
+                    source = source.lower()
+                    res_type = resource.get('type', '').lower()
+
+                    if 'titan' in source: return 0
+                    if 'huda' in source: return 1 # As per rule for physics days
+                    if 'crack the core' in source or 'case companion' in source or 'war machine' in source: return 2
+                    if 'nis' in source or 'risc' in source: return 3
+                    if 'qbank' in res_type or 'question' in res_type: return 4 # Covers all Q-banks
+                    if 'discord' in source: return 5
+                    if 'core radiology' in source: return 6
+                    return 7
+
+                tasks_for_day.sort(key=get_sort_key)
+
+                current_minute = 0
+                for resource in tasks_for_day:
+                    start_minute = current_minute
+                    end_minute = current_minute + resource['durationMinutes']
+                    schedule_slots.append({
+                        "run_id": run_id,
+                        "resource_id": resource['id'],
+                        "date": str(current_date),
+                        "start_minute": start_minute,
+                        "end_minute": end_minute,
+                        "title": resource['title'],
+                        "domain": resource['domain'],
+                        "type": resource['type']
+                    })
+                    current_minute = end_minute
+
+            if schedule_slots:
+                supabase.table("schedule_slots").delete().eq('run_id', run_id).execute() # Clear old slots for this run
+                supabase.table("schedule_slots").insert(schedule_slots).execute()
+            
+            supabase.table("runs").update({"status": "COMPLETE"}).eq("id", run_id).execute()
+            return jsonify({"status": "success", "run_id": run_id}), 200
+        else:
+            raise Exception("Solver could not find a feasible solution.")
+
+    except Exception as e:
+        print(f"Error for run_id {run_id}: {e}")
+        supabase.table("runs").update({"status": "FAILED", "error_text": str(e)}).eq("id", run_id).execute()
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/", methods=["GET"])
+def health_check():
+    return "Radiology Solver Service is running."
+
+if __name__ == "__main__":
+    app.run(debug=False, host="0.0.0.0", port=int(os.environ.get("PORT", 8080)))
