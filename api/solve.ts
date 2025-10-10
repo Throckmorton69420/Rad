@@ -61,6 +61,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         // OIDC token provides secure authentication between Google services
         oidcToken: {
           serviceAccountEmail,
+          // CRITICAL FIX: The 'audience' must be specified for the token to be valid for the target service.
+          audience: solverUrl,
         },
         body: Buffer.from(JSON.stringify({ run_id: newRunId })).toString('base64'),
       },
@@ -75,6 +77,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   } catch (error: any) {
     console.error('Critical Error in /api/solve:', error);
     if (newRunId) {
+        // Clean up the failed run record
         await supabase.from('runs').delete().eq('id', newRunId);
     }
     return res.status(500).json({ error: 'Failed to initiate schedule generation.', details: error.message });
