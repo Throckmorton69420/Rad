@@ -127,6 +127,8 @@ const SidebarContent = React.memo(({
               if(options.type === 'topic-time') setSelectedDate(options.date); 
             }}
             isLoading={isLoading}
+            // FIX: Pass selectedDate to AdvancedControls as it is a required prop.
+            selectedDate={selectedDate}
             isCramModeActive={studyPlan.isCramModeActive ?? false}
             onToggleCramMode={handleToggleCramMode}
             deadlines={studyPlan.deadlines}
