@@ -1,173 +1,160 @@
 import os
+import threading
+import traceback
 from flask import Flask, request, jsonify
 from supabase import create_client, Client
 from ortools.sat.python import cp_model
-from datetime import date, timedelta, datetime
-import collections
-import threading
+from datetime import date, timedelta
 
-# --- Initialization ---
 app = Flask(__name__)
 
-# These will be set as environment variables in Cloud Run
-supabase_url = os.environ.get("SUPABASE_URL")
-supabase_key = os.environ.get("SUPABASE_KEY")
-solver_token = os.environ.get("INTERNAL_API_TOKEN")
+# --- Supabase Initialization ---
+url: str = os.environ.get("SUPABASE_URL")
+key: str = os.environ.get("SUPABASE_KEY")
+supabase: Client = create_client(url, key)
+INTERNAL_API_TOKEN: str = os.environ.get("INTERNAL_API_TOKEN")
 
-if not all([supabase_url, supabase_key, solver_token]):
-    raise ValueError("FATAL: Missing required environment variables SUPABASE_URL, SUPABASE_KEY, or INTERNAL_API_TOKEN.")
+# --- Health Check Endpoint ---
+@app.route("/", methods=["GET"])
+def health_check():
+    return jsonify({"status": "healthy"}), 200
 
-supabase: Client = create_client(supabase_url, supabase_key)
-
-# --- Background Solver Logic ---
-def run_solver_in_background(run_id: str):
-    """
-    This function contains the long-running solver logic and will be executed
-    in a separate thread.
-    """
+# --- Solver Logic ---
+def solve_schedule(run_id, start_date_str, end_date_str, resources, all_exception_rules):
     try:
-        app.logger.info(f"[{run_id}] Starting background solver.")
-        supabase.table("runs").update({"status": "SOLVING"}).eq("id", run_id).execute()
+        print(f"[{run_id}] Solver thread started. Updating status to SOLVING.")
+        supabase.from_("runs").update({"status": "SOLVING"}).eq("id", run_id).execute()
 
-        # 1. Fetch all necessary data from Supabase
-        run_data_req = supabase.table("runs").select("start_date, end_date").eq("id", run_id).single().execute()
-        if not run_data_req.data:
-            raise Exception(f"Run ID {run_id} not found.")
-        run_data = run_data_req.data
-        app.logger.info(f"[{run_id}] Fetched run data.")
-
-        all_resources_req = supabase.table("resources").select("*").eq("isArchived", False).execute()
-        all_resources = all_resources_req.data
-        app.logger.info(f"[{run_id}] Fetched {len(all_resources)} resources.")
+        start_dt = date.fromisoformat(start_date_str)
+        end_dt = date.fromisoformat(end_date_str)
         
-        # --- CP-SAT MODEL CONSTRUCTION ---
+        all_days = []
+        current_dt = start_dt
+        exception_map = {e['date']: e for e in all_exception_rules}
+
+        while current_dt <= end_dt:
+            date_str = current_dt.isoformat()
+            day_config = exception_map.get(date_str)
+            
+            if day_config:
+                all_days.append({
+                    'date': date_str,
+                    'isRestDay': day_config.get('isRestDayOverride', False),
+                    'targetMinutes': day_config.get('targetMinutes', 0)
+                })
+            else:
+                day_of_week = current_dt.weekday()
+                is_weekend = day_of_week >= 5
+                all_days.append({
+                    'date': date_str,
+                    'isRestDay': False,
+                    'targetMinutes': 480 if is_weekend else 330
+                })
+            current_dt += timedelta(days=1)
+        
+        print(f"[{run_id}] Processed {len(all_days)} days. Creating model...")
+
         model = cp_model.CpModel()
+        on_day_vars = {}
+        for r in resources:
+            for day_index in range(len(all_days)):
+                on_day_vars[(r['id'], day_index)] = model.NewBoolVar(f"on_day_{r['id']}_{day_index}")
+
+        for r in resources:
+            if r.get('isPrimaryMaterial', False):
+                model.AddExactlyOne(on_day_vars[(r['id'], day_index)] for day_index in range(len(all_days)))
+
+        for day_index, day in enumerate(all_days):
+            if day['isRestDay']:
+                for r in resources:
+                    model.Add(on_day_vars[(r['id'], day_index)] == 0)
+            else:
+                daily_work = sum(on_day_vars[(r['id'], day_index)] * r['durationMinutes'] for r in resources)
+                model.Add(daily_work <= day['targetMinutes'])
+
+        print(f"[{run_id}] Model created. Starting solver...")
         
-        start_date = datetime.fromisoformat(run_data['start_date']).date()
-        end_date = datetime.fromisoformat(run_data['end_date']).date()
-        num_days = (end_date - start_date).days + 1
-        all_dates = [start_date + timedelta(days=i) for i in range(num_days)]
-
-        tasks = {}
-        resource_map = {res['id']: res for res in all_resources}
-
-        app.logger.info(f"[{run_id}] Building model variables...")
-        for res in all_resources:
-            task_days = [model.NewBoolVar(f"on_day_{res['id']}_{d}") for d in range(num_days)]
-            tasks[res['id']] = { 'days': task_days, 'duration': res['durationMinutes'], 'resource': res }
-            # Each task can only be scheduled once
-            model.AddAtMostOne(task_days)
-
-        # 2. Add Constraints
-        app.logger.info(f"[{run_id}] Adding constraints...")
-        # Daily capacity: <= 15 hours (900 minutes)
-        for d in range(num_days):
-            daily_duration = sum(tasks[res_id]['duration'] * tasks[res_id]['days'][d] for res_id in tasks)
-            model.Add(daily_duration <= 15 * 60)
-        
-        # --- Add more complex constraints here in the future ---
-
-        # 3. Add Objectives (Prioritized Goals)
-        app.logger.info(f"[{run_id}] Adding objectives...")
-        # We give higher scores to more important tasks to guide the solver.
-        priority_map = {'high': 1000, 'medium': 100, 'low': 10}
-        model.Maximize(sum(
-            priority_map.get(task['resource'].get('schedulingPriority', 'medium'), 100) * sum(task['days'])
-            for task in tasks.values()
-        ))
-
-        # --- SOLVER EXECUTION ---
-        app.logger.info(f"[{run_id}] Starting solver...")
-        solver = cp_model.CpSatSolver()
-        # Increased time limit, as the request is now async.
-        # Cloud Run instance will stay alive due to "CPU is always allocated".
-        solver.parameters.max_time_in_seconds = (15 * 60) - 30 # Just under the 15 min timeout
-        solver.parameters.num_search_workers = 8
+        solver = cp_model.CpSolver()
+        solver.parameters.max_time_in_seconds = 840.0
         status = solver.Solve(model)
-        
-        # --- PROCESS AND SAVE RESULTS ---
-        app.logger.info(f"[{run_id}] Solver finished with status: {solver.StatusName(status)}")
+
         if status == cp_model.OPTIMAL or status == cp_model.FEASIBLE:
+            print(f"[{run_id}] Solution found. Processing results...")
             schedule_slots = []
-            
-            for d, current_date in enumerate(all_dates):
-                tasks_for_day_ids = [res_id for res_id, task_vars in tasks.items() if solver.Value(task_vars['days'][d])]
-                if not tasks_for_day_ids:
-                    continue
-
-                tasks_for_day = [resource_map[res_id] for res_id in tasks_for_day_ids]
+            for day_index, day in enumerate(all_days):
+                start_minute = 0
+                day_tasks = [r for r in resources if solver.Value(on_day_vars[(r['id'], day_index)]['endPage'])]
                 
-                def get_sort_key(resource):
-                    source = (resource.get('videoSource') or resource.get('bookSource') or 'zz_custom').lower()
-                    res_type = resource.get('type', '').lower()
-                    
-                    if 'titan' in source: return 0
-                    if 'core radiology' in source: return 1
-                    if 'crack the core' in source or 'case companion' in source or 'war machine' in source or 'review of physics' in source: return 2
-                    if 'guide' in res_type: return 3
-                    if 'qbank' in res_type or 'question' in res_type: return 4
-                    return 5
+                day_tasks.sort(key=lambda r: r.get('sequenceOrder', 9999))
 
-                tasks_for_day.sort(key=get_sort_key)
-
-                current_minute = 0
-                for resource in tasks_for_day:
-                    start_minute = current_minute
-                    end_minute = current_minute + resource['durationMinutes']
-                    schedule_slots.append({
-                        "run_id": run_id,
-                        "resource_id": resource['id'],
-                        "date": str(current_date),
-                        "start_minute": start_minute,
-                        "end_minute": end_minute,
-                        "title": resource['title'],
-                        "domain": resource['domain'],
-                        "type": resource['type']
-                    })
-                    current_minute = end_minute
+                for r in day_tasks:
+                    end_minute = start_minute + r['durationMinutes']
+                    slot = {
+                        "run_id": run_id, "resource_id": r['id'], "date": day['date'],
+                        "start_minute": start_minute, "end_minute": end_minute,
+                        "title": r['title'], "domain": r['domain'], "type": r['type']
+                    }
+                    schedule_slots.append(slot)
+                    start_minute = end_minute
             
-            app.logger.info(f"[{run_id}] Generated {len(schedule_slots)} schedule slots. Inserting into database...")
-            if schedule_slots:
-                # Clear old slots for this run just in case of a retry
-                supabase.table("schedule_slots").delete().eq('run_id', run_id).execute()
-                supabase.table("schedule_slots").insert(schedule_slots).execute()
-            
-            supabase.table("runs").update({"status": "COMPLETE"}).eq("id", run_id).execute()
-            app.logger.info(f"[{run_id}] Run marked as COMPLETE.")
+            print(f"[{run_id}] Inserting {len(schedule_slots)} slots.")
+            supabase.from_("schedule_slots").insert(schedule_slots).execute()
+            supabase.from_("runs").update({"status": "COMPLETE"}).eq("id", run_id).execute()
+            print(f"[{run_id}] Run complete.")
         else:
-            raise Exception("Solver could not find a feasible solution or optimal point.")
+            raise Exception("Solver could not find a feasible solution. Check constraints.")
 
     except Exception as e:
-        app.logger.error(f"Error during background solve for run_id {run_id}: {e}", exc_info=True)
-        supabase.table("runs").update({"status": "FAILED", "error_text": str(e)}).eq("id", run_id).execute()
+        error_trace = traceback.format_exc()
+        error_message = f"Error in solver thread for run {run_id}: {e}\n{error_trace}"
+        print(error_message)
+        try:
+            supabase.from_("runs").update({"status": "FAILED", "error_text": error_message}).eq("id", run_id).execute()
+        except Exception as db_e:
+            print(f"[{run_id}] CRITICAL: Failed to write error status to DB: {db_e}")
 
-
-# --- API Endpoints ---
-@app.route("/solve", methods=["POST"])
-def solve_schedule_endpoint():
-    # 1. Authorization Check
-    auth_header = request.headers.get("Authorization")
-    if not auth_header or auth_header.split(" ")[1] != solver_token:
+@app.route("/internal/run-solver", methods=["POST"])
+def run_solver_endpoint():
+    auth_header = request.headers.get('Authorization')
+    expected_token = f"Bearer {INTERNAL_API_TOKEN}"
+    if not auth_header or auth_header != expected_token:
         return jsonify({"error": "Unauthorized"}), 401
-
-    # 2. Get Run ID
+        
     data = request.get_json()
     run_id = data.get("run_id")
     if not run_id:
         return jsonify({"error": "run_id is required"}), 400
+
+    try:
+        print(f"[{run_id}] Received task. Fetching data.")
+        run_data = supabase.from_("runs").select("start_date, end_date").eq("id", run_id).single().execute().data
+        if not run_data:
+            raise Exception(f"Run ID {run_id} not found.")
+
+        resources_response = supabase.from_("resources").select("*").eq("isArchived", False).execute()
+        resources = resources_response.data or []
         
-    app.logger.info(f"Received solve request for run_id: {run_id}")
+        exceptions_data = []
+        user_data_response = supabase.from_("user_data").select("data").eq("id", 1).maybe_single().execute()
+        if user_data_response.data and 'data' in user_data_response.data and 'exceptionDates' in user_data_response.data['data']:
+            exceptions_data = user_data_response.data['data']['exceptionDates']
+        
+        print(f"[{run_id}] Data fetch complete. Starting solver thread.")
+        
+        solver_thread = threading.Thread(
+            target=solve_schedule,
+            args=(run_id, run_data['start_date'], run_data['end_date'], resources, exceptions_data)
+        )
+        solver_thread.start()
 
-    # 3. Start the solver in a background thread
-    solver_thread = threading.Thread(target=run_solver_in_background, args=(run_id,))
-    solver_thread.start()
-    
-    # 4. Immediately return a 202 Accepted response
-    return jsonify({"status": "Solver process started", "run_id": run_id}), 202
+        return jsonify({"message": f"Solver thread started for run_id: {run_id}"}), 200
 
-@app.route("/", methods=["GET"])
-def health_check():
-    return "Radiology Solver Service is running."
+    except Exception as e:
+        error_trace = traceback.format_exc()
+        error_message = f"Failed to prepare solver: {e}\n{error_trace}"
+        print(error_message)
+        supabase.from_("runs").update({"status": "FAILED", "error_text": error_message}).eq("id", run_id).execute()
+        return jsonify({"error": error_message}), 500
 
 if __name__ == "__main__":
-    app.run(debug=False, host="0.0.0.0", port=int(os.environ.get("PORT", 8080)))
+    app.run(debug=True, host="0.0.0.0", port=int(os.environ.get("PORT", 8080)))
