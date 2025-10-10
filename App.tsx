@@ -60,6 +60,7 @@ interface SidebarContentProps {
     showConfirmation: (options: ShowConfirmationOptions) => void;
     loadSchedule: (regenerate?: boolean) => Promise<void>;
     handleMasterResetTasks: () => void;
+    handleUpdatePlanDates: (startDate: string, endDate: string) => void;
 }
 
 // Memoized Sidebar to prevent re-renders from the Pomodoro timer
@@ -70,7 +71,7 @@ const SidebarContent = React.memo(({
     todayInNewYork, handleRebalance, isLoading, handleToggleCramMode, handleUpdateDeadlines,
     isSettingsOpen, setIsSettingsOpen, handleUpdateTopicOrderAndRebalance, handleUpdateCramTopicOrderAndRebalance,
     handleToggleSpecialTopicsInterleaving, handleAddOrUpdateException, handleUndo, previousStudyPlan,
-    showConfirmation, loadSchedule, handleMasterResetTasks
+    showConfirmation, loadSchedule, handleMasterResetTasks, handleUpdatePlanDates
 }: SidebarContentProps) => (
     <aside className={`w-80 text-[var(--text-secondary)] flex flex-col h-dvh isolated-scroll glass-chrome`}>
         <div className="flex-grow flex flex-col min-h-0">
@@ -117,6 +118,9 @@ const SidebarContent = React.memo(({
                         onToggleCramMode={handleToggleCramMode}
                         deadlines={studyPlan.deadlines}
                         onUpdateDeadlines={handleUpdateDeadlines}
+                        startDate={studyPlan.startDate}
+                        endDate={studyPlan.endDate}
+                        onUpdateDates={handleUpdatePlanDates}
                     />
 
                     <div className="space-y-3">
@@ -162,12 +166,21 @@ const App: React.FC = () => {
   const [isSettingsOpen, setIsSettingsOpen] = useState(true);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 1024);
 
+  // FIX: Reordered hooks to resolve circular dependency. `useModalManager` no longer depends on `isNewUser` at initialization.
+  const {
+    modalStates, modalData,
+    openModal, closeModal,
+    openResourceEditor, closeResourceEditor,
+    showConfirmation, handleConfirm,
+  } = useModalManager();
+
+  // FIX: Correctly passed the `showConfirmation` function to `useStudyPlanManager`, resolving the "Expected 1 arguments, but got 0" error.
   const {
     studyPlan, setStudyPlan, previousStudyPlan,
     globalMasterResourcePool, setGlobalMasterResourcePool,
     isLoading, systemNotification, setSystemNotification,
     isNewUser,
-    loadSchedule, handleRebalance, handleUpdateTopicOrderAndRebalance, handleUpdateCramTopicOrderAndRebalance,
+    loadSchedule, handleRebalance, handleUpdatePlanDates, handleUpdateTopicOrderAndRebalance, handleUpdateCramTopicOrderAndRebalance,
     handleToggleCramMode,
     handleToggleSpecialTopicsInterleaving,
     handleTaskToggle, handleSaveModifiedDayTasks, handleUndo,
@@ -175,14 +188,7 @@ const App: React.FC = () => {
     saveStatus,
     handleToggleRestDay,
     handleAddOrUpdateException,
-  } = useStudyPlanManager();
-
-  const {
-    modalStates, modalData,
-    openModal, closeModal, closeWelcomeModal,
-    openResourceEditor, closeResourceEditor,
-    showConfirmation, handleConfirm,
-  } = useModalManager(isNewUser);
+  } = useStudyPlanManager(showConfirmation);
 
   const todayInNewYork = useMemo(() => getTodayInNewYork(), []);
   const [selectedDate, setSelectedDate] = useState<string>(todayInNewYork);
@@ -217,6 +223,13 @@ const App: React.FC = () => {
     if (highlightEl) highlightEl.setAttribute('href', highlight);
     
   }, []);
+
+  // FIX: Added a useEffect to open the welcome modal when isNewUser becomes true, breaking the hook dependency cycle.
+  useEffect(() => {
+    if (isNewUser) {
+      openModal('isWelcomeModalOpen');
+    }
+  }, [isNewUser, openModal]);
 
   useEffect(() => {
     loadSchedule();
@@ -549,7 +562,7 @@ const App: React.FC = () => {
   }
   
   if (!studyPlan) {
-     return <div className="flex flex-col items-center justify-center min-h-screen bg-black text-white p-4"><i className="fas fa-exclamation-triangle fa-3x text-[var(--accent-red)] mb-4"></i><h1 className="text-2xl font-bold mb-2">Error</h1><p className="text-red-400 text-center mb-6">{systemNotification?.message || 'An unknown error occurred.'}</p><Button onClick={() => loadSchedule()} variant="primary">Try Again</Button></div>;
+     return <div className="flex flex-col items-center justify-center min-h-screen bg-black text-white p-4"><i className="fas fa-exclamation-triangle fa-3x text-[var(--accent-red)] mb-4"></i><h1 className="text-2xl font-bold mb-2">Error</h1><p className="text-red-400 text-center mb-6">{systemNotification?.message || 'An unknown error occurred.'}</p><Button onClick={() => loadSchedule(true)} variant="primary">Try Again</Button></div>;
   }
 
   const selectedDaySchedule = studyPlan.schedule.find(day => day.date === selectedDate);
@@ -566,7 +579,7 @@ const App: React.FC = () => {
                 isSettingsOpen={isSettingsOpen} setIsSettingsOpen={setIsSettingsOpen} handleUpdateTopicOrderAndRebalance={handleUpdateTopicOrderAndRebalance}
                 handleUpdateCramTopicOrderAndRebalance={handleUpdateCramTopicOrderAndRebalance} handleToggleSpecialTopicsInterleaving={handleToggleSpecialTopicsInterleaving}
                 handleAddOrUpdateException={handleAddOrUpdateException} handleUndo={handleUndo} previousStudyPlan={previousStudyPlan} showConfirmation={showConfirmation}
-                loadSchedule={loadSchedule} handleMasterResetTasks={handleMasterResetTasks}
+                loadSchedule={loadSchedule} handleMasterResetTasks={handleMasterResetTasks} handleUpdatePlanDates={handleUpdatePlanDates}
             />
         </div>
         <div className={`lg:hidden fixed inset-0 bg-black/60 z-[var(--z-sidebar-mobile-backdrop)] transition-opacity ${isSidebarOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`} onClick={() => setIsSidebarOpen(false)} aria-hidden="true"></div>
@@ -579,7 +592,7 @@ const App: React.FC = () => {
                 isSettingsOpen={isSettingsOpen} setIsSettingsOpen={setIsSettingsOpen} handleUpdateTopicOrderAndRebalance={handleUpdateTopicOrderAndRebalance}
                 handleUpdateCramTopicOrderAndRebalance={handleUpdateCramTopicOrderAndRebalance} handleToggleSpecialTopicsInterleaving={handleToggleSpecialTopicsInterleaving}
                 handleAddOrUpdateException={handleAddOrUpdateException} handleUndo={handleUndo} previousStudyPlan={previousStudyPlan} showConfirmation={showConfirmation}
-                loadSchedule={loadSchedule} handleMasterResetTasks={handleMasterResetTasks}
+                loadSchedule={loadSchedule} handleMasterResetTasks={handleMasterResetTasks} handleUpdatePlanDates={handleUpdatePlanDates}
             />
         </div>
 
@@ -699,7 +712,7 @@ const App: React.FC = () => {
           )}
         </div>
         
-        {modalStates.isWelcomeModalOpen && <WelcomeModal isOpen={modalStates.isWelcomeModalOpen} onClose={closeWelcomeModal} />}
+        {modalStates.isWelcomeModalOpen && <WelcomeModal isOpen={modalStates.isWelcomeModalOpen} onClose={() => closeModal('isWelcomeModalOpen')} />}
         {modalStates.isAddTaskModalOpen && selectedDaySchedule && <AddTaskModal isOpen={modalStates.isAddTaskModalOpen} onClose={() => closeModal('isAddTaskModalOpen')} onSave={handleSaveOptionalTask} availableDomains={ALL_DOMAINS} selectedDate={selectedDate}/>}
         {modalStates.isModifyDayTasksModalOpen && selectedDaySchedule && <ModifyDayTasksModal isOpen={modalStates.isModifyDayTasksModalOpen} onClose={() => closeModal('isModifyDayTasksModalOpen')} onSave={onDayTasksSave} tasksForDay={selectedDaySchedule.tasks} allResources={globalMasterResourcePool} selectedDate={selectedDate} showConfirmation={showConfirmation} onEditResource={openResourceEditor} onArchiveResource={handleRequestArchive} onRestoreResource={handleRestoreResource} onPermanentDeleteResource={handlePermanentDelete} openAddResourceModal={() => openResourceEditor(null)} isCramModeActive={studyPlan.isCramModeActive ?? false} />}
         {modalStates.isResourceEditorOpen && <ResourceEditorModal isOpen={modalStates.isResourceEditorOpen} onClose={closeResourceEditor} onSave={handleSaveResource} onRequestArchive={handleRequestArchive} initialResource={modalData.editingResource} availableDomains={ALL_DOMAINS} availableResourceTypes={Object.values(ResourceType)}/>}

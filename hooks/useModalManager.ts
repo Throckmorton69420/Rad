@@ -13,12 +13,12 @@ export interface ModalData {
   editingResource: StudyResource | null;
 }
 
-export const useModalManager = (showWelcomeInitially = false) => {
+export const useModalManager = () => {
   const [modalStates, setModalStates] = useState<ModalStates>({
     isAddTaskModalOpen: false,
     isModifyDayTasksModalOpen: false,
     isResourceEditorOpen: false,
-    isWelcomeModalOpen: showWelcomeInitially,
+    isWelcomeModalOpen: false,
     confirmationState: { isOpen: false, title: '', message: '', onConfirm: () => {}, onClose: () => {}},
   });
 
@@ -32,10 +32,6 @@ export const useModalManager = (showWelcomeInitially = false) => {
 
   const closeModal = useCallback((modalName: keyof Omit<ModalStates, 'confirmationState' | 'isWelcomeModalOpen'>) => {
     setModalStates(prev => ({ ...prev, [modalName]: false }));
-  }, []);
-  
-  const closeWelcomeModal = useCallback(() => {
-    setModalStates(prev => ({ ...prev, isWelcomeModalOpen: false }));
   }, []);
 
   const openResourceEditor = useCallback((resource: StudyResource | null) => {
@@ -84,7 +80,6 @@ export const useModalManager = (showWelcomeInitially = false) => {
     modalData,
     openModal,
     closeModal,
-    closeWelcomeModal,
     openResourceEditor,
     closeResourceEditor,
     showConfirmation,

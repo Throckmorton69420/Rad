@@ -1004,7 +1004,7 @@ const caseCompanionResources: StudyResource[] = [
     schedulingPriority: 'high',
 } as StudyResource));
 
-export let masterResourcePool: StudyResource[] = [
+let initialResourcePool: StudyResource[] = [
     ...enhancedCoreRadiologyResources,
     ...ctcResources,
     ...caseCompanionResources,
@@ -1091,3 +1091,34 @@ export let masterResourcePool: StudyResource[] = [
         return allPhysicsQbChunks;
     })(),
 ];
+
+// Post-processing step to create pairings for the scheduler
+const addPairings = (resources: StudyResource[]): StudyResource[] => {
+    const resourceMap = new Map(resources.map(r => [r.id, r]));
+
+    const addPair = (id1: string, id2: string) => {
+        const r1 = resourceMap.get(id1);
+        const r2 = resourceMap.get(id2);
+        if (r1 && r2) {
+            r1.pairedResourceIds = [...(r1.pairedResourceIds || []), id2];
+            r2.pairedResourceIds = [...(r2.pairedResourceIds || []), id1];
+        } else {
+          // console.warn(`Could not create pairing: one or both IDs not found (${id1}, ${id2})`);
+        }
+    };
+
+    // Add pairings based on domain and topic keywords
+    addPair('titan_vid_0', 'ctc1_ch5_sec6_read'); // GI - Pancreas
+    addPair('titan_vid_2', 'ctc1_ch5_sec3_read'); // GI - Liver
+    addPair('titan_vid_4', 'ctc1_ch6_sec2_read'); // GU - Renal Masses
+    addPair('titan_vid_21', 'ctc2_ch10_sec3_read'); // MSK - Benign/Malignant Tumors
+    addPair('titan_vid_28', 'ctc2_ch11_sec7_read'); // Neuro - Tumors
+    addPair('titan_vid_34', 'ctc1_ch4_sec4_read'); // Peds - Airway
+    addPair('titan_vid_35', 'ctc1_ch4_sec7_read'); // Peds - Luminal GI
+    addPair('titan_vid_40', 'ctc1_ch3_sec1_read'); // Cardiac - Chambers/Valves
+    addPair('titan_vid_14', 'ctc1_ch2_sec5_read'); // Chest - Lung Cancer
+
+    return Array.from(resourceMap.values());
+};
+
+export const masterResourcePool: StudyResource[] = addPairings(initialResourcePool);

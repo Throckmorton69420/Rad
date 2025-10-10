@@ -293,6 +293,9 @@ export interface AdvancedControlsProps {
   onToggleCramMode: (isActive: boolean) => void;
   deadlines: DeadlineSettings;
   onUpdateDeadlines: (newDeadlines: DeadlineSettings) => void;
+  startDate: string;
+  endDate: string;
+  onUpdateDates: (startDate: string, endDate: string) => void;
 }
 
 

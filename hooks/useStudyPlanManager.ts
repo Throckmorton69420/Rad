@@ -1,12 +1,12 @@
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
-import { StudyPlan, RebalanceOptions, ExceptionDateRule, StudyResource, ScheduledTask, GeneratedStudyPlanOutcome, Domain, ResourceType, PlanDataBlob, DeadlineSettings } from '../types';
+import { StudyPlan, RebalanceOptions, ExceptionDateRule, StudyResource, ScheduledTask, GeneratedStudyPlanOutcome, Domain, ResourceType, PlanDataBlob, DeadlineSettings, ShowConfirmationOptions } from '../types';
 import { generateInitialSchedule, rebalanceSchedule } from '../services/scheduleGenerator';
 import { masterResourcePool as initialMasterResourcePool } from '../services/studyResources';
 import { supabase } from '../services/supabaseClient';
-import { DEFAULT_TOPIC_ORDER } from '../constants';
+import { DEFAULT_TOPIC_ORDER, STUDY_END_DATE, STUDY_START_DATE } from '../constants';
 
 
-export const useStudyPlanManager = () => {
+export const useStudyPlanManager = (showConfirmation: (options: ShowConfirmationOptions) => void) => {
     const [studyPlan, setStudyPlan] = useState<StudyPlan | null>(null);
     const [previousStudyPlan, setPreviousStudyPlan] = useState<StudyPlan | null>(null);
     const [globalMasterResourcePool, setGlobalMasterResourcePool] = useState<StudyResource[]>(initialMasterResourcePool);
@@ -19,10 +19,10 @@ export const useStudyPlanManager = () => {
     const isInitialLoadRef = useRef(true);
     const debounceTimerRef = useRef<number | null>(null);
 
-    const planStateRef = useRef({ studyPlan, userExceptions });
+    const planStateRef = useRef({ studyPlan, userExceptions, globalMasterResourcePool });
     useEffect(() => {
-        planStateRef.current = { studyPlan, userExceptions };
-    }, [studyPlan, userExceptions]);
+        planStateRef.current = { studyPlan, userExceptions, globalMasterResourcePool };
+    }, [studyPlan, userExceptions, globalMasterResourcePool]);
 
     const loadSchedule = useCallback(async (regenerate = false) => {
         setIsLoading(true);
@@ -76,6 +76,8 @@ export const useStudyPlanManager = () => {
                     if (loadedPlan.areSpecialTopicsInterleaved === undefined) {
                         loadedPlan.areSpecialTopicsInterleaved = true;
                     }
+                     if (!loadedPlan.startDate) loadedPlan.startDate = STUDY_START_DATE;
+                    if (!loadedPlan.endDate) loadedPlan.endDate = STUDY_END_DATE;
                     
                     setStudyPlan(loadedPlan);
                     setGlobalMasterResourcePool(reconciledPool);
@@ -93,10 +95,11 @@ export const useStudyPlanManager = () => {
             }
 
             // This block runs for new users OR for a manual regeneration.
-            const poolForGeneration = initialMasterResourcePool;
+            const poolForGeneration = planStateRef.current.globalMasterResourcePool;
             const exceptionsForGeneration = regenerate ? [] : planStateRef.current.userExceptions;
             if (regenerate) {
                 setUserExceptions([]);
+                setGlobalMasterResourcePool(initialMasterResourcePool); // Reset pool on full regen
             }
 
             const currentTopicOrder = planStateRef.current.studyPlan?.topicOrder;
@@ -109,7 +112,6 @@ export const useStudyPlanManager = () => {
             const outcome: GeneratedStudyPlanOutcome = generateInitialSchedule(poolForGeneration, exceptionsForGeneration, currentTopicOrder, defaultDeadlines);
 
             setStudyPlan(outcome.plan);
-            setGlobalMasterResourcePool(poolForGeneration); // Use the fresh pool
             setPreviousStudyPlan(null);
 
             if (outcome.notifications && outcome.notifications.length > 0) {
@@ -267,6 +269,37 @@ export const useStudyPlanManager = () => {
             }
         }, 50);
     }, [studyPlan, userExceptions, globalMasterResourcePool]);
+
+    const handleUpdatePlanDates = useCallback((newStartDate: string, newEndDate: string) => {
+        showConfirmation({
+            title: "Regenerate Entire Schedule?",
+            message: "Changing the study dates will erase all current progress and regenerate the plan from scratch using the current resource pool. Are you sure you want to continue?",
+            confirmText: "Yes, Regenerate",
+            confirmVariant: 'danger',
+            onConfirm: () => {
+                setIsLoading(true);
+                setSystemNotification({ type: 'info', message: 'Regenerating schedule with new dates...' });
+                setTimeout(() => {
+                    const outcome = generateInitialSchedule(
+                        globalMasterResourcePool,
+                        userExceptions,
+                        studyPlan?.topicOrder,
+                        studyPlan?.deadlines,
+                        newStartDate,
+                        newEndDate
+                    );
+                    setStudyPlan(outcome.plan);
+                    setPreviousStudyPlan(null);
+                    if (outcome.notifications && outcome.notifications.length > 0) {
+                        setSystemNotification(outcome.notifications[0]);
+                    } else {
+                         setSystemNotification({ type: 'info', message: `Plan regenerated for ${newStartDate} to ${newEndDate}.` });
+                    }
+                    setIsLoading(false);
+                }, 50);
+            }
+        });
+    }, [showConfirmation, globalMasterResourcePool, userExceptions, studyPlan]);
     
 
     const handleUpdateTopicOrderAndRebalance = (newOrder: Domain[]) => {
@@ -379,6 +412,7 @@ export const useStudyPlanManager = () => {
         isNewUser,
         loadSchedule,
         handleRebalance,
+        handleUpdatePlanDates,
         handleUpdateTopicOrderAndRebalance,
         handleUpdateCramTopicOrderAndRebalance,
         handleToggleCramMode,

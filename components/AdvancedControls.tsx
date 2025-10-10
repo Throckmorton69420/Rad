@@ -57,15 +57,61 @@ const DeadlineManager: React.FC<{
     );
 };
 
+const PlanDateManager: React.FC<{
+    startDate: string;
+    endDate: string;
+    onUpdate: (startDate: string, endDate: string) => void;
+    isLoading: boolean;
+}> = ({ startDate, endDate, onUpdate, isLoading }) => {
+    const [localStart, setLocalStart] = useState(startDate);
+    const [localEnd, setLocalEnd] = useState(endDate);
+
+    useEffect(() => {
+        setLocalStart(startDate);
+        setLocalEnd(endDate);
+    }, [startDate, endDate]);
+
+    const handleSave = () => {
+        if (localStart >= localEnd) {
+            alert("Start date must be before the end date.");
+            return;
+        }
+        onUpdate(localStart, localEnd);
+    };
+    
+    const isDirty = localStart !== startDate || localEnd !== endDate;
+
+    return (
+        <div className="p-3 glass-panel rounded-lg mt-2 space-y-3 animate-fade-in">
+            <h4 className="text-md font-semibold text-[var(--text-primary)]">Plan Dates</h4>
+            <p className="text-xxs text-[var(--text-secondary)]">Warning: Changing dates will regenerate the entire schedule from scratch and reset progress.</p>
+            <div className="grid grid-cols-2 gap-2">
+                 <div>
+                    <label htmlFor="plan-start-date" className="block text-xs font-medium text-[var(--text-secondary)] mb-1">Start Date:</label>
+                    <input type="date" id="plan-start-date" value={localStart} onChange={(e) => setLocalStart(e.target.value)} className="input-base text-sm" disabled={isLoading} />
+                </div>
+                <div>
+                    <label htmlFor="plan-end-date" className="block text-xs font-medium text-[var(--text-secondary)] mb-1">End Date:</label>
+                    <input type="date" id="plan-end-date" value={localEnd} onChange={(e) => setLocalEnd(e.target.value)} className="input-base text-sm" disabled={isLoading} />
+                </div>
+            </div>
+            <Button onClick={handleSave} className="w-full" size="sm" variant="danger" disabled={isLoading || !isDirty}>
+                Save Dates & Regenerate Plan
+            </Button>
+        </div>
+    );
+};
+
 
 const AdvancedControls: React.FC<AdvancedControlsProps> = ({ 
     onRebalance, isLoading, selectedDate, isCramModeActive, onToggleCramMode,
-    deadlines, onUpdateDeadlines 
+    deadlines, onUpdateDeadlines, startDate, endDate, onUpdateDates,
 }) => {
   const [showTopicTimeOptions, setShowTopicTimeOptions] = useState(false);
   const [selectedTopics, setSelectedTopics] = useState<Domain[]>([]);
   const [overallStudyTimeTotalMinutes, setOverallStudyTimeTotalMinutes] = useState<number>(240); 
   const [showDeadlineManager, setShowDeadlineManager] = useState(false);
+  const [showDateManager, setShowDateManager] = useState(false);
 
   const handleSimpleRebalance = () => {
     onRebalance({ type: 'standard' }); 
@@ -119,58 +165,49 @@ const AdvancedControls: React.FC<AdvancedControlsProps> = ({
           </label>
           <p className="text-xxs text-yellow-400/80 px-1">Prioritizes all Titan Radiology videos ASAP.</p>
       </div>
-
-      <div>
-        <Button onClick={handleSimpleRebalance} className="w-full" variant="secondary" disabled={isLoading}>
-          <i className="fas fa-calendar-day mr-2"></i> Standard Rebalance
-        </Button>
-        <p className="text-xxs text-[var(--text-secondary)] mt-1 px-1">Preserves past work and reschedules all future tasks.</p>
-      </div>
-      <div>
-        <Button onClick={() => setShowTopicTimeOptions(!showTopicTimeOptions)} className="w-full" variant="secondary" disabled={isLoading}>
-          <i className="fas fa-sliders-h mr-2"></i> Topic/Time Specific
-        </Button>
-        <p className="text-xxs text-[var(--text-secondary)] mt-1 px-1">Modifies a single day, then reschedules future tasks.</p>
-      </div>
-      <div>
-        <Button onClick={() => setShowDeadlineManager(!showDeadlineManager)} className="w-full" variant="secondary" disabled={isLoading}>
-            <i className="fas fa-flag-checkered mr-2"></i> Set Content Deadlines
-        </Button>
-        <p className="text-xxs text-[var(--text-secondary)] mt-1 px-1">Set target dates for content completion.</p>
-      </div>
-
+      
+      <Button onClick={handleSimpleRebalance} variant="secondary" className="w-full" disabled={isLoading}><i className="fas fa-sync-alt mr-2"></i> Rebalance Future</Button>
+      
+      <Button onClick={() => setShowTopicTimeOptions(!showTopicTimeOptions)} variant="secondary" className="w-full" disabled={isLoading}>
+        <i className={`fas fa-tasks mr-2`}></i> Rebalance Today by Topic/Time
+      </Button>
 
       {showTopicTimeOptions && (
         <div className="p-3 glass-panel rounded-lg mt-2 space-y-3 animate-fade-in">
-           <p className="text-sm font-medium text-[var(--text-primary)]">
-             For Day: <span className="font-bold">{parseDateString(selectedDate).toLocaleDateString('en-US', { timeZone: 'UTC', month: 'long', day: 'numeric' })}</span>
-           </p>
-          <p className="text-sm font-medium text-[var(--text-primary)]">Select up to 4 topics:</p>
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-            {ALL_DOMAINS.map(domain => (
-                <Button
-                    key={domain}
-                    onClick={() => handleTopicToggle(domain)}
-                    variant={selectedTopics.includes(domain) ? 'primary' : 'secondary'}
-                    size="sm"
-                    className="!text-xxs !py-1"
-                >
-                    {domain}
-                </Button>
-            ))}
+          <h4 className="text-md font-semibold">Rebalance for <span className="text-[var(--accent-purple)]">{parseDateString(selectedDate).toLocaleDateString()}</span></h4>
+          
+          <div>
+            <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">1. Select up to 4 priority topics:</label>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
+              {ALL_DOMAINS.map(domain => (
+                <button key={domain} onClick={() => handleTopicToggle(domain)}
+                  className={`p-1.5 text-xxs font-semibold rounded-md transition-colors ${selectedTopics.includes(domain) ? 'bg-[var(--accent-purple)] text-white' : 'bg-black/40 hover:bg-black/60'}`}>
+                  {domain}
+                </button>
+              ))}
+            </div>
           </div>
           
           <div>
-            <label className="block text-sm font-medium mb-1 text-[var(--text-primary)]">New Total Study Time for Day:</label>
-            <TimeInputScroller valueInMinutes={overallStudyTimeTotalMinutes} onChange={setOverallStudyTimeTotalMinutes} maxHours={12} />
+            <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">2. Set total study time for the day:</label>
+            <TimeInputScroller valueInMinutes={overallStudyTimeTotalMinutes} onChange={setOverallStudyTimeTotalMinutes} maxHours={14} />
           </div>
-          <Button onClick={handleTopicTimeRebalance} className="w-full" size="sm" disabled={isLoading || selectedTopics.length === 0}>Apply Topic/Time Rebalance</Button>
+          
+          <Button onClick={handleTopicTimeRebalance} className="w-full" disabled={isLoading || selectedTopics.length === 0}>
+            Apply & Rebalance Rest of Plan
+          </Button>
         </div>
       )}
 
-      {showDeadlineManager && (
-          <DeadlineManager deadlines={deadlines} onUpdate={onUpdateDeadlines} isLoading={isLoading} />
-      )}
+      <Button onClick={() => setShowDeadlineManager(s => !s)} variant="secondary" className="w-full" disabled={isLoading}>
+          <i className="fas fa-bullseye mr-2"></i> Manage Content Deadlines
+      </Button>
+      {showDeadlineManager && <DeadlineManager deadlines={deadlines} onUpdate={onUpdateDeadlines} isLoading={isLoading} />}
+      
+      <Button onClick={() => setShowDateManager(s => !s)} variant="secondary" className="w-full" disabled={isLoading}>
+          <i className="fas fa-calendar-alt mr-2"></i> Change Plan Dates
+      </Button>
+      {showDateManager && <PlanDateManager startDate={startDate} endDate={endDate} onUpdate={onUpdateDates} isLoading={isLoading} />}
     </div>
   );
 };
