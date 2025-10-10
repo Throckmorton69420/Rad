@@ -115,7 +115,7 @@ const MasterResourcePoolViewer: React.FC<MasterResourcePoolViewerProps> = ({
   const sourceOptions = useMemo(() => Array.from(new Set(resources.map(r => r.bookSource || r.videoSource).filter(Boolean) as string[])).sort().map(s => ({ value: s, label: s })), [resources]);
 
   return (
-    <div className="bg-transparent flex flex-col pb-[calc(1rem+env(safe-area-inset-bottom))]">
+    <div className="pb-[calc(1rem+env(safe-area-inset-bottom))]">
       <div className="flex-shrink-0">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 items-end mb-3">
           <input type="text" placeholder="Search resources..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="input-base !py-1.5 !text-sm"/>

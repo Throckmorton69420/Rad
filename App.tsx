@@ -249,9 +249,10 @@ const App: React.FC = () => {
       };
       window.addEventListener('afterprint', handleAfterPrint);
       
-      // Use requestAnimationFrame to ensure DOM is updated before printing
       requestAnimationFrame(() => {
-        window.print();
+        setTimeout(() => { // This timeout gives the browser a moment to paint complex content
+            window.print();
+        }, 50);
       });
     }
   }, [printableContent]);
@@ -269,11 +270,9 @@ const App: React.FC = () => {
   
   const navigatePeriod = useCallback((direction: 'next' | 'prev', viewMode: 'Weekly' | 'Monthly') => {
     const currentDateObj = parseDateString(selectedDate);
-    // FIX: Calendar navigation was unbounded. This logic is now correct.
     if (viewMode === 'Weekly') {
       currentDateObj.setUTCDate(currentDateObj.getUTCDate() + (direction === 'next' ? 7 : -7));
     } else if (viewMode === 'Monthly') {
-       // Correctly handle month changes, even across years
       const currentMonth = currentDateObj.getUTCMonth();
       currentDateObj.setUTCMonth(currentMonth + (direction === 'next' ? 1 : -1));
     }
@@ -561,7 +560,7 @@ const App: React.FC = () => {
   const currentPomodoroTask = currentPomodoroTaskId ? studyPlan.schedule.flatMap(d => d.tasks).find(t => t.id === currentPomodoroTaskId) : null;
   
   const MainAppContent = (
-      <div className="h-full w-full bg-transparent text-[var(--text-primary)] flex flex-col print:hidden">
+      <div className="h-full w-full bg-transparent text-[var(--text-primary)] flex print:hidden">
         <div className={`lg:hidden fixed inset-y-0 left-0 z-[var(--z-sidebar-mobile)] transform transition-transform duration-300 ease-in-out ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
             <SidebarContent 
                 isSidebarOpen={isSidebarOpen} setIsSidebarOpen={setIsSidebarOpen} isPomodoroCollapsed={isPomodoroCollapsed} setIsPomodoroCollapsed={setIsPomodoroCollapsed}
@@ -575,7 +574,7 @@ const App: React.FC = () => {
             />
         </div>
         <div className={`lg:hidden fixed inset-0 bg-black/60 z-[var(--z-sidebar-mobile-backdrop)] transition-opacity ${isSidebarOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`} onClick={() => setIsSidebarOpen(false)} aria-hidden="true"></div>
-        <div className="hidden lg:block fixed inset-y-0 left-0 z-30">
+        <div className="hidden lg:block flex-shrink-0">
           <SidebarContent 
                 isSidebarOpen={isSidebarOpen} setIsSidebarOpen={setIsSidebarOpen} isPomodoroCollapsed={isPomodoroCollapsed} setIsPomodoroCollapsed={setIsPomodoroCollapsed}
                 pomodoroSettings={pomodoroSettings} setPomodoroSettings={setPomodoroSettings} handlePomodoroSessionComplete={handlePomodoroSessionComplete} currentPomodoroTask={currentPomodoroTask}
@@ -588,7 +587,7 @@ const App: React.FC = () => {
             />
         </div>
 
-        <div className="flex-grow lg:pl-80 flex flex-col min-h-0">
+        <div className="flex-grow flex flex-col min-h-0">
           <div className={`relative flex-1 overflow-y-auto min-h-0 ${isMobile && isSidebarOpen ? 'overflow-hidden' : ''}`}>
             <header className="flex-shrink-0 text-[var(--text-primary)] px-3 md:px-4 pb-3 md:pb-4 flex justify-between items-center sticky top-0 z-[var(--z-header)] pt-[calc(0.75rem+env(safe-area-inset-top))] md:pt-[calc(1rem+env(safe-area-inset-top))] pl-[calc(0.75rem+env(safe-area-inset-left))] pr-[calc(0.75rem+env(safe-area-inset-right))] glass-chrome">
               <div className="flex items-center">
@@ -646,7 +645,7 @@ const App: React.FC = () => {
                         </div>
                     </div>
 
-                    <div className="flex-1 min-h-0 flex flex-col px-3 md:px-6">
+                    <div className="flex-1 min-h-0 px-3 md:px-6">
                         {isLoading && <div className="flex flex-col items-center justify-center p-10"> <i className="fas fa-spinner fa-spin fa-2x text-[var(--accent-purple)] mb-3"></i> <span className="text-[var(--text-primary)]">Loading...</span> </div>}
                         
                         {!isLoading && activeTab === 'schedule' && (
