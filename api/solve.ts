@@ -3,8 +3,9 @@ import { createClient } from '@supabase/supabase-js';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
 // Initialize Supabase client with SERVICE_ROLE_KEY for server-side operations
+// These env vars are set in Vercel project settings, NOT prefixed with VITE_
 const supabase = createClient(
-  process.env.VITE_SUPABASE_URL!,
+  process.env.SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 

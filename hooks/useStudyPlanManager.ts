@@ -214,8 +214,8 @@ export const useStudyPlanManager = (showConfirmation: (options: ShowConfirmation
     
             // FIX: Check for data existence before accessing its properties to prevent runtime errors on `null` data.
             if (data && data.plan_data) {
-                 // FIX: Removed unnecessary type assertion as the type is now correctly inferred from the Supabase client.
-                 const loadedData = data.plan_data;
+                 // FIX: Cast the loaded JSON data to the specific PlanDataBlob type for use in the application.
+                 const loadedData = data.plan_data as PlanDataBlob;
                  setStudyPlan(loadedData.plan);
                  setGlobalMasterResourcePool(loadedData.resources || initialMasterResourcePool);
                  setUserExceptions(loadedData.exceptions || []);
@@ -242,7 +242,7 @@ export const useStudyPlanManager = (showConfirmation: (options: ShowConfirmation
         debounceTimerRef.current = window.setTimeout(async () => {
             if (!planStateRef.current.studyPlan) return;
             const stateToSave: PlanDataBlob = { plan: planStateRef.current.studyPlan, resources: planStateRef.current.globalMasterResourcePool, exceptions: planStateRef.current.userExceptions };
-            // FIX: Removed 'as any' cast. The argument now correctly matches the expected type from the Supabase client.
+            // FIX: The argument now correctly matches the expected type from the Supabase client after updating the DB interface.
             const { error } = await supabase.from('study_plans').upsert({ id: 1, plan_data: stateToSave });
             if (error) {
                 setSystemNotification({ type: 'error', message: `Failed to save progress: ${error.message}` });
