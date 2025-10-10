@@ -114,7 +114,7 @@ const ModifyDayTasksModal: React.FC<ModifyDayTasksModalProps> = ({
             (domainFilter === 'all' || r.domain === domainFilter) &&
             (sourceFilter === 'all' || (r.bookSource || r.videoSource) === sourceFilter)
         );
-        return Array.from(new Set(tasksForTypeFilter.map(t => t.type))).sort();
+        return Array.from(new Set(tasksForTypeFilter.map(t => t.type))).sort((a, b) => a.localeCompare(b));
     }, [availableResources, domainFilter, sourceFilter]);
 
     const availableSources = useMemo(() => {
@@ -127,14 +127,14 @@ const ModifyDayTasksModal: React.FC<ModifyDayTasksModalProps> = ({
             const source = r.bookSource || r.videoSource;
             if (source) sources.add(source);
         });
-        return Array.from(sources).sort();
+        return Array.from(sources).sort((a, b) => a.localeCompare(b));
     }, [availableResources, domainFilter, typeFilter]);
     
     // 3. Effects to reset a filter if its current selection becomes invalid
     // FIX: Add type-safe checks to prevent invalid casting.
     useEffect(() => { if (domainFilter !== 'all' && !availableDomains.includes(domainFilter)) setDomainFilter('all'); }, [availableDomains, domainFilter]);
-    useEffect(() => { if (typeFilter !== 'all' && !availableResourceTypes.includes(typeFilter)) setTypeFilter('all'); }, [availableResourceTypes, typeFilter]);
-    useEffect(() => { if (sourceFilter !== 'all' && !availableSources.includes(sourceFilter)) setSourceFilter('all'); }, [availableSources, sourceFilter]);
+    useEffect(() => { if (typeFilter !== 'all' && !availableResourceTypes.includes(typeFilter as ResourceType)) setTypeFilter('all'); }, [availableResourceTypes, typeFilter]);
+    useEffect(() => { if (sourceFilter !== 'all' && !availableSources.includes(sourceFilter as string)) setSourceFilter('all'); }, [availableSources, sourceFilter]);
 
     // ------------------------------------------
 
