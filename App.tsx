@@ -53,7 +53,7 @@ durationMinutes: number) => void;
   highlightedDates: string[];
   todayInNewYork: string;
   // FIX: Updated signature to take RebalanceOptions.
-  handleRebalance: (options: RebalanceOptions) => void;
+  handleRebalance: (options?: RebalanceOptions) => void;
   isLoading: boolean;
   handleToggleCramMode: (isActive: boolean) => void;
   handleUpdateDeadlines: (newDeadlines: DeadlineSettings) => void;
@@ -197,9 +197,10 @@ const App: React.FC = () => {
     handleToggleSpecialTopicsInterleaving,
     handleTaskToggle, handleSaveModifiedDayTasks, handleUndo,
     updatePreviousStudyPlan,
-    saveStatus,
     handleToggleRestDay,
     handleAddOrUpdateException,
+    handleUpdateDeadlines,
+    handleMasterResetTasks,
   } = useStudyPlanManager(showConfirmation);
 
   const todayInNewYork = useMemo(() => getTodayInNewYork(), []);
@@ -374,12 +375,6 @@ setSystemNotification]);
   }, [globalMasterResourcePool, showConfirmation, setGlobalMasterResourcePool,
 setSystemNotification]);
 
-  const handleMasterResetTasks = useCallback(() => {
-    if (!studyPlan) return;
-    updatePreviousStudyPlan(studyPlan);
-    setStudyPlan(prev => prev ? ({ ...prev, schedule: prev.schedule.map(d => ({ ...d, tasks: d.tasks.map(t => ({...t, status: 'pending'})) }))}) : null);
-  }, [studyPlan, updatePreviousStudyPlan, setStudyPlan]);
-
   const handleSaveOptionalTask: AddTaskModalProps['onSave'] =
 useCallback((taskData) => {
     setStudyPlan(prevPlan => {
@@ -415,7 +410,7 @@ useCallback((taskData) => {
     handleSaveModifiedDayTasks(updatedTasks, selectedDate);
     closeModal('isModifyDayTasksModalOpen');
     // FIX: Changed call to handleRebalance to pass a standard options object.
-    setTimeout(() => handleRebalance({ type: 'standard' }), 100);
+    setTimeout(() => handleRebalance(), 100);
   }, [handleSaveModifiedDayTasks, selectedDate, closeModal, handleRebalance]);
 
   const handlePomodoroSessionComplete = useCallback((sessionType: 'study' | 'rest', durationMinutes: number) => {
@@ -458,15 +453,6 @@ useCallback((taskData) => {
     }
   }, [currentPomodoroTaskId, studyPlan, setStudyPlan, updatePreviousStudyPlan,
 setSystemNotification, showConfirmation, handleTaskToggle, selectedDate]);
-
-  const handleUpdateDeadlines = useCallback((newDeadlines: DeadlineSettings) => {
-    if (!studyPlan) return;
-    updatePreviousStudyPlan(studyPlan);
-    const updatedPlan = { ...studyPlan, deadlines: newDeadlines };
-    setStudyPlan(updatedPlan);
-    // FIX: Passed a standard options object to handleRebalance.
-    handleRebalance({ type: 'standard' });
-  }, [studyPlan, updatePreviousStudyPlan, setStudyPlan, handleRebalance]);
 
   const scheduledResourceIds = useMemo(() => {
     if (!studyPlan) return new Set<string>();
@@ -558,12 +544,14 @@ setSystemNotification, showConfirmation, handleTaskToggle, selectedDate]);
   };
 
   const SaveStatusIndicator: React.FC = () => {
-    switch (saveStatus) {
-      case 'saving': return <div className="text-xs text-[var(--accent-yellow)] flex items-center"><i className="fas fa-sync fa-spin mr-1.5"></i> Saving...</div>;
-      case 'saved': return <div className="text-xs text-[var(--accent-green)] flex items-center"><i className="fas fa-check-circle mr-1.5"></i> Saved</div>;
-      case 'error': return <div className="text-xs text-[var(--accent-red)] flex items-center"><i className="fas fa-exclamation-triangle mr-1.5"></i> Error</div>;
-      default: return <div className="text-xs text-[var(--text-secondary)] flex items-center"><i className="fas fa-cloud mr-1.5"></i> Synced</div>;
+    // FIX: Updated component to use isLoading and systemNotification instead of non-existent saveStatus.
+    if (isLoading) {
+      return <div className="text-xs text-[var(--accent-yellow)] flex items-center"><i className="fas fa-sync fa-spin mr-1.5"></i> Syncing...</div>;
     }
+    if (systemNotification?.type === 'error') {
+      return <div className="text-xs text-[var(--accent-red)] flex items-center"><i className="fas fa-exclamation-triangle mr-1.5"></i> Error</div>;
+    }
+    return <div className="text-xs text-[var(--text-secondary)] flex items-center"><i className="fas fa-cloud mr-1.5"></i> Synced</div>;
   };
 
   if (isLoading && !studyPlan) {

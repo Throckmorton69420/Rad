@@ -1,61 +1,79 @@
 # Radiology Core Exam Study Planner
 
-This is an interactive, day-by-day study planner for radiology residents preparing for their Core Exam. It organizes study resources into a personalized schedule and helps manage study time effectively.
+This is an interactive, day-by-day study planner for radiology residents preparing for their Core Exam. It uses a powerful backend solver to generate an optimized schedule based on your resources and constraints.
 
-## Run Locally
+## Architecture Overview
 
-**Prerequisites:** [Node.js](https://nodejs.org/) installed on your machine.
+This project has two main parts:
+1.  **Frontend (This Repo):** A React application built with Vite and deployed on Vercel.
+2.  **Backend Solver:** A Python/Flask service using Google OR-Tools, designed to be deployed as a container on a service like Google Cloud Run.
 
-1.  **Install Dependencies:**
-    Open your terminal, navigate to the project directory, and run:
-    ```bash
-    npm install
-    ```
+The flow is as follows: The user requests a schedule generation/rebalance from the frontend. The frontend calls a Vercel API route, which creates a "run" job in a Supabase database and triggers the backend solver. The solver fetches data from Supabase, calculates the optimal schedule, and writes the results back to the database. The frontend polls the database for the results and displays them when ready.
 
-2.  **Set Up Environment Variables:**
-    This project connects to a Supabase database to store and sync your study plan. You will need to provide your Supabase project's URL and anonymous key.
+## Setup & Deployment Guide
 
-    *   Create a new file named `.env` in the root of your project directory.
-    *   Add the following lines to the `.env` file, replacing the placeholder values with your actual Supabase credentials:
-        ```
-        VITE_SUPABASE_URL=https://YOUR_PROJECT_ID.supabase.co
-        VITE_SUPABASE_ANON_KEY=YOUR_SUPABASE_ANON_KEY
-        ```
-    *   You can find these values in your Supabase project dashboard under `Settings` > `API`.
+### Step 1: Set Up Supabase
 
-3.  **Start the Development Server:**
-    Once the dependencies are installed and your `.env` file is set up, start the local server with:
-    ```bash
-    npm run dev
-    ```
+Your Supabase project is the central hub for all data.
 
-4.  **Open in Browser:**
-    Your application will now be running. You can access it by opening your web browser and navigating to `http://localhost:5173` (or the address shown in your terminal).
+1.  **Create Tables:** Go to your Supabase project's "SQL Editor". Create a new query, paste the entire content of `sql/schema.sql`, and run it. This will create the `resources`, `runs`, and `schedule_slots` tables.
+2.  **Seed Data:** Create another new query. Paste the entire content of `sql/seed.sql` and run it. This populates your `resources` table with the complete master list of study materials.
 
-## Deploying to Vercel
+### Step 2: Deploy the Backend Python Solver
 
-When you deploy this project to Vercel, you need to configure the same environment variables you used in your local `.env` file. This is a critical step for the deployed application to connect to your Supabase database.
+The solver service needs to be deployed separately. We recommend Google Cloud Run for its scalability and free tier.
 
-Here's how to do it:
+**1. Set Up Your Local Python Project**
+On your computer (in a separate folder from this React app), create a new folder named `radiology-solver`. Inside it, create three files and paste the content from this project into them:
+- `main.py`
+- `requirements.txt`
+- `Dockerfile`
 
-1.  **Go to your Project Settings in Vercel:**
-    Navigate to your project on the Vercel dashboard.
+**2. Install Google Cloud CLI & Configure**
+- If you don't have it, [install the gcloud command-line tool](https://cloud.google.com/sdk/docs/install).
+- Login and set your project:
+  ```bash
+  gcloud auth login
+  gcloud config set project [YOUR_PROJECT_ID]
+  ```
+- Enable the necessary APIs:
+  ```bash
+  gcloud services enable run.googleapis.com
+  gcloud services enable artifactregistry.googleapis.com
+  ```
 
-2.  **Find Environment Variables:**
-    Click on the "Settings" tab, and then select "Environment Variables" from the side menu.
+**3. Deploy to Cloud Run**
+- In your terminal, navigate into your `radiology-solver` folder.
+- Run the deploy command:
+  ```bash
+  gcloud run deploy radiology-solver --source . --region us-central1 --allow-unauthenticated
+  ```
+- This will take a few minutes. When it's done, it will print a **Service URL**. Copy this URL.
 
-3.  **Add the Variables:**
-    You need to add two environment variables, using the same names as in your `.env` file and the values from your Supabase project's API settings.
+### Step 3: Configure Environment Variables
 
-    *   **Variable 1:**
-        *   **Name:** `VITE_SUPABASE_URL`
-        *   **Value:** `[Your Supabase Project URL]`
+This is the final step to connect everything.
 
-    *   **Variable 2:**
-        *   **Name:** `VITE_SUPABASE_ANON_KEY`
-        *   **Value:** `[Your Supabase Anon Key]`
+**1. Generate a Secret Token**
+Create a long, random string to act as a password between your Vercel app and your Cloud Run service. Example: `my-super-secret-solver-token-12345`.
 
-    *Important: Make sure the variables are available to all environments (Production, Preview, and Development) in the Vercel settings.*
+**2. Configure Cloud Run Environment Variables**
+- Go to the Google Cloud Run console and find your `radiology-solver` service.
+- Click "Edit & Deploy New Revision".
+- Go to the "Variables & Secrets" tab and add these three environment variables:
+  - `SUPABASE_URL`: Your Supabase project URL.
+  - `SUPABASE_KEY`: Your Supabase **service_role key** (find in Supabase Settings > API).
+  - `INTERNAL_API_TOKEN`: The secret token you just generated.
+- Click "Deploy".
 
-4.  **Redeploy:**
-    After adding and saving the variables, go to the "Deployments" tab for your project and trigger a new deployment for your latest commit. Vercel will use these new environment variables during the build process, and your application should connect to Supabase successfully.
+**3. Configure Vercel Environment Variables**
+- Go to your Vercel project dashboard > Settings > Environment Variables.
+- Add the following variables:
+  - `VITE_SUPABASE_URL`: Your Supabase project URL.
+  - `VITE_SUPABASE_ANON_KEY`: Your Supabase **anon key** (find in Supabase Settings > API).
+  - `SUPABASE_SERVICE_ROLE_KEY`: Your Supabase **service_role key**.
+  - `SOLVER_URL`: The **Service URL** you copied from your Cloud Run deployment.
+  - `SOLVER_TOKEN`: The same secret token you used for `INTERNAL_API_TOKEN` in Cloud Run.
+- **Redeploy Vercel:** Trigger a new deployment in Vercel to apply the new environment variables.
+
+Your application is now fully configured and ready to use!

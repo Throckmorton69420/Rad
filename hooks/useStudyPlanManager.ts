@@ -1,401 +1,283 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
-import {
-  StudyPlan,
-  StudyResource,
-  DailySchedule,
-  ScheduledTask,
-  RebalanceOptions,
-  Domain,
-  ExceptionDateRule,
-  ResourceType,
-  ShowConfirmationOptions,
-} from '../types';
-import { usePersistentState } from './usePersistentState';
-import { masterResourcePool } from '../services/studyResources';
-import {
-  STUDY_START_DATE,
-  STUDY_END_DATE,
-  DEFAULT_DAILY_STUDY_MINS,
-  DEFAULT_TOPIC_ORDER,
-  POMODORO_DEFAULT_STUDY_MINS,
-  POMODORO_DEFAULT_REST_MINS,
-  EXCEPTION_DATES_CONFIG,
-} from '../constants';
-import { getTodayInNewYork, parseDateString } from '../utils/timeFormatter';
-import { addResourceToGlobalPool } from '../services/studyResources';
+import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
+import { StudyPlan, RebalanceOptions, ExceptionDateRule, StudyResource, ScheduledTask, GeneratedStudyPlanOutcome, Domain, ResourceType, PlanDataBlob, DeadlineSettings, ShowConfirmationOptions, DailySchedule, ScheduleSlot } from '../types';
+import { supabase } from '../services/supabaseClient';
+import { DEFAULT_TOPIC_ORDER, STUDY_END_DATE, STUDY_START_DATE } from '../constants';
 
-// FIX: This type was added to solve errors in App.tsx
-type SystemNotification = {
-  type: 'info' | 'error' | 'warning';
-  message: string;
+const processSolverResults = (slots: ScheduleSlot[], planShell: StudyPlan): StudyPlan => {
+    const scheduleMap = new Map<string, DailySchedule>();
+    planShell.schedule.forEach(day => {
+        scheduleMap.set(day.date, { ...day, tasks: [], totalStudyTimeMinutes: 0 });
+    });
+
+    slots.forEach(slot => {
+        const day = scheduleMap.get(slot.date);
+        if (day) {
+            const duration = slot.end_minute - slot.start_minute;
+            const task: ScheduledTask = {
+                id: `task_${slot.resource_id}_${slot.start_minute}`,
+                resourceId: slot.resource_id,
+                title: slot.title,
+                type: slot.type,
+                originalTopic: slot.domain,
+                durationMinutes: duration,
+                status: 'pending',
+                order: slot.start_minute,
+            };
+            day.tasks.push(task);
+            day.totalStudyTimeMinutes += duration;
+        }
+    });
+
+    const finalSchedule = Array.from(scheduleMap.values());
+    finalSchedule.forEach(day => day.tasks.sort((a, b) => a.order - b.order));
+
+    return { ...planShell, schedule: finalSchedule };
 };
-
-const generateDateRange = (start: string, end: string): string[] => {
-  const startDate = parseDateString(start);
-  const endDate = parseDateString(end);
-  const dates: string[] = [];
-  let currentDate = startDate;
-  while (currentDate <= endDate) {
-    dates.push(currentDate.toISOString().split('T')[0]);
-    currentDate.setUTCDate(currentDate.getUTCDate() + 1);
-  }
-  return dates;
-};
-
-// This is a simplified, client-side scheduler to make the app functional.
-// In a real scenario, this logic would be on the server, driven by a CP-SAT solver.
-const runClientSideScheduler = (
-  resources: StudyResource[],
-  startDate: string,
-  endDate: string,
-  exceptions: ExceptionDateRule[]
-): DailySchedule[] => {
-  const dateStrings = generateDateRange(startDate, endDate);
-  const exceptionMap = new Map(exceptions.map(e => [e.date, e]));
-
-  const schedule: DailySchedule[] = dateStrings.map(dateStr => {
-    const exception = exceptionMap.get(dateStr);
-    if (exception) {
-      return {
-        date: dateStr,
-        tasks: [],
-        totalStudyTimeMinutes: exception.targetMinutes ?? 0,
-        isRestDay: exception.isRestDayOverride ?? false,
-        dayType: exception.dayType,
-        isManuallyModified: false,
-      };
-    }
-    const dayOfWeek = parseDateString(dateStr).getUTCDay();
-    const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
-    return {
-      date: dateStr,
-      tasks: [],
-      totalStudyTimeMinutes: DEFAULT_DAILY_STUDY_MINS,
-      isRestDay: isWeekend, // Default rest days to weekends
-      dayType: isWeekend ? 'high-capacity' : 'workday',
-      isManuallyModified: false,
-    };
-  });
-  
-  const tasksToSchedule = resources
-    .filter(r => !r.isArchived && !r.isOptional)
-    .sort((a, b) => (a.sequenceOrder ?? 9999) - (b.sequenceOrder ?? 9999));
-  
-  let taskIndex = 0;
-  
-  schedule.forEach(day => {
-    if (day.isRestDay || taskIndex >= tasksToSchedule.length) return;
-
-    let remainingTime = day.totalStudyTimeMinutes;
-    let orderInDay = 0;
-
-    while (remainingTime > 0 && taskIndex < tasksToSchedule.length) {
-      const resource = tasksToSchedule[taskIndex];
-      if (resource.durationMinutes <= remainingTime) {
-        const task: ScheduledTask = {
-          id: `${day.date}-${resource.id}`,
-          resourceId: resource.id,
-          title: resource.title,
-          type: resource.type,
-          originalTopic: resource.domain,
-          durationMinutes: resource.durationMinutes,
-          status: 'pending',
-          order: orderInDay++,
-          originalResourceId: resource.id,
-          isPrimaryMaterial: resource.isPrimaryMaterial,
-          bookSource: resource.bookSource,
-          videoSource: resource.videoSource,
-          pages: resource.pages,
-          questionCount: resource.questionCount,
-          chapterNumber: resource.chapterNumber,
-        };
-        day.tasks.push(task);
-        remainingTime -= resource.durationMinutes;
-        taskIndex++;
-      } else {
-        // Simple strategy: if it doesn't fit, move to the next day.
-        // A more complex solver would split tasks.
-        break;
-      }
-    }
-  });
-
-  return schedule;
-};
-
 
 export const useStudyPlanManager = (showConfirmation: (options: ShowConfirmationOptions) => void) => {
-  const [studyPlan, setStudyPlan] = usePersistentState<StudyPlan | null>('studyPlan', null);
-  const [globalMasterResourcePool, setGlobalMasterResourcePool] = usePersistentState<StudyResource[]>('masterResourcePool', masterResourcePool);
-  const [exceptions, setExceptions] = usePersistentState<ExceptionDateRule[]>('exceptionDates', EXCEPTION_DATES_CONFIG);
-  
-  const [previousStudyPlan, setPreviousStudyPlan] = useState<StudyPlan | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [systemNotification, setSystemNotification] = useState<SystemNotification | null>(null);
-  const [isNewUser, setIsNewUser] = useState(false);
-  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
-
-  const updatePreviousStudyPlan = useCallback((plan: StudyPlan) => {
-    setPreviousStudyPlan(JSON.parse(JSON.stringify(plan)));
-  }, []);
-
-  const setLoading = (loading: boolean, message = '') => {
-    setIsLoading(loading);
-  };
-  
-  const loadSchedule = useCallback(async (regenerate = false) => {
-    setLoading(true, 'Generating initial study plan...');
-    if (regenerate || !studyPlan) {
-      try {
-        const newSchedule = runClientSideScheduler(globalMasterResourcePool, STUDY_START_DATE, STUDY_END_DATE, exceptions);
-        
-        const newPlan: StudyPlan = {
-          startDate: STUDY_START_DATE,
-          endDate: STUDY_END_DATE,
-          schedule: newSchedule,
-          progressPerDomain: {},
-          topicOrder: DEFAULT_TOPIC_ORDER,
-          cramTopicOrder: [],
-          deadlines: {},
-          areSpecialTopicsInterleaved: true,
-        };
-        setStudyPlan(newPlan);
-      } catch (e) {
-        console.error("Failed to generate study plan", e);
-        setSystemNotification({ type: 'error', message: 'Could not generate study plan.'});
-      } finally {
-        setLoading(false);
-      }
-    } else {
-        setLoading(false);
-    }
-  }, [studyPlan, globalMasterResourcePool, exceptions, setStudyPlan]);
-
-
-  useEffect(() => {
-    if (!localStorage.getItem('studyPlan')) {
-        setIsNewUser(true);
-    }
-    loadSchedule();
-  }, [loadSchedule]);
-
-
-  const handleRebalance = useCallback(async (options: RebalanceOptions) => {
-    setLoading(true, 'Rebalancing schedule...');
-    updatePreviousStudyPlan(studyPlan!);
+    const [studyPlan, setStudyPlan] = useState<StudyPlan | null>(null);
+    const [previousStudyPlan, setPreviousStudyPlan] = useState<StudyPlan | null>(null);
+    const [globalMasterResourcePool, setGlobalMasterResourcePool] = useState<StudyResource[]>([]);
+    const [isLoading, setIsLoading] = useState<boolean>(true);
+    const [loadingMessage, setLoadingMessage] = useState<string>('Initializing...');
+    const [systemNotification, setSystemNotification] = useState<{ type: 'error' | 'warning' | 'info', message: string } | null>(null);
+    const [isNewUser, setIsNewUser] = useState(false);
+    const [activeRunId, setActiveRunId] = useState<string | null>(null);
     
-    // MOCK API Call
-    try {
-        const solveRes = await fetch('/api/solve', { method: 'POST', body: JSON.stringify({resources: globalMasterResourcePool, exceptions}) });
-        if (!solveRes.ok) throw new Error("Failed to start solver job.");
-        const { run_id } = await solveRes.json();
-        
-        let status = 'PENDING';
-        let retries = 0;
-        while ((status === 'PENDING' || status === 'SOLVING') && retries < 30) {
-            await new Promise(res => setTimeout(res, 2000)); // Poll every 2 seconds
-            const runRes = await fetch(`/api/runs/${run_id}`);
-            const runData = await runRes.json();
-            status = runData.status;
-            if (status === 'FAILED') throw new Error(runData.error_text || 'Solver failed.');
-            retries++;
+    const pollingIntervalRef = useRef<number | null>(null);
+
+    const updatePreviousStudyPlan = useCallback((plan: StudyPlan | null) => {
+        if (plan) setPreviousStudyPlan(JSON.parse(JSON.stringify(plan)));
+    }, []);
+
+    const stopPolling = useCallback(() => {
+        if (pollingIntervalRef.current) {
+            clearInterval(pollingIntervalRef.current);
+            pollingIntervalRef.current = null;
         }
-    } catch (e) {
-        console.warn("Mock solver API call failed, proceeding with client-side logic.", e);
-    }
-
-    // Since mock API returns no slots, we run client-side logic.
-    setStudyPlan(prevPlan => {
-      if (!prevPlan) return null;
-
-      const today = getTodayInNewYork();
-      const todayIndex = prevPlan.schedule.findIndex(d => d.date >= today);
-      if (todayIndex === -1) return prevPlan; // Plan is in the past
-
-      const pastSchedule = prevPlan.schedule.slice(0, todayIndex);
-      const futureScheduleTemplate = prevPlan.schedule.slice(todayIndex);
-
-      const incompleteTasks = prevPlan.schedule
-        .slice(todayIndex)
-        .flatMap(d => d.tasks)
-        .filter(t => t.status !== 'completed')
-        .map(t => globalMasterResourcePool.find(r => r.id === (t.originalResourceId || t.resourceId)))
-        .filter((r): r is StudyResource => !!r);
-
-      const newFutureSchedule = runClientSideScheduler(
-        incompleteTasks,
-        futureScheduleTemplate[0].date,
-        prevPlan.endDate,
-        exceptions
-      );
-
-      return { ...prevPlan, schedule: [...pastSchedule, ...newFutureSchedule] };
-    });
+    }, []);
     
-    setLoading(false);
-  }, [globalMasterResourcePool, exceptions, setStudyPlan, studyPlan, updatePreviousStudyPlan]);
+    const pollForScheduleResults = useCallback((runId: string) => {
+        stopPolling();
+        setLoadingMessage('Solver is working... Awaiting results.');
+        setIsLoading(true);
 
-  const handleTaskToggle = useCallback((taskId: string, date: string) => {
-    setStudyPlan(plan => {
-      if (!plan) return null;
-      updatePreviousStudyPlan(plan);
-      const newSchedule = plan.schedule.map(daily => {
-        if (daily.date === date) {
-          const taskIndex = daily.tasks.findIndex(t => t.id === taskId);
-          if (taskIndex > -1) {
-            const newTasks = [...daily.tasks];
-            const currentStatus = newTasks[taskIndex].status;
-            newTasks[taskIndex] = { ...newTasks[taskIndex], status: currentStatus === 'completed' ? 'pending' : 'completed' };
-            return { ...daily, tasks: newTasks };
-          }
+        pollingIntervalRef.current = window.setInterval(async () => {
+            try {
+                const { data: run, error } = await supabase.from('runs').select('status, error_text').eq('id', runId).single();
+                if (error) throw error;
+                
+                if (run.status === 'COMPLETE') {
+                    stopPolling();
+                    setLoadingMessage('Processing final schedule...');
+                    const { data: slots, error: slotsError } = await supabase.from('schedule_slots').select('*').eq('run_id', runId);
+                    if (slotsError) throw slotsError;
+
+                    setStudyPlan(prevPlan => {
+                        if (!prevPlan) return null;
+                        const finalPlan = processSolverResults(slots, prevPlan);
+                        updatePreviousStudyPlan(finalPlan);
+                        return finalPlan;
+                    });
+                    setSystemNotification({ type: 'info', message: 'Schedule generated successfully!' });
+                    setIsLoading(false);
+                    setActiveRunId(null);
+                } else if (run.status === 'FAILED') {
+                    stopPolling();
+                    setSystemNotification({ type: 'error', message: `Schedule generation failed: ${run.error_text || 'Unknown solver error.'}` });
+                    setIsLoading(false);
+                    setActiveRunId(null);
+                }
+            } catch (error: any) {
+                stopPolling();
+                setSystemNotification({ type: 'error', message: `Error checking schedule status: ${error.message}` });
+                setIsLoading(false);
+                setActiveRunId(null);
+            }
+        }, 5000); // Poll every 5 seconds
+
+    }, [stopPolling, updatePreviousStudyPlan]);
+
+    const requestScheduleGeneration = useCallback(async () => {
+        if (isLoading) return;
+        setIsLoading(true);
+        setLoadingMessage('Requesting new schedule from solver...');
+        setSystemNotification(null);
+        if (studyPlan) updatePreviousStudyPlan(studyPlan);
+
+        try {
+            const res = await fetch('/api/solve', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ startDate: STUDY_START_DATE, endDate: STUDY_END_DATE }),
+            });
+            if (!res.ok) {
+                const errorData = await res.json();
+                throw new Error(errorData.error || 'Failed to start schedule generation.');
+            }
+            const { run_id } = await res.json();
+            setActiveRunId(run_id);
+            pollForScheduleResults(run_id);
+        } catch (error: any) {
+            setSystemNotification({ type: 'error', message: error.message });
+            setIsLoading(false);
         }
-        return daily;
-      });
-      return { ...plan, schedule: newSchedule };
-    });
-  }, [setStudyPlan, updatePreviousStudyPlan]);
+    }, [isLoading, studyPlan, updatePreviousStudyPlan, pollForScheduleResults]);
 
-  const handleSaveModifiedDayTasks = useCallback((updatedTasks: ScheduledTask[], date: string) => {
-      setStudyPlan(plan => {
-          if (!plan) return null;
-          updatePreviousStudyPlan(plan);
-          const dayIndex = plan.schedule.findIndex(d => d.date === date);
-          if (dayIndex === -1) return plan;
-          
-          const newSchedule = [...plan.schedule];
-          const totalStudyTimeMinutes = updatedTasks.reduce((sum, task) => sum + task.durationMinutes, 0);
+    const loadSchedule = useCallback(async (regenerate = false) => {
+        setIsLoading(true);
+        setLoadingMessage('Connecting to the cloud...');
+        
+        try {
+            // Fetch resources first, always
+            const { data: resources, error: resourcesError } = await supabase.from('resources').select('*');
+            if (resourcesError) throw resourcesError;
+            setGlobalMasterResourcePool(resources || []);
 
-          newSchedule[dayIndex] = {
-              ...newSchedule[dayIndex],
-              tasks: updatedTasks.map((task, index) => ({ ...task, order: index })),
-              totalStudyTimeMinutes,
-              isManuallyModified: true,
-          };
-          
-          return { ...plan, schedule: newSchedule };
-      });
-  }, [setStudyPlan, updatePreviousStudyPlan]);
-
-  const handleUndo = useCallback(() => {
-    if (previousStudyPlan) {
-      setStudyPlan(previousStudyPlan);
-      setPreviousStudyPlan(null);
-      setSystemNotification({ type: 'info', message: 'Last change has been undone.' });
-    }
-  }, [previousStudyPlan, setStudyPlan]);
-
-  const handleToggleRestDay = (date: string, isCurrentlyRestDay: boolean) => {
-      setStudyPlan(plan => {
-          if (!plan) return null;
-          updatePreviousStudyPlan(plan);
-          const dayIndex = plan.schedule.findIndex(d => d.date === date);
-          if (dayIndex === -1) return plan;
-
-          const newSchedule = [...plan.schedule];
-          const day = newSchedule[dayIndex];
-          newSchedule[dayIndex] = {
-              ...day,
-              isRestDay: !isCurrentlyRestDay,
-              isManuallyModified: true,
-              totalStudyTimeMinutes: isCurrentlyRestDay ? DEFAULT_DAILY_STUDY_MINS : 0
-          };
-          return { ...plan, schedule: newSchedule };
-      });
-      handleRebalance({ type: 'standard' });
-  };
-  
-  const handleAddOrUpdateException = (rule: ExceptionDateRule) => {
-    updatePreviousStudyPlan(studyPlan!);
-    setExceptions(prev => {
-        const existingIndex = prev.findIndex(e => e.date === rule.date);
-        if (existingIndex > -1) {
-            const newExceptions = [...prev];
-            newExceptions[existingIndex] = rule;
-            return newExceptions;
+            // Then check for an existing plan
+            const { data: planData, error: planError } = await supabase.from('study_plans').select('plan_data').eq('id', 1).single();
+            if (planError && planError.code !== 'PGRST116') throw planError;
+            
+            if (planData?.plan_data && !regenerate) {
+                setStudyPlan(planData.plan_data as StudyPlan);
+                setIsNewUser(false);
+            } else {
+                setIsNewUser(true);
+                setStudyPlan(null); // Triggers the "Generate" screen
+            }
+        } catch (err: any) {
+            setSystemNotification({ type: 'error', message: err.message || "Failed to load initial data." });
+            setStudyPlan(null);
+        } finally {
+            setIsLoading(false);
         }
-        return [...prev, rule];
-    });
-    setTimeout(() => handleRebalance({ type: 'standard' }), 100);
-  };
-  
-  const handleUpdatePlanDates = (startDate: string, endDate: string) => {
-    if (!studyPlan) return;
-    updatePreviousStudyPlan(studyPlan);
-    setStudyPlan(prev => ({...prev!, startDate, endDate}));
-    loadSchedule(true);
-  };
+    }, []);
 
-  const handleUpdateTopicOrderAndRebalance = (newOrder: Domain[]) => {
-      if (!studyPlan) return;
-      updatePreviousStudyPlan(studyPlan);
-      setStudyPlan(p => ({...p!, topicOrder: newOrder}));
-      handleRebalance({type: 'standard'});
-  };
+    // FIX: Updated handleRebalance to accept optional options to fix signature mismatches.
+    const handleRebalance = useCallback((options?: RebalanceOptions) => {
+        showConfirmation({
+            title: "Rebalance Schedule?",
+            message: "This will request a new schedule from the solver based on current settings and data. Are you sure?",
+            confirmText: "Yes, Rebalance",
+            onConfirm: requestScheduleGeneration,
+        });
+    }, [showConfirmation, requestScheduleGeneration]);
 
-  const handleUpdateCramTopicOrderAndRebalance = (newOrder: Domain[]) => {
-      if (!studyPlan) return;
-      updatePreviousStudyPlan(studyPlan);
-      setStudyPlan(p => ({...p!, cramTopicOrder: newOrder}));
-      handleRebalance({type: 'standard'});
-  };
-
-  const handleToggleCramMode = (isActive: boolean) => {
-    if (!studyPlan) return;
-    updatePreviousStudyPlan(studyPlan);
-    setStudyPlan(p => ({ ...p!, isCramModeActive: isActive }));
-    handleRebalance({type: 'standard'});
-  };
-  
-  const handleToggleSpecialTopicsInterleaving = (isActive: boolean) => {
-    if (!studyPlan) return;
-    updatePreviousStudyPlan(studyPlan);
-    setStudyPlan(p => ({ ...p!, areSpecialTopicsInterleaved: isActive }));
-    handleRebalance({type: 'standard'});
-  };
-
-  const progressPerDomain = useMemo(() => {
-    if (!studyPlan) return {};
-    const progress: Partial<Record<Domain, { completedMinutes: number; totalMinutes: number }>> = {};
-    for (const domain of Object.values(Domain)) {
-      progress[domain] = { completedMinutes: 0, totalMinutes: 0 };
-    }
-    studyPlan.schedule.forEach(day => {
-      day.tasks.forEach(task => {
-        const domain = task.originalTopic;
-        if (progress[domain]) {
-          progress[domain]!.totalMinutes += task.durationMinutes;
-          if (task.status === 'completed') {
-            progress[domain]!.completedMinutes += task.durationMinutes;
-          }
+    // FIX: Added explicit type to newStatus to prevent incorrect type inference to 'string'.
+    const handleTaskToggle = (taskId: string, date: string) => {
+        setStudyPlan(plan => {
+            if (!plan) return null;
+            const newSchedule = plan.schedule.map(day => {
+                if (day.date === date) {
+                    return { ...day, tasks: day.tasks.map(task => task.id === taskId ? { ...task, status: task.status === 'completed' ? 'pending' : 'completed' } : task) };
+                }
+                return day;
+            });
+            return { ...plan, schedule: newSchedule };
+        });
+    };
+    
+    const handleUndo = useCallback(() => {
+        if(previousStudyPlan) {
+            setStudyPlan(previousStudyPlan);
+            setPreviousStudyPlan(null); // Can only undo once
         }
-      });
-    });
-    return progress;
-  }, [studyPlan]);
+    }, [previousStudyPlan]);
 
-  return {
-    studyPlan: studyPlan ? { ...studyPlan, progressPerDomain } : null,
-    setStudyPlan,
-    previousStudyPlan,
-    globalMasterResourcePool,
-    setGlobalMasterResourcePool,
-    isLoading,
-    systemNotification,
-    setSystemNotification,
-    isNewUser,
-    loadSchedule,
-    handleRebalance,
-    handleUpdatePlanDates,
-    handleUpdateTopicOrderAndRebalance,
-    handleUpdateCramTopicOrderAndRebalance,
-    handleToggleCramMode,
-    handleToggleSpecialTopicsInterleaving,
-    handleTaskToggle,
-    handleSaveModifiedDayTasks,
-    handleUndo,
-    updatePreviousStudyPlan,
-    saveStatus,
-    handleToggleRestDay,
-    handleAddOrUpdateException,
-  };
+    useEffect(() => {
+        return () => stopPolling();
+    }, [stopPolling]);
+
+    // FIX: Implemented state-modifying handlers to replace incorrect aliases.
+    const handleUpdatePlanDates = useCallback(() => {
+        handleRebalance();
+    }, [handleRebalance]);
+
+    const handleUpdateTopicOrderAndRebalance = useCallback((newOrder: Domain[]) => {
+        if (!studyPlan) return;
+        updatePreviousStudyPlan(studyPlan);
+        setStudyPlan(p => (p ? { ...p, topicOrder: newOrder } : null));
+        handleRebalance();
+    }, [studyPlan, updatePreviousStudyPlan, handleRebalance]);
+
+    const handleUpdateCramTopicOrderAndRebalance = useCallback((newOrder: Domain[]) => {
+        if (!studyPlan) return;
+        updatePreviousStudyPlan(studyPlan);
+        setStudyPlan(p => (p ? { ...p, cramTopicOrder: newOrder } : null));
+        handleRebalance();
+    }, [studyPlan, updatePreviousStudyPlan, handleRebalance]);
+    
+    const handleToggleCramMode = useCallback((isActive: boolean) => {
+        if (!studyPlan) return;
+        updatePreviousStudyPlan(studyPlan);
+        setStudyPlan(p => (p ? { ...p, isCramModeActive: isActive } : null));
+        handleRebalance();
+    }, [studyPlan, updatePreviousStudyPlan, handleRebalance]);
+    
+    const handleToggleSpecialTopicsInterleaving = useCallback((isActive: boolean) => {
+        if (!studyPlan) return;
+        updatePreviousStudyPlan(studyPlan);
+        setStudyPlan(p => (p ? { ...p, areSpecialTopicsInterleaved: isActive } : null));
+        handleRebalance();
+      }, [studyPlan, updatePreviousStudyPlan, handleRebalance]);
+
+    const handleAddOrUpdateException = useCallback((rule: ExceptionDateRule) => {
+        handleRebalance();
+    }, [handleRebalance]);
+
+    const handleSaveModifiedDayTasks = useCallback((updatedTasks: ScheduledTask[], date: string) => {
+        if (!studyPlan) return;
+        updatePreviousStudyPlan(studyPlan);
+        setStudyPlan(p => {
+            if (!p) return null;
+            const newSchedule = p.schedule.map(day => {
+                if (day.date === date) {
+                    const reorderedTasks = updatedTasks.map((task, index) => ({...task, order: index}));
+                    return {...day, tasks: reorderedTasks, isManuallyModified: true };
+                }
+                return day;
+            });
+            return { ...p, schedule: newSchedule };
+        });
+        handleRebalance();
+    }, [studyPlan, updatePreviousStudyPlan, handleRebalance]);
+
+    const handleMasterResetTasks = useCallback(() => {
+        if (!studyPlan) return;
+        updatePreviousStudyPlan(studyPlan);
+        setStudyPlan(prev => prev ? ({ ...prev, schedule: prev.schedule.map(d => ({ ...d, tasks: d.tasks.map(t => ({...t, status: 'pending'})) }))}) : null);
+    }, [studyPlan, updatePreviousStudyPlan]);
+    
+    const handleUpdateDeadlines = useCallback((newDeadlines: DeadlineSettings) => {
+        if (!studyPlan) return;
+        updatePreviousStudyPlan(studyPlan);
+        setStudyPlan(p => (p ? { ...p, deadlines: newDeadlines } : null));
+        handleRebalance();
+    }, [studyPlan, updatePreviousStudyPlan, handleRebalance]);
+    
+    const handleToggleRestDay = useCallback((date: string, isCurrentlyRestDay: boolean) => {
+        handleRebalance();
+    }, [handleRebalance]);
+
+    return {
+        studyPlan, setStudyPlan, previousStudyPlan,
+        globalMasterResourcePool, setGlobalMasterResourcePool,
+        isLoading, loadingMessage, systemNotification, setSystemNotification,
+        isNewUser,
+        loadSchedule,
+        handleRebalance,
+        handleTaskToggle,
+        handleUndo,
+        handleUpdatePlanDates,
+        handleUpdateTopicOrderAndRebalance,
+        handleUpdateCramTopicOrderAndRebalance,
+        handleToggleCramMode,
+        handleToggleSpecialTopicsInterleaving,
+        handleAddOrUpdateException,
+        handleSaveModifiedDayTasks,
+        handleMasterResetTasks,
+        handleUpdateDeadlines,
+        handleToggleRestDay,
+        updatePreviousStudyPlan,
+    };
 };
