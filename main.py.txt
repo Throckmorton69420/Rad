@@ -1,5 +1,6 @@
 import os
 import traceback
+import threading
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from supabase import create_client, Client
@@ -21,13 +22,14 @@ if not all([supabase_url, supabase_key]):
 
 supabase: Client = create_client(supabase_url, supabase_key)
 
-# --- Synchronous Solver Logic ---
+# --- Background Solver Logic ---
 def solve_schedule(run_id: str):
     """
     This function contains the long-running solver logic.
-    It runs synchronously and is triggered by a POST request from Google Cloud Tasks.
-    Robust error handling is included to ensure the run status is always updated.
+    It's designed to be run in a background thread.
+    Robust error handling ensures the run status is always updated in the database.
     """
+    app.logger.info(f"[{run_id}] Background thread execution beginning.")
     try:
         app.logger.info(f"[{run_id}] Solver process started.")
         supabase.table("runs").update({"status": "SOLVING", "progress": 5}).eq("id", run_id).execute()
@@ -54,7 +56,6 @@ def solve_schedule(run_id: str):
             exception_dates = []
         
         supabase.table("runs").update({"progress": 15}).eq("id", run_id).execute()
-
 
         # --- CP-SAT MODEL CONSTRUCTION ---
         model = cp_model.CpModel()
@@ -117,13 +118,11 @@ def solve_schedule(run_id: str):
             schedule_slots = []
             
             for d, current_date in enumerate(all_dates):
-                # CORRECTED LOGIC
                 tasks_for_day_ids = [res_id for res_id, task_vars in tasks.items() if solver.Value(task_vars['days'][d])]
                 if not tasks_for_day_ids: continue
 
                 tasks_for_day = [resource_map[res_id] for res_id in tasks_for_day_ids]
                 
-                # Sorting logic
                 def get_sort_key(resource):
                     source = (resource.get('videoSource') or resource.get('bookSource') or 'zz_custom').lower()
                     res_type = resource.get('type', '').lower()
@@ -152,7 +151,6 @@ def solve_schedule(run_id: str):
                 supabase.table("schedule_slots").insert(schedule_slots).execute()
             
             supabase.table("runs").update({"progress": 95}).eq("id", run_id).execute()
-
             supabase.table("runs").update({"status": "COMPLETE", "progress": 100}).eq("id", run_id).execute()
             app.logger.info(f"[{run_id}] Run marked as COMPLETE.")
         else:
@@ -165,22 +163,33 @@ def solve_schedule(run_id: str):
 
 
 # --- API Endpoints ---
-@app.route("/internal/run-solver", methods=["POST"])
+@app.route("/solve", methods=["POST"])
 def run_solver_endpoint():
-    # Authentication is handled by Cloud Run's IAM ingress controls with OIDC
-    data = request.get_json()
-    run_id = data.get("run_id")
-    if not run_id:
-        app.logger.error("Received task with no run_id.")
-        return jsonify({"error": "run_id is required"}), 400
-        
-    app.logger.info(f"Received internal solver task for run_id: {run_id}")
+    # OIDC token is validated by Google Cloud Run's frontend.
+    # If the request reaches here, it's authenticated.
+    auth_header = request.headers.get("Authorization")
+    if not auth_header:
+        # This should not happen if ingress is configured correctly, but is a safeguard.
+        app.logger.warning("Request received without Authorization header.")
+        return jsonify({"error": "Unauthorized: Missing Authorization header."}), 401
 
-    # Run the solver synchronously in the main request thread.
-    # Cloud Tasks will wait for this to complete.
-    solve_schedule(run_id)
+    data = request.get_json()
+    if not data or 'run_id' not in data:
+        app.logger.error("Received solver request with no run_id in body.")
+        return jsonify({"error": "run_id is required in the JSON body"}), 400
     
-    return jsonify({"status": "Solver process finished for run_id", "run_id": run_id}), 200
+    run_id = data.get("run_id")
+    app.logger.info(f"Received solver request for run_id: {run_id}")
+
+    # Start solver in a background thread to allow the request to return immediately.
+    app.logger.info(f"Starting background thread for solver on run_id: {run_id}")
+    thread = threading.Thread(target=solve_schedule, args=(run_id,))
+    thread.daemon = True # Allows main process to exit even if threads are running.
+    thread.start()
+    app.logger.info(f"Background thread for {run_id} started. Returning 202 Accepted.")
+    
+    # Return 202 Accepted to indicate the process has been started.
+    return jsonify({"status": "Solver process started in background.", "run_id": run_id}), 202
 
 @app.route("/", methods=["GET"])
 def health_check():
