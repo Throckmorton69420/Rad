@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.50.2",
+    "buffer": "^6.0.3",
     "focus-trap-react": "^10.2.3",
     "google-auth-library": "^9.11.0",
     "path": "^0.12.7",
