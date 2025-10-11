@@ -1,0 +1,8 @@
+# Ignore all Python backend files to prevent Vercel from trying to build a Python environment.
+# This is the definitive fix for the "pip install" build error.
+requirements.txt
+main.py
+main.py.txt
+Dockerfile
+Dockerfile.txt
+schema.sql.json
