@@ -514,7 +514,7 @@ const App: React.FC = () => {
     document.documentElement.style.setProperty('--glass-highlight-map', `url(${highlight})`);
   }, []);
   
-  if (!studyPlan) {
+  if (!studyPlan && isLoading) {
     return (
       <LoadingOverlay 
         progress={progress}
@@ -522,6 +522,25 @@ const App: React.FC = () => {
       />
     );
   }
+  
+  if (!studyPlan && !isLoading) {
+    return (
+        <div className="fixed inset-0 bg-black flex items-center justify-center flex-col p-8 text-center">
+            <div className="max-w-md">
+                <h2 className="text-2xl font-bold text-red-500 mb-3"><i className="fas fa-exclamation-triangle mr-2"></i> Failed to Generate Schedule</h2>
+                <p className="text-base text-gray-400 mb-6">
+                    A critical error occurred while trying to generate your schedule. This is often due to a server configuration issue.
+                    Please refer to the troubleshooting guide in the README file or click below to try again.
+                </p>
+                <Button onClick={() => loadSchedule()} variant="primary">
+                    <i className="fas fa-sync-alt mr-2"></i> Try Again
+                </Button>
+            </div>
+        </div>
+    );
+  }
+
+  if (!studyPlan) return null; // Should not be reached due to logic above, but satisfies TypeScript
 
   return (
     <>

@@ -45,7 +45,7 @@ This service account provides secure credentials for your Vercel functions to au
 3.  **Service account name:** Enter `vercel-task-creator`.
 4.  Click **"CREATE AND CONTINUE"**.
 5.  In the **"Select a role"** dropdown, grant the following single role:
-    -   `Cloud Run Invoker` (allows it to trigger your private Cloud Run service).
+    -   `Service Account Token Creator` (This is needed by the Google Auth Library to create tokens).
 6.  Click **"CONTINUE"**, then click **"DONE"**.
 
 #### Part C: Generate a JSON Key for the Service Account
@@ -58,16 +58,18 @@ This service account provides secure credentials for your Vercel functions to au
 
 ### 3. Vercel Environment Variables Setup
 
-In your Vercel project dashboard, go to **Settings > Environment Variables**. Add the following variables:
+In your Vercel project dashboard, go to **Settings > Environment Variables**. Add the following variables. **Note:** Both `SUPABASE_URL` and `VITE_SUPABASE_URL` are required and should have the same value (your Supabase Project URL).
 
-| Variable Name                       | Value                                                                                                                                                                                                                                   |
-| ----------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `VITE_SUPABASE_URL`                 | Your Supabase Project URL.                                                                                                                                                                                                              |
-| `VITE_SUPABASE_ANON_KEY`            | Your Supabase `anon` (public) key.                                                                                                                                                                                                      |
-| `SUPABASE_SERVICE_ROLE_KEY`         | Your Supabase `service_role` (secret) key.                                                                                                                                                                                              |
-| `GCP_PROJECT_ID`                    | Your Google Cloud Project ID (e.g., `scheduler-474709`).                                                                                                                                                                                |
-| `SOLVER_URL`                        | The URL of your deployed Google Cloud Run service (from the next step).                                                                                                                                                                 |
-| `GCP_SERVICE_ACCOUNT_KEY_BASE64`    | The **Base64 encoded** content of your downloaded JSON key file. To generate this: <br/> 1. On **macOS/Linux**, run: `cat your-key-file.json | base64 -w 0` <br/> 2. On **Windows (PowerShell)**, run: `[Convert]::ToBase64String([IO.File]::ReadAllBytes("your-key-file.json"))` <br/> 3. Paste the resulting single-line string here. |
+| Variable Name                       | Value                                                                                                                                                                                                                                   | Description                                                                                             |
+| ----------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| `SUPABASE_URL`                      | Your Supabase Project URL.                                                                                                                                                                                                              | Used by server-side Vercel Functions (`/api/*`).                                                        |
+| `VITE_SUPABASE_URL`                 | Your Supabase Project URL.                                                                                                                                                                                                              | Used by the client-side React application (prefixed with `VITE_`).                                      |
+| `VITE_SUPABASE_ANON_KEY`            | Your Supabase `anon` (public) key.                                                                                                                                                                                                      | Used by the client-side React application.                                                              |
+| `SUPABASE_SERVICE_ROLE_KEY`         | Your Supabase `service_role` (secret) key.                                                                                                                                                                                              | Used by server-side Vercel Functions for privileged database access.                                    |
+| `GCP_PROJECT_ID`                    | Your Google Cloud Project ID (e.g., `scheduler-474709`).                                                                                                                                                                                | Your Google Cloud project identifier.                                                                   |
+| `SOLVER_URL`                        | The URL of your deployed Google Cloud Run service (from the next step).                                                                                                                                                                 | The endpoint for the backend Python solver.                                                             |
+| `GCP_SERVICE_ACCOUNT_KEY_BASE64`    | The **Base64 encoded** content of your downloaded JSON key file. To generate this: <br/> 1. On **macOS/Linux**, run: `cat your-key-file.json | base64 -w 0` <br/> 2. On **Windows (PowerShell)**, run: `[Convert]::ToBase64String([IO.File]::ReadAllBytes("your-key-file.json"))` <br/> 3. Paste the resulting single-line string here. | Credentials for the Vercel Function to authenticate as the service account to invoke the Cloud Run solver. |
+
 
 ### 4. Backend Deployment to Google Cloud Run
 
@@ -85,7 +87,7 @@ In your Vercel project dashboard, go to **Settings > Environment Variables**. Ad
       --timeout=900 \
       --cpu=1 \
       --memory=2Gi \
-      --min-instances=1
+      --min-instances=0
     ```
     -   **CRITICAL:** Replace `YOUR_SUPABASE_URL` and `YOUR_SUPABASE_SERVICE_ROLE_KEY` with the actual values from your Supabase settings.
     -   `--no-allow-unauthenticated` ensures your service is private and can only be accessed by authenticated callers (like our Vercel function).
@@ -107,22 +109,26 @@ In your Vercel project dashboard, go to **Settings > Environment Variables**. Ad
 
 ### Troubleshooting
 
-**Problem: App is stuck at 0% and never moves.**
+**Problem: App is stuck at 0% or shows a "Failed to Generate Schedule" error.**
 
-This is almost always an authentication or permissions issue where the Vercel function cannot successfully call the Cloud Run service.
+This is almost always an authentication, permissions, or environment variable issue where the Vercel function cannot successfully call the Cloud Run service or connect to the database.
 
-1.  **Check Vercel Function Logs:**
+1.  **Check Vercel Environment Variables:**
+    -   Go to Vercel settings and ensure **all** variables from the table in Step 3 are present and correct.
+    -   Pay special attention to `SUPABASE_URL` (for the API) vs `VITE_SUPABASE_URL` (for the client). They must both be set to the same Supabase URL.
+    -   Ensure `SOLVER_URL` is the correct URL from your Cloud Run deployment.
+    -   Re-check that `GCP_SERVICE_ACCOUNT_KEY_BASE64` was copied correctly without extra characters or line breaks.
+
+2.  **Check Vercel Function Logs:**
     -   Go to your Vercel project dashboard.
     -   Click the **"Logs"** tab.
     -   Trigger a schedule generation in your app.
-    -   Look for logs from the `/api/solve` function. The newly added logging will show detailed trace information. Look for any errors, especially messages like "Request failed with status 403" or "401". This indicates an authentication failure.
+    -   Look for logs from the `/api/solve` function. The newly added logging will show detailed trace information. Look for any errors, especially messages like "Request failed with status 403" or "401". This indicates an authentication failure between Vercel and Google Cloud.
 
-2.  **Verify Cloud Run Invoker Permission:**
+3.  **Verify Cloud Run Invoker Permission:**
     -   Go to your `radiology-solver` service in the Google Cloud Console.
     -   Go to the **"Permissions"** tab.
     -   Verify that your `vercel-task-creator@...` service account is listed as a Principal and has the **"Cloud Run Invoker"** role assigned to it. If it is missing, add it using the steps in "Part 4.4" above.
 
-3.  **Check Environment Variables:**
-    -   In Vercel, double-check that `SOLVER_URL` is the correct URL from your Cloud Run deployment.
-    -   Ensure `GCP_SERVICE_ACCOUNT_KEY_BASE64` was copied correctly and doesn't have extra characters or line breaks.
-    -   In your Cloud Run service's **"Revisions"** tab, verify that the `SUPABASE_URL` and `SUPABASE_KEY` environment variables are set correctly for the running revision.
+4.  **Check Cloud Run Environment Variables:**
+    -   In your Cloud Run service's **"Revisions"** tab, verify that the `SUPABASE_URL` and `SUPABASE_KEY` environment variables are set correctly for the running revision. If they are wrong, the solver will fail to update its status.

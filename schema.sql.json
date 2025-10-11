@@ -1,0 +1,71 @@
+-- sql/schema.sql
+
+-- Drop tables if they exist to ensure a clean slate
+DROP TABLE IF EXISTS public.schedule_slots;
+DROP TABLE IF EXISTS public.runs;
+DROP TABLE IF EXISTS public.resources;
+DROP TABLE IF EXISTS public.user_data;
+
+-- Create the resources table
+CREATE TABLE public.resources (
+    id TEXT PRIMARY KEY,
+    title TEXT NOT NULL,
+    type TEXT,
+    domain TEXT,
+    "durationMinutes" INTEGER NOT NULL,
+    pages INTEGER,
+    "startPage" INTEGER,
+    "endPage" INTEGER,
+    "bookSource" TEXT,
+    "chapterNumber" INTEGER,
+    "sequenceOrder" INTEGER,
+    "isPrimaryMaterial" BOOLEAN DEFAULT false,
+    "isSplittable" BOOLEAN DEFAULT false,
+    "isArchived" BOOLEAN DEFAULT false,
+    "isOptional" BOOLEAN DEFAULT false,
+    "schedulingPriority" TEXT DEFAULT 'medium',
+    "questionCount" INTEGER,
+    "videoSource" TEXT,
+    "pairedResourceIds" TEXT[]
+);
+
+-- Create the runs table for tracking solver jobs
+CREATE TABLE public.runs (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    status TEXT DEFAULT 'PENDING',
+    progress INTEGER DEFAULT 0,
+    start_date DATE,
+    end_date DATE,
+    objective_values JSONB,
+    error_text TEXT
+);
+
+-- Create the schedule_slots table to store solver results
+CREATE TABLE public.schedule_slots (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    run_id UUID REFERENCES public.runs(id) ON DELETE CASCADE,
+    resource_id TEXT REFERENCES public.resources(id),
+    date DATE NOT NULL,
+    start_minute INTEGER NOT NULL,
+    end_minute INTEGER NOT NULL,
+    pass_index INTEGER,
+    violation_flags JSONB,
+    -- Denormalized data for easier display
+    title TEXT,
+    domain TEXT,
+    type TEXT
+);
+
+-- Create a generic user_data table for cloud sync
+CREATE TABLE public.user_data (
+  id BIGINT PRIMARY KEY,
+  data JSONB,
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- RLS Policies for user_data
+ALTER TABLE public.user_data ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow authenticated user to access their own data" ON public.user_data FOR ALL
+USING (auth.role() = 'authenticated')
+WITH CHECK (auth.role() = 'authenticated');
