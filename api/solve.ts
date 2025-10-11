@@ -16,9 +16,10 @@ const getGoogleAuthClient = () => {
     const keyFileContent = Buffer.from(base64Key, 'base64').toString('utf-8');
     const credentials = JSON.parse(keyFileContent);
 
+    // FIX: Removed the `scopes` parameter. It is not needed for generating an OIDC ID token
+    // for Cloud Run and can interfere with the authentication flow.
     return new GoogleAuth({
       credentials,
-      scopes: 'https://www.googleapis.com/auth/cloud-platform',
     });
   } catch (error: any) {
     console.error('Failed to parse credentials or initialize GoogleAuth:', error.message);
