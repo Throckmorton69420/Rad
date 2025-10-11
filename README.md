@@ -102,10 +102,10 @@ In your Vercel project dashboard, go to **Settings > Environment Variables**. Ad
       --cpu=1 \
       --memory=2Gi \
       --min-instances=1 \
-      --ingress=internal
+      --ingress=all
     ```
     -   Replace `YOUR_SUPABASE_URL`, `YOUR_SUPABASE_SERVICE_ROLE_KEY`, and `YOUR_SECRET_TOKEN` with the actual values from your Supabase and Vercel settings.
-    -   The `--ingress=internal` flag makes the service private from the start.
+    -   **Note on `--ingress=all`**: This flag allows your service to receive requests from the internet. This is required because the Vercel functions that trigger the solver run outside of your Google Cloud project's private network. The service remains secure because it is still protected by IAM and requires an authenticated request from a service account with the "Cloud Run Invoker" role.
 
 3.  After deployment, copy the **Service URL** provided by Cloud Run and paste it into the `SOLVER_URL` environment variable in Vercel.
 
