@@ -4,7 +4,6 @@ import {
   ShowConfirmationOptions, Domain, DeadlineSettings, PlanDataBlob, ScheduleSlot
 } from '../types';
 import { usePersistentState } from './usePersistentState';
-import { supabase } from '../services/supabaseClient';
 import { STUDY_START_DATE, STUDY_END_DATE, DEFAULT_TOPIC_ORDER, DEFAULT_DAILY_STUDY_MINS } from '../constants';
 
 const POLLING_INTERVAL = 3000; // Poll every 3 seconds
@@ -78,6 +77,7 @@ export const useStudyPlanManager = (showConfirmation: (options: ShowConfirmation
     const [previousStudyPlan, setPreviousStudyPlan] = useState<StudyPlan | null>(null);
     const [globalMasterResourcePool, setGlobalMasterResourcePool] = usePersistentState<StudyResource[]>('radiology_master_resources', []);
     const [exceptionDates, setExceptionDates] = usePersistentState<ExceptionDateRule[]>('radiology_exception_dates', []);
+    const [activeRunId, setActiveRunId] = usePersistentState<string | null>('radiology_active_run_id', null);
     const [isLoading, setIsLoading] = useState(false);
     const [systemNotification, setSystemNotification] = useState<{ type: 'info' | 'error', message: string } | null>(null);
     const [isNewUser, setIsNewUser] = useState(false);
@@ -96,6 +96,7 @@ export const useStudyPlanManager = (showConfirmation: (options: ShowConfirmation
             setSystemNotification({ type: 'error', message: 'Solver timed out. The server is taking too long to respond. Please try again later.' });
             setIsLoading(false);
             if(pollingRef.current) clearInterval(pollingRef.current);
+            setActiveRunId(null);
             return;
         }
         pollingAttemptsRef.current++;
@@ -121,6 +122,7 @@ export const useStudyPlanManager = (showConfirmation: (options: ShowConfirmation
             
             if (data.status === 'COMPLETE') {
                 if (pollingRef.current) clearInterval(pollingRef.current);
+                setActiveRunId(null);
                 setProgress(100);
                 setProgressMessage('Schedule complete! Loading...');
                 
@@ -144,15 +146,17 @@ export const useStudyPlanManager = (showConfirmation: (options: ShowConfirmation
                 }, 500);
             } else if (data.status === 'FAILED') {
                 if(pollingRef.current) clearInterval(pollingRef.current);
+                setActiveRunId(null);
                 setSystemNotification({ type: 'error', message: `Solver failed: ${data.error_text || 'An unknown error occurred.'}` });
                 setIsLoading(false);
             }
         } catch (error: any) {
             if(pollingRef.current) clearInterval(pollingRef.current);
+            setActiveRunId(null);
             setSystemNotification({ type: 'error', message: `Error checking status: ${error.message}` });
             setIsLoading(false);
         }
-    }, [setStudyPlan]);
+    }, [setStudyPlan, setActiveRunId]);
 
     const triggerSolver = useCallback(async (isInitialGeneration: boolean, startDate: string, endDate: string) => {
         setIsLoading(true);
@@ -171,17 +175,26 @@ export const useStudyPlanManager = (showConfirmation: (options: ShowConfirmation
             if (!res.ok) throw new Error(`Server responded with ${res.status}`);
             
             const { run_id } = await res.json();
+            setActiveRunId(run_id);
             setProgressMessage(`Solver initiated... This may take several minutes.`);
             pollingRef.current = window.setInterval(() => pollRunStatus(run_id, globalMasterResourcePool, exceptionDates, startDate, endDate), POLLING_INTERVAL);
         } catch (error: any) {
             setSystemNotification({ type: 'error', message: `Failed to start solver: ${error.message}` });
+            setActiveRunId(null);
             setIsLoading(false);
         }
-    }, [globalMasterResourcePool, exceptionDates, pollRunStatus]);
+    }, [globalMasterResourcePool, exceptionDates, pollRunStatus, setActiveRunId]);
 
 
     const loadSchedule = useCallback(async (regenerate = false) => {
         setIsLoading(true);
+
+        if (activeRunId && !regenerate) {
+            setProgressMessage('Checking status of a previous solver job...');
+            pollingRef.current = window.setInterval(() => pollRunStatus(activeRunId, globalMasterResourcePool, exceptionDates, studyPlan?.startDate || STUDY_START_DATE, studyPlan?.endDate || STUDY_END_DATE), POLLING_INTERVAL);
+            return;
+        }
+
         if(regenerate) {
             triggerSolver(true, studyPlan?.startDate || STUDY_START_DATE, studyPlan?.endDate || STUDY_END_DATE);
             return;
@@ -201,8 +214,8 @@ export const useStudyPlanManager = (showConfirmation: (options: ShowConfirmation
             setSystemNotification({ type: 'error', message: `Failed to load data: ${error.message}` });
             setIsLoading(false);
         }
-    }, [triggerSolver, setStudyPlan]);
-
+    }, [triggerSolver, setStudyPlan, activeRunId, pollRunStatus, globalMasterResourcePool, exceptionDates, studyPlan]);
+    
     const handleRebalance = useCallback(async (options: RebalanceOptions = { type: 'standard' }) => {
         showConfirmation({
             title: "Rebalance Schedule?",
@@ -249,7 +262,6 @@ export const useStudyPlanManager = (showConfirmation: (options: ShowConfirmation
         });
     }, [setStudyPlan, updatePreviousStudyPlan]);
     
-    // FIX: Define the handleUndo function to restore the previous state of the study plan.
     const handleUndo = useCallback(() => {
         if (previousStudyPlan) {
             setStudyPlan(previousStudyPlan);
@@ -260,7 +272,6 @@ export const useStudyPlanManager = (showConfirmation: (options: ShowConfirmation
         }
     }, [previousStudyPlan, setStudyPlan]);
 
-    // Placeholder implementations for other handlers
     const handleUpdatePlanDates = useCallback((startDate: string, endDate: string) => {
         showConfirmation({
             title: "Regenerate with New Dates?",
