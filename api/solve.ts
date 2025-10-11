@@ -44,7 +44,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     log('Step 2: Decoding and parsing GCP service account key from Base64...');
     const keyFileContent = Buffer.from(GCP_SERVICE_ACCOUNT_KEY_BASE64, 'base64').toString('utf-8');
     const keyData = JSON.parse(keyFileContent);
-    if (!keyData.client_email || !keyData.private_key) {
+    
+    // ** THE DEFINITIVE FIX IS HERE **
+    // The private key from the environment variable has its newlines escaped (e.g., "\\n").
+    // The google-auth-library requires actual newline characters ('\n').
+    // This line of code repairs the key before it's used.
+    const privateKey = keyData.private_key.replace(/\\n/g, '\n');
+
+    if (!keyData.client_email || !privateKey) {
       throw new Error('Parsed GCP key is invalid. Missing client_email or private_key.');
     }
     log('Step 2: Key decoded and parsed successfully.');
@@ -70,12 +77,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (!run) throw new Error('Failed to create and retrieve run from Supabase.');
     log('Step 4: Supabase run created successfully.', { run_id: run.id });
 
-    // Step 5: Initialize Google Auth library
+    // Step 5: Initialize Google Auth library with the CORRECTED private key
     log('Step 5: Initializing Google Auth...');
     const auth = new GoogleAuth({
       credentials: {
         client_email: keyData.client_email,
-        private_key: keyData.private_key,
+        private_key: privateKey, // Use the repaired key
       },
     });
     log('Step 5: Google Auth initialized.');
