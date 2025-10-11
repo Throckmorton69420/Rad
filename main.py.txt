@@ -9,6 +9,10 @@ import logging
 from concurrent.futures import ThreadPoolExecutor
 
 # --- Initialization ---
+# This logging configuration is critical for visibility in Cloud Run
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logging.info("Python module 'main.py' loaded by Gunicorn worker.")
+
 app = Flask(__name__)
 CORS(app)  # Enable Cross-Origin Resource Sharing
 app.logger.setLevel(logging.INFO)
@@ -63,7 +67,8 @@ def solve_schedule(run_id: str):
 
             exception_dates = []
             try:
-                user_data_req = supabase.table("user_data").select("data").eq("id", 1).single().execute()
+                # Use maybe_single() to safely handle cases where the row doesn't exist.
+                user_data_req = supabase.table("user_data").select("data").eq("id", 1).maybe_single().execute()
                 if user_data_req.data and 'data' in user_data_req.data and isinstance(user_data_req.data['data'], dict) and 'exceptionDates' in user_data_req.data['data']:
                     exception_dates = user_data_req.data['data']['exceptionDates'] or []
                 app.logger.info(f"[{run_id}] Fetched {len(exception_dates)} exception dates.")

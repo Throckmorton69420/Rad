@@ -10,14 +10,25 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-// Initialize Google Auth client
-// The credentials will be automatically sourced from environment variables.
+// --- Corrected Google Auth Initialization ---
+// 1. Decode the entire base64'd JSON key file content.
+const keyFileContent = Buffer.from(process.env.GCP_SERVICE_ACCOUNT_KEY_BASE64!, 'base64').toString('utf8');
+
+// 2. Parse the decoded string into a JSON object.
+const credentials = JSON.parse(keyFileContent);
+
+// 3. The Google Auth library requires the private key to have literal newlines.
+//    The `replace` call handles formatting issues from environment variables.
+const privateKeyWithNewlines = credentials.private_key.replace(/\\n/g, '\n');
+
+// 4. Initialize the auth client with the correctly parsed credentials.
 const auth = new GoogleAuth({
   credentials: {
-    client_email: process.env.GCP_CLIENT_EMAIL,
-    private_key: Buffer.from(process.env.GCP_SERVICE_ACCOUNT_KEY_BASE64!, 'base64').toString('utf8'),
+    client_email: credentials.client_email,
+    private_key: privateKeyWithNewlines,
   },
 });
+
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   console.log('[/api/solve] Direct invocation handler started.');
@@ -33,7 +44,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(400).json({ error: 'startDate and endDate are required.' });
   }
 
-  // --- Environment Variable Validation ---
   const solverUrl = process.env.SOLVER_URL;
   if (!solverUrl) {
     console.error('[/api/solve] FATAL: Server configuration error. Missing SOLVER_URL.');
@@ -42,7 +52,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   let newRunId: string | null = null;
   try {
-    // 1. Create a new run record in Supabase to get a run_id
     console.log('[/api/solve] Creating new run record in Supabase...');
     const { data: newRun, error: insertError } = await supabase
       .from('runs')
@@ -56,14 +65,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     newRunId = newRun.id;
     console.log(`[/api/solve] Successfully created run record with ID: ${newRunId}`);
 
-    // 2. Get an authenticated client for invoking the Cloud Run service
     console.log(`[/api/solve] Requesting OIDC token for Cloud Run service: ${solverUrl}`);
     const client = await auth.getIdTokenClient(solverUrl);
     
-    // 3. Prepare the request payload for the solver
     const solverPayload = { run_id: newRunId };
 
-    // 4. Make the authenticated request to the solver
     console.log(`[/api/solve] Invoking solver at ${solverUrl}/solve for run_id ${newRunId}`);
     const solverResponse = await client.request({
       url: `${solverUrl}/solve`,
@@ -72,10 +78,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       body: JSON.stringify(solverPayload),
     });
 
-    // The Python solver returns 202 Accepted immediately and runs in the background.
-    // We just need to check that the request was accepted.
     if (solverResponse.status !== 202) {
-      throw new Error(`Solver service responded with status ${solverResponse.status}. Body: ${JSON.stringify(solverResponse.data)}`);
+      const responseBody = solverResponse.data ? JSON.stringify(solverResponse.data) : 'No response body';
+      throw new Error(`Solver service responded with status ${solverResponse.status}. Body: ${responseBody}`);
     }
 
     console.log(`[/api/solve] Solver invocation successful. Returning 202 with run_id: ${newRunId}`);

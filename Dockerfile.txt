@@ -20,7 +20,6 @@ EXPOSE 8080
 ENV PORT 8080
 
 # Run main.py when the container launches using gunicorn
-# --worker-class gthread: Use a standard threaded worker for robust background task handling.
-# --threads 8: Allow each worker process to handle multiple requests concurrently.
-# --timeout 900: Allow workers up to 15 minutes (900s) to complete tasks.
-CMD ["gunicorn", "--bind", "0.0.0.0:8080", "--workers", "1", "--worker-class", "gthread", "--threads", "8", "--timeout", "900", "main:app"]
+# --log-level debug: Increase logging verbosity for better diagnostics.
+# --access-logfile - / --error-logfile -: Ensure all logs go to stdout/stderr for Cloud Run.
+CMD ["gunicorn", "--bind", "0.0.0.0:8080", "--workers", "1", "--worker-class", "gthread", "--threads", "8", "--timeout", "900", "--log-level", "debug", "--access-logfile", "-", "--error-logfile", "-", "main:app"]

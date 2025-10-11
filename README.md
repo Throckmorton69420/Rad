@@ -65,7 +65,6 @@ In your Vercel project dashboard, go to **Settings > Environment Variables**. Ad
 | `SUPABASE_URL`                      | Your Supabase Project URL.                                                                                                                                                                                                              | Used by server-side Vercel Functions.                                                        |
 | `SUPABASE_SERVICE_ROLE_KEY`         | Your Supabase `service_role` (secret) key.                                                                                                                                                                                              | Used by server-side Vercel Functions.                                    |
 | `SOLVER_URL`                        | The URL of your deployed Google Cloud Run service (from the next step).                                                                                                                                                                 | The endpoint for the backend Python solver.                                                             |
-| `GCP_CLIENT_EMAIL`                  | The `client_email` from the JSON key file you downloaded.                                                                                                                                                                               | Identifies the service account to Google Auth.                                                          |
 | `GCP_SERVICE_ACCOUNT_KEY_BASE64`    | The **Base64 encoded** content of your downloaded JSON key file. To generate this: <br/> 1. On **macOS/Linux**, run: `cat your-key-file.json | base64 -w 0` <br/> 2. On **Windows (PowerShell)**, run: `[Convert]::ToBase64String([IO.File]::ReadAllBytes("your-key-file.json"))` <br/> 3. Paste the resulting single-line string here. | Credentials for the Vercel Function to authenticate to GCP. |
 
 ### 4. Backend Deployment to Google Cloud Run
@@ -98,6 +97,17 @@ In your Vercel project dashboard, go to **Settings > Environment Variables**. Ad
     -   In the "New principals" field, paste the full email address of your `vercel-solver-invoker` service account (e.g., `vercel-solver-invoker@your-project-id.iam.gserviceaccount.com`).
     -   In the "Assign roles" dropdown, select the **"Cloud Run Invoker"** role.
     -   Click **"Save"**.
+    -   **Note:** If the "Add Principal" button is missing, use the `gcloud` CLI command from a Cloud Shell terminal:
+        ```bash
+        # First, set your project context
+        gcloud config set project YOUR_PROJECT_ID
+        
+        # Then, add the permission
+        gcloud run services add-iam-policy-binding radiology-solver \
+          --member="serviceAccount:YOUR_VERCEL_SERVICE_ACCOUNT_EMAIL" \
+          --role="roles/run.invoker" \
+          --region="us-central1"
+        ```
 
 ### 5. Frontend Deployment to Vercel
 
