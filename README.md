@@ -6,7 +6,7 @@ This is an interactive, day-by-day study planner for radiology residents prepari
 
 This project uses a modern serverless architecture designed for robust, asynchronous background processing:
 
--   **Frontend**: Vite + React + TypeScript, deployed on Vercel. The client polls for results after initiating a solver job.
+-   **Frontend**: Vite + React + TypeScript, deployed on Vercel.
 -   **Backend Solver**: Python (Flask + Google OR-Tools), containerized and deployed on Google Cloud Run. The solver runs in a background thread, allowing the API to respond immediately.
 -   **Database**: Supabase (PostgreSQL) for storing resources, solver jobs (`runs`), and schedule results (`schedule_slots`).
 -   **API Layer**: Vercel Serverless Functions act as a secure bridge, receiving requests from the frontend and making authenticated calls to trigger the backend solver.
@@ -25,8 +25,6 @@ This project uses a modern serverless architecture designed for robust, asynchro
 
 ### 2. Google Cloud Setup
 
-This is a one-time setup for the project's backend infrastructure.
-
 #### Part A: Enable APIs
 
 1.  Go to the [Google Cloud Console](https://console.cloud.google.com/).
@@ -34,9 +32,9 @@ This is a one-time setup for the project's backend infrastructure.
 3.  In the **search bar** at the top, find and **Enable** the following APIs if they are not already enabled:
     -   **Cloud Run API**
     -   **Cloud Build API**
-    -   **IAM Credentials API** (This is needed for the Vercel function to generate auth tokens)
+    -   **IAM Service Account Credentials API** (This is needed for the Vercel function to generate auth tokens)
 
-#### Part B: Create a Dedicated Service Account for Vercel
+#### Part B: Create a Service Account for Vercel
 
 This service account provides secure credentials for your Vercel functions to authenticate with and trigger your Cloud Run solver.
 
@@ -62,12 +60,13 @@ In your Vercel project dashboard, go to **Settings > Environment Variables**. Ad
 
 | Variable Name                       | Value                                                                                                                                                                                                                                   | Description                                                                                             |
 | ----------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
-| `VITE_SUPABASE_URL`                 | Your Supabase Project URL.                                                                                                                                                                                                              | Used by the client-side React application (prefixed with `VITE_`).                                      |
+| `VITE_SUPABASE_URL`                 | Your Supabase Project URL.                                                                                                                                                                                                              | Used by the client-side React application.                                      |
 | `VITE_SUPABASE_ANON_KEY`            | Your Supabase `anon` (public) key.                                                                                                                                                                                                      | Used by the client-side React application.                                                              |
-| `SUPABASE_URL`                      | Your Supabase Project URL.                                                                                                                                                                                                              | Used by server-side Vercel Functions (`/api/*`).                                                        |
-| `SUPABASE_SERVICE_ROLE_KEY`         | Your Supabase `service_role` (secret) key.                                                                                                                                                                                              | Used by server-side Vercel Functions for privileged database access.                                    |
+| `SUPABASE_URL`                      | Your Supabase Project URL.                                                                                                                                                                                                              | Used by server-side Vercel Functions.                                                        |
+| `SUPABASE_SERVICE_ROLE_KEY`         | Your Supabase `service_role` (secret) key.                                                                                                                                                                                              | Used by server-side Vercel Functions.                                    |
 | `SOLVER_URL`                        | The URL of your deployed Google Cloud Run service (from the next step).                                                                                                                                                                 | The endpoint for the backend Python solver.                                                             |
-| `GCP_SERVICE_ACCOUNT_KEY_BASE64`    | The **Base64 encoded** content of your downloaded JSON key file. To generate this: <br/> 1. On **macOS/Linux**, run: `cat your-key-file.json | base64 -w 0` <br/> 2. On **Windows (PowerShell)**, run: `[Convert]::ToBase64String([IO.File]::ReadAllBytes("your-key-file.json"))` <br/> 3. Paste the resulting single-line string here. | Credentials for the Vercel Function to authenticate as the service account to invoke the Cloud Run solver. |
+| `GCP_CLIENT_EMAIL`                  | The `client_email` from the JSON key file you downloaded.                                                                                                                                                                               | Identifies the service account to Google Auth.                                                          |
+| `GCP_SERVICE_ACCOUNT_KEY_BASE64`    | The **Base64 encoded** content of your downloaded JSON key file. To generate this: <br/> 1. On **macOS/Linux**, run: `cat your-key-file.json | base64 -w 0` <br/> 2. On **Windows (PowerShell)**, run: `[Convert]::ToBase64String([IO.File]::ReadAllBytes("your-key-file.json"))` <br/> 3. Paste the resulting single-line string here. | Credentials for the Vercel Function to authenticate to GCP. |
 
 ### 4. Backend Deployment to Google Cloud Run
 
@@ -88,13 +87,13 @@ In your Vercel project dashboard, go to **Settings > Environment Variables**. Ad
       --min-instances=0
     ```
     -   **CRITICAL:** Replace `YOUR_SUPABASE_URL` and `YOUR_SUPABASE_SERVICE_ROLE_KEY` with the actual values from your Supabase settings.
-    -   `--no-allow-unauthenticated` ensures your service is private and can only be accessed by authenticated callers (like our Vercel function).
+    -   `--no-allow-unauthenticated` secures your service so it can only be accessed by authenticated callers.
 
 3.  After deployment, Cloud Run will show you a **Service URL**. Copy this URL and paste it into the `SOLVER_URL` environment variable in Vercel.
 
-4.  **CRITICAL - Grant Permissions:** You must explicitly grant the `vercel-solver-invoker` service account permission to invoke your newly deployed service.
+4.  **CRITICAL - Grant Invoke Permission:** You must grant the `vercel-solver-invoker` service account permission to call your new service.
     -   In the Google Cloud Console, navigate to your `radiology-solver` Cloud Run service.
-    -   Go to the **"Permissions"** tab.
+    -   Go to the **"Security"** tab.
     -   Click **"Add Principal"**.
     -   In the "New principals" field, paste the full email address of your `vercel-solver-invoker` service account (e.g., `vercel-solver-invoker@your-project-id.iam.gserviceaccount.com`).
     -   In the "Assign roles" dropdown, select the **"Cloud Run Invoker"** role.
@@ -102,31 +101,6 @@ In your Vercel project dashboard, go to **Settings > Environment Variables**. Ad
 
 ### 5. Frontend Deployment to Vercel
 
--   With all environment variables configured, push your code to the main branch linked to your Vercel project. Vercel will automatically build and deploy the frontend and serverless functions.
+-   With all environment variables configured, push your code to the main branch linked to your Vercel project.
 -   You may need to manually trigger a new deployment in the Vercel dashboard to ensure it uses the latest environment variables.
-
-### Troubleshooting
-
-**Problem: App is stuck at 0% or shows a "Failed to Generate Schedule" error.**
-
-This is almost always an authentication, permissions, or environment variable issue where the Vercel function cannot successfully call the Cloud Run service or connect to the database.
-
-1.  **Check Vercel Environment Variables:**
-    -   Go to Vercel settings and ensure **all** variables from the table in Step 3 are present and correct.
-    -   Pay special attention to `SUPABASE_URL` (for the API) vs `VITE_SUPABASE_URL` (for the client). They must both be set to the same Supabase URL.
-    -   Ensure `SOLVER_URL` is the correct URL from your Cloud Run deployment.
-    -   Re-check that `GCP_SERVICE_ACCOUNT_KEY_BASE64` was copied correctly without extra characters or line breaks.
-
-2.  **Check Vercel Function Logs:**
-    -   Go to your Vercel project dashboard.
-    -   Click the **"Logs"** tab.
-    -   Trigger a schedule generation in your app.
-    -   Look for logs from the `/api/solve` function. The newly added logging will show detailed trace information. Look for any errors, especially messages like "Request failed with status 403" or "401". This indicates an authentication failure between Vercel and Google Cloud.
-
-3.  **Verify Cloud Run Invoker Permission:**
-    -   Go to your `radiology-solver` service in the Google Cloud Console.
-    -   Go to the **"Permissions"** tab.
-    -   Verify that your `vercel-solver-invoker@...` service account is listed as a Principal and has the **"Cloud Run Invoker"** role assigned to it. If it is missing, add it using the steps in "Part 4.4" above.
-
-4.  **Check Cloud Run Environment Variables:**
-    -   In your Cloud Run service's **"Revisions"** tab, verify that the `SUPABASE_URL` and `SUPABASE_KEY` environment variables are set correctly for the running revision. If they are wrong, the solver will fail to update its status.
+-   The app should now be fully functional.
