@@ -2,7 +2,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { GoogleAuth } from 'google-auth-library';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-// FIX: Import Buffer to resolve TypeScript error 'Cannot find name Buffer'.
 import { Buffer } from 'buffer';
 
 // This function needs to be outside the handler to be memoized correctly by Vercel
@@ -10,20 +9,19 @@ const getGoogleAuthClient = () => {
   try {
     const base64Key = process.env.GCP_SERVICE_ACCOUNT_KEY_BASE64;
     if (!base64Key) {
-      throw new Error('GCP_SERVICE_ACCOUNT_KEY_BASE64 env var is not set.');
+      console.error('Failed to initialize GoogleAuth: GCP_SERVICE_ACCOUNT_KEY_BASE64 env var is not set.');
+      return null;
     }
     
-    // Decode the Base64 string to get the JSON key file content
     const keyFileContent = Buffer.from(base64Key, 'base64').toString('utf-8');
     const credentials = JSON.parse(keyFileContent);
 
-    // Initialize Google Auth client using the decoded credentials
     return new GoogleAuth({
       credentials,
       scopes: 'https://www.googleapis.com/auth/cloud-platform',
     });
   } catch (error: any) {
-    console.error('Failed to initialize GoogleAuth:', error.message);
+    console.error('Failed to parse credentials or initialize GoogleAuth:', error.message);
     return null;
   }
 };
@@ -44,8 +42,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   const { startDate, endDate } = req.body;
-  console.log(`[/api/solve] Received request with startDate: ${startDate}, endDate: ${endDate}`);
   if (!startDate || !endDate) {
+    console.error('[/api/solve] Bad Request: startDate and endDate are required.');
     return res.status(400).json({ error: 'startDate and endDate are required.' });
   }
   
@@ -54,11 +52,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     console.error('[/api/solve] FATAL: SOLVER_URL is not configured.');
     return res.status(500).json({ error: 'Server configuration error: SOLVER_URL is not set.' });
   }
+  console.log(`[/api/solve] Target solver URL: ${solverUrl}`);
 
   if (!auth) {
-    console.error('[/api/solve] FATAL: Google Auth client failed to initialize. Check GCP_SERVICE_ACCOUNT_KEY_BASE64 variable.');
+    console.error('[/api/solve] FATAL: Google Auth client failed to initialize. Check GCP_SERVICE_ACCOUNT_KEY_BASE64 format and content.');
     return res.status(500).json({ error: 'Server configuration error: Could not initialize authentication.' });
   }
+  console.log('[/api/solve] Google Auth client initialized.');
 
   let newRunId: string | null = null;
   try {
@@ -77,12 +77,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     console.log(`[/api/solve] Successfully created run record with ID: ${newRunId}`);
 
     // 2. Get an OIDC-authenticated client
-    console.log(`[/api/solve] Generating OIDC token for audience: ${solverUrl}`);
+    console.log(`[/api/solve] Generating OIDC token client for audience: ${solverUrl}`);
     const client = await auth.getIdTokenClient(solverUrl);
     console.log('[/api/solve] OIDC token client created successfully.');
     
     const solverEndpoint = `${solverUrl}/solve`;
-    console.log(`[/api/solve] Making direct POST request to solver at: ${solverEndpoint}`);
+    console.log(`[/api/solve] Making authenticated POST request to solver at: ${solverEndpoint}`);
 
     // 3. Make the authenticated request to the solver
     const response = await client.request({
@@ -104,11 +104,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(202).json({ run_id: newRunId });
 
   } catch (error: any) {
-    const errorMessage = error.response?.data || error.message;
-    console.error(`[/api/solve] CRITICAL ERROR for run_id ${newRunId}:`, errorMessage);
+    // THIS IS THE MOST IMPORTANT LOGGING BLOCK
+    let errorMessage = 'An unknown error occurred.';
+    if (error.response) {
+        // Axios error structure
+        errorMessage = `Request failed with status ${error.response.status}. Data: ${JSON.stringify(error.response.data)}`;
+    } else {
+        errorMessage = error.message;
+    }
+    
+    console.error(`[/api/solve] CRITICAL ERROR for run_id ${newRunId}. Full error object:`, JSON.stringify(error, null, 2));
     
     if (newRunId) {
-        console.log(`[/api/solve] Marking run ${newRunId} as FAILED in database.`);
+        console.log(`[/api/solve] Marking run ${newRunId} as FAILED in database due to critical error.`);
         await supabase
           .from('runs')
           .update({ status: 'FAILED', error_text: `Vercel function error: ${errorMessage}` })
