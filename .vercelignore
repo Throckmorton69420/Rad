@@ -1,8 +1,16 @@
-# Ignore all Python backend files to prevent Vercel from trying to build a Python environment.
-# This is the definitive fix for the "pip install" build error.
-requirements.txt
+# Vercel: Ignore all backend files and directories.
+# This is critical to force a pure Node.js build environment.
 main.py
 main.py.txt
 Dockerfile
 Dockerfile.txt
+requirements.txt
 schema.sql.json
+
+# Ignore common Python artifacts
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+/solver/
