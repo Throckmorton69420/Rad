@@ -7,10 +7,9 @@ This is an interactive, day-by-day study planner for radiology residents prepari
 This project uses a modern serverless architecture designed for robust, asynchronous background processing:
 
 -   **Frontend**: Vite + React + TypeScript, deployed on Vercel.
--   **Backend Solver**: Python (Flask + Google OR-Tools), containerized and deployed on Google Cloud Run.
+-   **Backend Solver**: Python (Flask + Google OR-Tools), containerized and deployed on Google Cloud Run. The solver runs in a background thread, allowing the API to respond immediately.
 -   **Database**: Supabase (PostgreSQL) for storing resources, solver jobs, and user data.
--   **Task Queue**: Google Cloud Tasks for reliably triggering long-running solver jobs asynchronously.
--   **API Layer**: Vercel Serverless Functions act as a bridge between the frontend and the backend task queue.
+-   **API Layer**: Vercel Serverless Functions act as a bridge, receiving requests from the frontend and making secure, authenticated calls directly to the backend solver.
 
 ## Setup Instructions
 
@@ -35,33 +34,23 @@ This is a one-time setup for the project's backend infrastructure.
 3.  In the **search bar** at the top, find and **Enable** the following APIs if they are not already enabled:
     -   **Cloud Run API**
     -   **Cloud Build API**
-    -   **Cloud Tasks API**
+    -   **IAM Credentials API** (This is needed for the Vercel function to generate auth tokens)
 
-#### Part B: Create a Task Queue
+#### Part B: Create a Dedicated Service Account for Vercel
 
-1.  In the console search bar, type `Cloud Tasks` and navigate to the Cloud Tasks page.
-2.  Click **"Create Queue"**.
-3.  Set the **Queue name** to `solver-queue`.
-4.  Set the **Region** to `us-central1` (to match your Cloud Run service).
-5.  Leave the other settings as default and click **"Create"**.
-    *(Note: The default "Push" queue type is correct for this application, which will be used to send HTTP tasks to your solver service.)*
-
-#### Part C: Create a Dedicated Service Account for Vercel
-
-This service account provides secure credentials for your Vercel functions to create tasks without exposing a master key.
+This service account provides secure credentials for your Vercel functions to authenticate with and trigger your Cloud Run solver.
 
 1.  In the console search bar, type `IAM & Admin` and navigate to **Service Accounts**.
 2.  Click **"+ CREATE SERVICE ACCOUNT"**.
-3.  **Service account name:** Enter `vercel-task-creator`.
+3.  **Service account name:** Enter `vercel-solver-invoker`.
 4.  Click **"CREATE AND CONTINUE"**.
-5.  In the **"Select a role"** dropdown, grant the following two roles:
-    -   `Cloud Tasks Enqueuer` (allows it to add tasks to the queue).
+5.  In the **"Select a role"** dropdown, grant the following single role:
     -   `Cloud Run Invoker` (allows it to trigger your private Cloud Run service).
 6.  Click **"CONTINUE"**, then click **"DONE"**.
 
-#### Part D: Generate a JSON Key for the Service Account
+#### Part C: Generate a JSON Key for the Service Account
 
-1.  From the Service Accounts list, click on the email of the `vercel-task-creator` account you just made.
+1.  From the Service Accounts list, click on the email of the `vercel-solver-invoker` account you just made.
 2.  Go to the **"KEYS"** tab.
 3.  Click **"ADD KEY"** -> **"Create new key"**.
 4.  Select **JSON** as the key type and click **"CREATE"**.
@@ -77,8 +66,6 @@ In your Vercel project dashboard, go to **Settings > Environment Variables**. Ad
 | `VITE_SUPABASE_ANON_KEY`      | Your Supabase `anon` (public) key.                                                                    |
 | `SUPABASE_SERVICE_ROLE_KEY`   | Your Supabase `service_role` (secret) key.                                                            |
 | `GCP_PROJECT_ID`              | `scheduler-474709`                                                                                    |
-| `GCP_QUEUE_LOCATION`          | `us-central1`                                                                                         |
-| `GCP_QUEUE_NAME`              | `solver-queue`                                                                                        |
 | `SOLVER_URL`                  | The URL of your deployed Google Cloud Run service (from the next step).                               |
 | `INTERNAL_API_TOKEN`          | A long, random, secret string you create. Used for an extra layer of security.                        |
 | `GCP_CLIENT_EMAIL`            | The `client_email` from the downloaded JSON key file.                                                 |
@@ -105,7 +92,7 @@ In your Vercel project dashboard, go to **Settings > Environment Variables**. Ad
       --ingress=all
     ```
     -   Replace `YOUR_SUPABASE_URL`, `YOUR_SUPABASE_SERVICE_ROLE_KEY`, and `YOUR_SECRET_TOKEN` with the actual values from your Supabase and Vercel settings.
-    -   **Note on `--ingress=all`**: This flag allows your service to receive requests from the internet. This is required because the Vercel functions that trigger the solver run outside of your Google Cloud project's private network. The service remains secure because it is still protected by IAM and requires an authenticated request from a service account with the "Cloud Run Invoker" role.
+    -   **Note on `--ingress=all`**: This flag allows your service to receive requests from the internet. This is required because the Vercel functions that trigger the solver run outside of your Google Cloud project's private network. The service remains secure because it is still protected by IAM and requires an authenticated OIDC token from a service account with the "Cloud Run Invoker" role.
 
 3.  After deployment, copy the **Service URL** provided by Cloud Run and paste it into the `SOLVER_URL` environment variable in Vercel.
 
