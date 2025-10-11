@@ -2,6 +2,8 @@
 import { createClient } from '@supabase/supabase-js';
 import { GoogleAuth } from 'google-auth-library';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+// FIX: Import Buffer to resolve TypeScript error 'Cannot find name Buffer'.
+import { Buffer } from 'buffer';
 
 // This function needs to be outside the handler to be memoized correctly by Vercel
 const getGoogleAuthClient = () => {
