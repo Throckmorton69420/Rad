@@ -1,6 +1,5 @@
 Flask==3.0.3
 Flask-Cors==4.0.1
-gevent==24.2.1
 gunicorn==22.0.0
 ortools==9.9.3963
 python-dotenv==1.0.1
