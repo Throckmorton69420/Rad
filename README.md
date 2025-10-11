@@ -41,10 +41,10 @@ This is a one-time setup for the project's backend infrastructure.
 
 1.  In the console search bar, type `Cloud Tasks` and navigate to the Cloud Tasks page.
 2.  Click **"Create Queue"**.
-3.  Select queue type **"HTTP"**.
-4.  Set the **Queue name** to `solver-queue`.
-5.  Set the **Region** to `us-central1` (to match your Cloud Run service).
-6.  Click **"Create"**.
+3.  Set the **Queue name** to `solver-queue`.
+4.  Set the **Region** to `us-central1` (to match your Cloud Run service).
+5.  Leave the other settings as default and click **"Create"**.
+    *(Note: The default "Push" queue type is correct for this application, which will be used to send HTTP tasks to your solver service.)*
 
 #### Part C: Create a Dedicated Service Account for Vercel
 
