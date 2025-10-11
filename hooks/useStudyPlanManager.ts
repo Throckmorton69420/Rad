@@ -1,7 +1,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import {
   StudyPlan, StudyResource, ExceptionDateRule, DailySchedule, ScheduledTask, RebalanceOptions,
-  ShowConfirmationOptions, Domain, DeadlineSettings, PlanDataBlob, ScheduleSlot
+  ShowConfirmationOptions, Domain, DeadlineSettings, PlanDataBlob, ScheduleSlot, Run
 } from '../types';
 import { usePersistentState } from './usePersistentState';
 import { STUDY_START_DATE, STUDY_END_DATE, DEFAULT_TOPIC_ORDER, DEFAULT_DAILY_STUDY_MINS } from '../constants';
@@ -84,19 +84,29 @@ export const useStudyPlanManager = (showConfirmation: (options: ShowConfirmation
     const [progress, setProgress] = useState(0);
     const [progressMessage, setProgressMessage] = useState('');
 
-    const pollingRef = useRef<number | null>(null);
     const pollingAttemptsRef = useRef(0);
 
     const updatePreviousStudyPlan = useCallback((plan: StudyPlan) => {
         setPreviousStudyPlan(JSON.parse(JSON.stringify(plan)));
     }, []);
+    
+    const stopPolling = useCallback((run_id_to_clear: string | null = null) => {
+        setActiveRunId(currentId => {
+            // Only clear the run ID if it's the one we intended to stop,
+            // preventing race conditions where a new run starts before the old one stops.
+            if (run_id_to_clear === null || currentId === run_id_to_clear) {
+                return null;
+            }
+            return currentId;
+        });
+        pollingAttemptsRef.current = 0;
+        setIsLoading(false);
+    }, [setActiveRunId]);
 
-    const pollRunStatus = useCallback(async (run_id: string, resources: StudyResource[], exceptions: ExceptionDateRule[], startDate: string, endDate: string) => {
+    const pollRunStatus = useCallback(async (run_id: string) => {
         if (pollingAttemptsRef.current >= MAX_POLLING_ATTEMPTS) {
             setSystemNotification({ type: 'error', message: 'Solver timed out. The server is taking too long to respond. Please try again later.' });
-            setIsLoading(false);
-            if(pollingRef.current) clearInterval(pollingRef.current);
-            setActiveRunId(null);
+            stopPolling(run_id);
             return;
         }
         pollingAttemptsRef.current++;
@@ -105,7 +115,7 @@ export const useStudyPlanManager = (showConfirmation: (options: ShowConfirmation
             const res = await fetch(`/api/runs/${run_id}`);
             if (!res.ok) throw new Error(`Server returned status ${res.status}`);
             
-            const data = await res.json();
+            const data: Run & { slots?: ScheduleSlot[] } = await res.json();
             
             const currentProgress = data.progress || 0;
             if(currentProgress >= 0) {
@@ -120,13 +130,15 @@ export const useStudyPlanManager = (showConfirmation: (options: ShowConfirmation
                  else setProgressMessage('Saving new schedule...');
             }
             
-            if (data.status === 'COMPLETE') {
-                if (pollingRef.current) clearInterval(pollingRef.current);
-                setActiveRunId(null);
+            if (data.status === 'COMPLETE' && data.slots) {
+                stopPolling(run_id);
                 setProgress(100);
                 setProgressMessage('Schedule complete! Loading...');
                 
-                const newSchedule = transformSolverSlotsToSchedule(data.slots, resources, startDate, endDate, exceptions);
+                const startDate = data.start_date || studyPlan?.startDate || STUDY_START_DATE;
+                const endDate = data.end_date || studyPlan?.endDate || STUDY_END_DATE;
+                
+                const newSchedule = transformSolverSlotsToSchedule(data.slots, globalMasterResourcePool, startDate, endDate, exceptionDates);
                 
                 setTimeout(() => {
                     setStudyPlan(plan => ({
@@ -142,27 +154,31 @@ export const useStudyPlanManager = (showConfirmation: (options: ShowConfirmation
                         schedule: newSchedule,
                     }));
                     setSystemNotification({ type: 'info', message: 'New schedule generated successfully!' });
-                    setIsLoading(false);
-                }, 500);
+                }, 500); // Short delay for the "Loading..." message to show
             } else if (data.status === 'FAILED') {
-                if(pollingRef.current) clearInterval(pollingRef.current);
-                setActiveRunId(null);
                 setSystemNotification({ type: 'error', message: `Solver failed: ${data.error_text || 'An unknown error occurred.'}` });
-                setIsLoading(false);
+                stopPolling(run_id);
             }
         } catch (error: any) {
-            if(pollingRef.current) clearInterval(pollingRef.current);
-            setActiveRunId(null);
             setSystemNotification({ type: 'error', message: `Error checking status: ${error.message}` });
-            setIsLoading(false);
+            stopPolling(run_id);
         }
-    }, [setStudyPlan, setActiveRunId]);
+    }, [setStudyPlan, stopPolling, globalMasterResourcePool, exceptionDates, studyPlan]);
+    
+    // This useEffect is the heart of the robust polling mechanism.
+    // It automatically starts and stops the polling interval based on activeRunId.
+    useEffect(() => {
+        if (activeRunId) {
+            const intervalId = setInterval(() => pollRunStatus(activeRunId), POLLING_INTERVAL);
+            return () => clearInterval(intervalId);
+        }
+    }, [activeRunId, pollRunStatus]);
+
 
     const triggerSolver = useCallback(async (isInitialGeneration: boolean, startDate: string, endDate: string) => {
         setIsLoading(true);
         setProgress(0);
         setProgressMessage('Initiating solver service...');
-        if (pollingRef.current) clearInterval(pollingRef.current);
         pollingAttemptsRef.current = 0;
 
         try {
@@ -175,23 +191,22 @@ export const useStudyPlanManager = (showConfirmation: (options: ShowConfirmation
             if (!res.ok) throw new Error(`Server responded with ${res.status}`);
             
             const { run_id } = await res.json();
-            setActiveRunId(run_id);
+            setActiveRunId(run_id); // This will trigger the useEffect to start polling
             setProgressMessage(`Solver initiated... This may take several minutes.`);
-            pollingRef.current = window.setInterval(() => pollRunStatus(run_id, globalMasterResourcePool, exceptionDates, startDate, endDate), POLLING_INTERVAL);
         } catch (error: any) {
             setSystemNotification({ type: 'error', message: `Failed to start solver: ${error.message}` });
-            setActiveRunId(null);
             setIsLoading(false);
+            setActiveRunId(null);
         }
-    }, [globalMasterResourcePool, exceptionDates, pollRunStatus, setActiveRunId]);
-
+    }, [setActiveRunId]);
 
     const loadSchedule = useCallback(async (regenerate = false) => {
         setIsLoading(true);
 
         if (activeRunId && !regenerate) {
-            setProgressMessage('Checking status of a previous solver job...');
-            pollingRef.current = window.setInterval(() => pollRunStatus(activeRunId, globalMasterResourcePool, exceptionDates, studyPlan?.startDate || STUDY_START_DATE, studyPlan?.endDate || STUDY_END_DATE), POLLING_INTERVAL);
+            setProgressMessage('Re-attaching to running solver job...');
+            // The useEffect will handle the polling automatically.
+            // We just need to ensure the UI is in a loading state.
             return;
         }
 
@@ -214,7 +229,7 @@ export const useStudyPlanManager = (showConfirmation: (options: ShowConfirmation
             setSystemNotification({ type: 'error', message: `Failed to load data: ${error.message}` });
             setIsLoading(false);
         }
-    }, [triggerSolver, setStudyPlan, activeRunId, pollRunStatus, globalMasterResourcePool, exceptionDates, studyPlan]);
+    }, [triggerSolver, setStudyPlan, activeRunId, studyPlan]);
     
     const handleRebalance = useCallback(async (options: RebalanceOptions = { type: 'standard' }) => {
         showConfirmation({

@@ -366,6 +366,7 @@ export interface Run {
   end_date: string; // date
   objective_values?: Record<string, any>; // jsonb
   error_text?: string; // text
+  progress?: number;
 }
 
 export interface ScheduleSlot {
