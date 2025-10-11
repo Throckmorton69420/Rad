@@ -1,213 +1,128 @@
-from gevent import monkey
-monkey.patch_all() # MONKEY PATCHING MUST BE DONE FIRST
+# Radiology Study Planner
 
-import os
-import traceback
-from flask import Flask, request, jsonify
-from flask_cors import CORS
-from supabase import create_client, Client
-from ortools.sat.python import cp_model
-from datetime import date, timedelta, datetime
-import logging
-import gevent
+This is an interactive, day-by-day study planner for radiology residents preparing for their Core Exam. It uses a sophisticated CP-SAT solver running on Google Cloud Run to generate an optimal schedule based on a comprehensive list of study resources.
 
-# --- Initialization ---
-app = Flask(__name__)
-CORS(app)  # Enable Cross-Origin Resource Sharing
-app.logger.setLevel(logging.INFO)
+## Architecture
 
-# These are set as environment variables in Cloud Run
-supabase_url = os.environ.get("SUPABASE_URL")
-supabase_key = os.environ.get("SUPABASE_KEY")
+This project uses a modern serverless architecture designed for robust, asynchronous background processing:
 
-if not all([supabase_url, supabase_key]):
-    raise ValueError("FATAL: Missing required environment variables SUPABASE_URL or SUPABASE_KEY.")
+-   **Frontend**: Vite + React + TypeScript, deployed on Vercel.
+-   **Backend Solver**: Python (Flask + Google OR-Tools), containerized and deployed on Google Cloud Run. The solver runs in a background task, allowing the API to respond immediately.
+-   **Database**: Supabase (PostgreSQL) for storing resources, solver jobs, and user data.
+-   **API Layer**: Vercel Serverless Functions act as a bridge, receiving requests from the frontend and making secure, authenticated calls directly to the backend solver.
 
-supabase: Client = create_client(supabase_url, supabase_key)
+## Setup Instructions
 
-# --- Background Solver Logic ---
-def solve_schedule(app_context, run_id: str):
-    """
-    This function contains the long-running solver logic.
-    It's designed to be run in a background greenlet.
-    It requires the app context to be passed for logging and other context-sensitive operations.
-    """
-    with app_context.app_context():
-        app.logger.info(f"[{run_id}] Background greenlet execution beginning inside app context.")
-        try:
-            # IMMEDIATE PROGRESS UPDATE
-            app.logger.info(f"[{run_id}] Attempting to update run status to SOLVING and progress to 1%.")
-            supabase.table("runs").update({"status": "SOLVING", "progress": 1}).eq("id", run_id).execute()
-            app.logger.info(f"[{run_id}] Successfully updated run status. Fetching data...")
+### 1. Supabase Setup
 
-            # 1. Fetch all necessary data from Supabase
-            run_data_req = supabase.table("runs").select("start_date, end_date").eq("id", run_id).single().execute()
-            if not run_data_req.data:
-                raise Exception(f"Run ID {run_id} not found.")
-            run_data = run_data_req.data
-            app.logger.info(f"[{run_id}] Fetched run data for period: {run_data['start_date']} to {run_data['end_date']}.")
-            
-            supabase.table("runs").update({"progress": 5}).eq("id", run_id).execute()
-            app.logger.info(f"[{run_id}] Progress at 5%. Fetching resources...")
+1.  Create a new project on [Supabase](https://supabase.com/).
+2.  Navigate to the **SQL Editor**.
+3.  Copy the entire contents of `sql/schema.sql` and run it to create the necessary tables (`resources`, `runs`, `schedule_slots`, `user_data`).
+4.  Copy the entire contents of `sql/seed.sql` and run it to populate the `resources` table with the master list of study materials.
+5.  Go to **Project Settings** > **API**.
+    -   Find your **Project URL**.
+    -   Find your **Project API Keys**. You will need the `anon` (public) key and the `service_role` (secret) key.
 
-            all_resources_req = supabase.table("resources").select("*").eq("isArchived", False).execute()
-            all_resources = all_resources_req.data
-            app.logger.info(f"[{run_id}] Fetched {len(all_resources)} active resources.")
+### 2. Google Cloud Setup
 
-            exception_dates = []
-            try:
-                user_data_req = supabase.table("user_data").select("data").eq("id", 1).single().execute()
-                if user_data_req.data and 'data' in user_data_req.data and isinstance(user_data_req.data['data'], dict) and 'exceptionDates' in user_data_req.data['data']:
-                    exception_dates = user_data_req.data['data']['exceptionDates'] or []
-                app.logger.info(f"[{run_id}] Fetched {len(exception_dates)} exception dates.")
-            except Exception as user_data_error:
-                app.logger.warning(f"[{run_id}] Could not fetch or parse user_data for exceptions, continuing without them. Error: {user_data_error}")
-                exception_dates = []
-            
-            supabase.table("runs").update({"progress": 15}).eq("id", run_id).execute()
-            app.logger.info(f"[{run_id}] Progress at 15%. Building CP-SAT model...")
+This is a one-time setup for the project's backend infrastructure.
 
-            # --- CP-SAT MODEL CONSTRUCTION ---
-            model = cp_model.CpModel()
-            
-            start_date = datetime.fromisoformat(run_data['start_date']).date()
-            end_date = datetime.fromisoformat(run_data['end_date']).date()
-            num_days = (end_date - start_date).days + 1
-            all_dates = [start_date + timedelta(days=i) for i in range(num_days)]
+#### Part A: Enable APIs
 
-            tasks = {}
-            resource_map = {res['id']: res for res in all_resources}
+1.  Go to the [Google Cloud Console](https://console.cloud.google.com/).
+2.  Ensure you are in the correct project.
+3.  In the **search bar** at the top, find and **Enable** the following APIs if they are not already enabled:
+    -   **Cloud Run API**
+    -   **Cloud Build API**
+    -   **IAM Credentials API** (This is needed for the Vercel function to generate auth tokens)
 
-            app.logger.info(f"[{run_id}] Building model variables...")
-            for res in all_resources:
-                task_days = [model.NewBoolVar(f"on_day_{res['id']}_{d}") for d in range(num_days)]
-                tasks[res['id']] = { 'days': task_days, 'duration': res['durationMinutes'], 'resource': res }
-                model.AddAtMostOne(task_days)
+#### Part B: Create a Dedicated Service Account for Vercel
 
-            # 2. Add Constraints
-            app.logger.info(f"[{run_id}] Adding constraints...")
-            exception_map = {e['date']: e for e in exception_dates if isinstance(e, dict) and 'date' in e}
-            for d, current_date in enumerate(all_dates):
-                date_str = str(current_date)
-                exception = exception_map.get(date_str)
-                
-                daily_budget = 900 # Default 15 hours
-                if exception:
-                    if exception.get('isRestDayOverride', False):
-                        daily_budget = 0
-                    elif exception.get('targetMinutes') is not None:
-                        daily_budget = exception['targetMinutes']
+This service account provides secure credentials for your Vercel functions to authenticate with and trigger your Cloud Run solver.
 
-                daily_duration = sum(tasks[res_id]['duration'] * tasks[res_id]['days'][d] for res_id in tasks)
-                model.Add(daily_duration <= daily_budget)
-                if daily_budget == 0:
-                    model.Add(daily_duration == 0)
+1.  In the console search bar, type `IAM & Admin` and navigate to **Service Accounts**.
+2.  Click **"+ CREATE SERVICE ACCOUNT"**.
+3.  **Service account name:** Enter `vercel-task-creator`.
+4.  Click **"CREATE AND CONTINUE"**.
+5.  In the **"Select a role"** dropdown, grant the following single role:
+    -   `Service Account Token Creator` (This is needed by the Google Auth Library to create tokens).
+6.  Click **"CONTINUE"**, then click **"DONE"**.
 
-            # 3. Add Objectives
-            app.logger.info(f"[{run_id}] Adding objectives...")
-            priority_map = {'high': 1000, 'medium': 100, 'low': 10}
-            model.Maximize(sum(
-                priority_map.get(task['resource'].get('schedulingPriority', 'medium'), 100) * sum(task['days'])
-                for task in tasks.values()
-            ))
-            
-            supabase.table("runs").update({"progress": 25}).eq("id", run_id).execute()
-            app.logger.info(f"[{run_id}] Progress at 25%. Starting solver...")
+#### Part C: Generate a JSON Key for the Service Account
 
-            # --- SOLVER EXECUTION ---
-            solver = cp_model.CpSatSolver()
-            solver.parameters.max_time_in_seconds = 840 # 14 minutes
-            solver.parameters.num_search_workers = 8 # Use multiple cores
-            status = solver.Solve(model)
-            
-            supabase.table("runs").update({"progress": 85}).eq("id", run_id).execute()
-            app.logger.info(f"[{run_id}] Progress at 85%. Solver finished with status: {solver.StatusName(status)}. Processing results...")
-            
-            # --- PROCESS AND SAVE RESULTS ---
-            if status == cp_model.OPTIMAL or status == cp_model.FEASIBLE:
-                schedule_slots = []
-                
-                for d, current_date in enumerate(all_dates):
-                    tasks_for_day_ids = [res_id for res_id, task_vars in tasks.items() if solver.Value(task_vars['days'][d])]
-                    if not tasks_for_day_ids: continue
+1.  From the Service Accounts list, click on the email of the `vercel-task-creator` account you just made.
+2.  Go to the **"KEYS"** tab.
+3.  Click **"ADD KEY"** -> **"Create new key"**.
+4.  Select **JSON** as the key type and click **"CREATE"**.
+5.  A JSON file will download. **Treat this file as a password and never commit it to git.** You will need its contents for the Vercel setup.
 
-                    tasks_for_day = [resource_map[res_id] for res_id in tasks_for_day_ids]
-                    
-                    def get_sort_key(resource):
-                        source = (resource.get('videoSource') or resource.get('bookSource') or 'zz_custom').lower()
-                        res_type = resource.get('type', '').lower()
-                        if 'titan' in source: return 0
-                        if 'core radiology' in source: return 1
-                        if 'crack the core' in source or 'case companion' in source or 'war machine' in source or 'review of physics' in source: return 2
-                        if 'guide' in res_type: return 3
-                        if 'qbank' in res_type or 'question' in res_type: return 4
-                        return 5
-                    tasks_for_day.sort(key=get_sort_key)
+### 3. Vercel Environment Variables Setup
 
-                    current_minute = 0
-                    for resource in tasks_for_day:
-                        start_minute = current_minute
-                        end_minute = current_minute + resource['durationMinutes']
-                        schedule_slots.append({
-                            "run_id": run_id, "resource_id": resource['id'], "date": str(current_date),
-                            "start_minute": start_minute, "end_minute": end_minute,
-                            "title": resource['title'], "domain": resource['domain'], "type": resource['type']
-                        })
-                        current_minute = end_minute
-                
-                app.logger.info(f"[{run_id}] Generated {len(schedule_slots)} slots. Deleting old slots and inserting new ones...")
-                if schedule_slots:
-                    supabase.table("schedule_slots").delete().eq('run_id', run_id).execute()
-                    insert_res = supabase.table("schedule_slots").insert(schedule_slots).execute()
-                    if insert_res.data is None:
-                       app.logger.warning(f"[{run_id}] Supabase insert operation might have failed or returned no data.")
-                else:
-                    app.logger.warning(f"[{run_id}] No schedule slots were generated by the solver.")
+In your Vercel project dashboard, go to **Settings > Environment Variables**. Add the following variables:
 
-                app.logger.info(f"[{run_id}] Database insertion complete. Updating run to COMPLETE.")
-                supabase.table("runs").update({"progress": 95}).eq("id", run_id).execute()
-                supabase.table("runs").update({"status": "COMPLETE", "progress": 100}).eq("id", run_id).execute()
-                app.logger.info(f"[{run_id}] Run marked as COMPLETE.")
-            else:
-                raise Exception(f"Solver could not find a solution. Status: {solver.StatusName(status)}")
+| Variable Name                       | Value                                                                                                                                                                                                                                   |
+| ----------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `VITE_SUPABASE_URL`                 | Your Supabase Project URL.                                                                                                                                                                                                              |
+| `VITE_SUPABASE_ANON_KEY`            | Your Supabase `anon` (public) key.                                                                                                                                                                                                      |
+| `SUPABASE_SERVICE_ROLE_KEY`         | Your Supabase `service_role` (secret) key.                                                                                                                                                                                              |
+| `GCP_PROJECT_ID`                    | Your Google Cloud Project ID (e.g., `scheduler-474709`).                                                                                                                                                                                |
+| `SOLVER_URL`                        | The URL of your deployed Google Cloud Run service (from the next step).                                                                                                                                                                 |
+| `GCP_SERVICE_ACCOUNT_KEY_BASE64`    | The **Base64 encoded** content of your downloaded JSON key file. To generate this: <br/> 1. On **macOS/Linux**, run: `cat your-key-file.json | base64 -w 0` <br/> 2. On **Windows (PowerShell)**, run: `[Convert]::ToBase64String([IO.File]::ReadAllBytes("your-key-file.json"))` <br/> 3. Paste the resulting single-line string here. |
 
-        except Exception as e:
-            error_trace = traceback.format_exc()
-            app.logger.error(f"CRITICAL ERROR during solve for run_id {run_id}: {e}\n{error_trace}")
-            try:
-                supabase.table("runs").update({"status": "FAILED", "progress": -1, "error_text": f"Error: {str(e)}\nTrace: {error_trace}"}).eq("id", run_id).execute()
-                app.logger.info(f"[{run_id}] Successfully marked run as FAILED in database.")
-            except Exception as db_update_error:
-                app.logger.error(f"[{run_id}] FAILED TO MARK RUN AS FAILED. DB update error: {db_update_error}")
+### 4. Backend Deployment to Google Cloud Run
 
+1.  Ensure you have the `gcloud` CLI installed and authenticated (`gcloud auth login`).
+2.  From your project's root directory, run the deployment command. **You must replace the placeholder values.**
 
-# --- API Endpoints ---
-@app.route("/solve", methods=["POST"])
-def run_solver_endpoint():
-    auth_header = request.headers.get("Authorization")
-    if not auth_header:
-        app.logger.warning("Request received without Authorization header.")
-        return jsonify({"error": "Unauthorized: Missing Authorization header."}), 401
+    ```bash
+    gcloud run deploy radiology-solver \
+      --source . \
+      --platform managed \
+      --region us-central1 \
+      --no-allow-unauthenticated \
+      --set-env-vars="SUPABASE_URL=YOUR_SUPABASE_URL" \
+      --set-env-vars="SUPABASE_KEY=YOUR_SUPABASE_SERVICE_ROLE_KEY" \
+      --timeout=900 \
+      --cpu=1 \
+      --memory=2Gi \
+      --min-instances=0
+    ```
+    -   **CRITICAL:** Replace `YOUR_SUPABASE_URL` and `YOUR_SUPABASE_SERVICE_ROLE_KEY` with the actual values from your Supabase settings.
+    -   `--no-allow-unauthenticated` ensures your service is private and can only be accessed by authenticated callers (like our Vercel function).
 
-    data = request.get_json()
-    if not data or 'run_id' not in data:
-        app.logger.error("Received solver request with no run_id in body.")
-        return jsonify({"error": "run_id is required in the JSON body"}), 400
-    
-    run_id = data.get("run_id")
-    app.logger.info(f"Received solver request for run_id: {run_id}")
+3.  After deployment, Cloud Run will show you a **Service URL**. Copy this URL and paste it into the `SOLVER_URL` environment variable in Vercel.
 
-    # Start solver in a background greenlet to allow the request to return immediately.
-    # This is compatible with the gunicorn gevent worker.
-    app.logger.info(f"Spawning gevent greenlet for solver on run_id: {run_id}")
-    gevent.spawn(solve_schedule, app, run_id)
-    app.logger.info(f"Greenlet for {run_id} spawned. Returning 202 Accepted.")
-    
-    return jsonify({"status": "Solver process started in background.", "run_id": run_id}), 202
+4.  **CRITICAL - Grant Permissions:** You must explicitly grant the `vercel-task-creator` service account permission to invoke your newly deployed service.
+    -   In the Google Cloud Console, navigate to your `radiology-solver` Cloud Run service.
+    -   Go to the **"Permissions"** tab.
+    -   Click **"Add Principal"**.
+    -   In the "New principals" field, paste the full email address of your `vercel-task-creator` service account (e.g., `vercel-task-creator@your-project-id.iam.gserviceaccount.com`).
+    -   In the "Assign roles" dropdown, select the **"Cloud Run Invoker"** role.
+    -   Click **"Save"**.
 
-@app.route("/", methods=["GET"])
-def health_check():
-    return "Radiology Solver Service is running."
+### 5. Frontend Deployment to Vercel
 
-if __name__ == "__main__":
-    app.run(debug=False, host="0.0.0.0", port=int(os.environ.get("PORT", 8080)))
+-   With all environment variables configured, push your code to the main branch linked to your Vercel project. Vercel will automatically build and deploy the frontend and serverless functions.
+-   You may need to manually trigger a new deployment in the Vercel dashboard to ensure it uses the latest environment variables.
+
+### Troubleshooting
+
+**Problem: App is stuck at 0% and never moves.**
+
+This is almost always an authentication or permissions issue where the Vercel function cannot successfully call the Cloud Run service.
+
+1.  **Check Vercel Function Logs:**
+    -   Go to your Vercel project dashboard.
+    -   Click the **"Logs"** tab.
+    -   Trigger a schedule generation in your app.
+    -   Look for logs from the `/api/solve` function. The newly added logging will show detailed trace information. Look for any errors, especially messages like "Request failed with status 403" or "401". This indicates an authentication failure.
+
+2.  **Verify Cloud Run Invoker Permission:**
+    -   Go to your `radiology-solver` service in the Google Cloud Console.
+    -   Go to the **"Permissions"** tab.
+    -   Verify that your `vercel-task-creator@...` service account is listed as a Principal and has the **"Cloud Run Invoker"** role assigned to it. If it is missing, add it using the steps in "Part 4.4" above.
+
+3.  **Check Environment Variables:**
+    -   In Vercel, double-check that `SOLVER_URL` is the correct URL from your Cloud Run deployment.
+    -   Ensure `GCP_SERVICE_ACCOUNT_KEY_BASE64` was copied correctly and doesn't have extra characters or line breaks.
+    -   In your Cloud Run service's **"Revisions"** tab, verify that the `SUPABASE_URL` and `SUPABASE_KEY` environment variables are set correctly for the running revision.
