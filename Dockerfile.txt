@@ -1,1 +1,27 @@
-full contents of Dockerfile.txt
+# Use the full Python 3.9 image to ensure build tools for libraries like ortools are available.
+FROM python:3.9
+
+# Set the working directory inside the container
+WORKDIR /app
+
+# Copy the requirements file into the container
+COPY requirements.txt .
+
+# Install the Python dependencies with verbose logging
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy the main application file into the container
+COPY main.py .
+
+# Make port 8080 available to the world outside this container
+EXPOSE 8080
+
+# Define the environment variable for the port that Gunicorn will run on
+ENV PORT 8080
+
+# Run the application using Gunicorn.
+# This command is robust and provides detailed logging suitable for a production environment.
+# --workers 1 --threads 8: A good starting point for concurrency on Cloud Run.
+# --timeout 0: Disables worker timeouts, as our solver job is handed to a background thread.
+# --log-level debug: Provides maximum visibility into requests and errors in Cloud Run logs.
+CMD ["gunicorn", "--bind", "0.0.0.0:$PORT", "--workers", "1", "--threads", "8", "--timeout", "0", "--log-level", "debug", "main:app"]
