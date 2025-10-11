@@ -1,41 +1,20 @@
 // /api/solve.ts
 import { createClient } from '@supabase/supabase-js';
-import { GoogleAuth } from 'google-auth-library';
+import { CloudTasksClient } from '@google-cloud/tasks';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { Buffer } from 'buffer';
 
-// This function needs to be outside the handler to be memoized correctly by Vercel
-const getGoogleAuthClient = () => {
-  try {
-    const base64Key = process.env.GCP_SERVICE_ACCOUNT_KEY_BASE64;
-    if (!base64Key) {
-      console.error('Failed to initialize GoogleAuth: GCP_SERVICE_ACCOUNT_KEY_BASE64 env var is not set.');
-      return null;
-    }
-    
-    const keyFileContent = Buffer.from(base64Key, 'base64').toString('utf-8');
-    const credentials = JSON.parse(keyFileContent);
-
-    // FIX: Removed the `scopes` parameter. It is not needed for generating an OIDC ID token
-    // for Cloud Run and can interfere with the authentication flow.
-    return new GoogleAuth({
-      credentials,
-    });
-  } catch (error: any) {
-    console.error('Failed to parse credentials or initialize GoogleAuth:', error.message);
-    return null;
-  }
-};
-
-const auth = getGoogleAuthClient();
-
+// Initialize Supabase client
 const supabase = createClient(
   process.env.SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
+// Initialize Google Cloud Tasks client
+const tasksClient = new CloudTasksClient();
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  console.log('[/api/solve] Function invoked.');
+  console.log('[/api/solve] Cloud Tasks invocation handler started.');
 
   if (req.method !== 'POST') {
     res.setHeader('Allow', 'POST');
@@ -47,19 +26,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     console.error('[/api/solve] Bad Request: startDate and endDate are required.');
     return res.status(400).json({ error: 'startDate and endDate are required.' });
   }
-  
-  const solverUrl = process.env.SOLVER_URL;
-  if (!solverUrl) {
-    console.error('[/api/solve] FATAL: SOLVER_URL is not configured.');
-    return res.status(500).json({ error: 'Server configuration error: SOLVER_URL is not set.' });
-  }
-  console.log(`[/api/solve] Target solver URL: ${solverUrl}`);
 
-  if (!auth) {
-    console.error('[/api/solve] FATAL: Google Auth client failed to initialize. Check GCP_SERVICE_ACCOUNT_KEY_BASE64 format and content.');
-    return res.status(500).json({ error: 'Server configuration error: Could not initialize authentication.' });
+  // --- Environment Variable Validation ---
+  const requiredEnv = ['SOLVER_URL', 'GCP_PROJECT_ID', 'GCP_QUEUE_LOCATION', 'GCP_QUEUE_NAME', 'GCP_CLIENT_EMAIL'];
+  for (const key of requiredEnv) {
+    if (!process.env[key]) {
+      console.error(`[/api/solve] FATAL: Server configuration error. Missing environment variable: ${key}`);
+      return res.status(500).json({ error: `Server configuration error: ${key} is not set.` });
+    }
   }
-  console.log('[/api/solve] Google Auth client initialized.');
+
+  const solverUrl = process.env.SOLVER_URL!;
+  const projectId = process.env.GCP_PROJECT_ID!;
+  const queueLocation = process.env.GCP_QUEUE_LOCATION!;
+  const queueName = process.env.GCP_QUEUE_NAME!;
+  const serviceAccountEmail = process.env.GCP_CLIENT_EMAIL!;
 
   let newRunId: string | null = null;
   try {
@@ -77,51 +58,40 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     newRunId = newRun.id;
     console.log(`[/api/solve] Successfully created run record with ID: ${newRunId}`);
 
-    // 2. Get an OIDC-authenticated client
-    console.log(`[/api/solve] Generating OIDC token client for audience: ${solverUrl}`);
-    const client = await auth.getIdTokenClient(solverUrl);
-    console.log('[/api/solve] OIDC token client created successfully.');
-    
-    const solverEndpoint = `${solverUrl}/solve`;
-    console.log(`[/api/solve] Making authenticated POST request to solver at: ${solverEndpoint}`);
+    // 2. Construct the Cloud Task
+    const parent = tasksClient.queuePath(projectId, queueLocation, queueName);
+    const taskPayload = { run_id: newRunId };
+    const task = {
+      httpRequest: {
+        httpMethod: 'POST' as const,
+        url: `${solverUrl}/solve`,
+        headers: { 'Content-Type': 'application/json' },
+        body: Buffer.from(JSON.stringify(taskPayload)).toString('base64'),
+        oidcToken: {
+          serviceAccountEmail: serviceAccountEmail,
+        },
+      },
+    };
 
-    // 3. Make the authenticated request to the solver
-    const response = await client.request({
-      url: solverEndpoint,
-      method: 'POST',
-      data: { run_id: newRunId },
-      headers: { 'Content-Type': 'application/json' },
-    });
-
-    console.log(`[/api/solve] Solver service responded with status: ${response.status}`);
-    
-    if (response.status < 200 || response.status >= 300) {
-      const responseBody = response.data ? JSON.stringify(response.data) : 'No response body';
-      throw new Error(`Solver service responded with error status ${response.status}: ${responseBody}`);
-    }
+    // 3. Create and dispatch the task
+    console.log(`[/api/solve] Creating Cloud Task to call ${solverUrl}/solve for run_id ${newRunId}`);
+    const [response] = await tasksClient.createTask({ parent, task });
+    console.log(`[/api/solve] Successfully created Cloud Task: ${response.name}`);
 
     // 4. Immediately return the run_id to the frontend
-    console.log(`[/api/solve] Successfully initiated solver. Returning 202 with run_id: ${newRunId}`);
+    console.log(`[/api/solve] Task creation successful. Returning 202 with run_id: ${newRunId}`);
     return res.status(202).json({ run_id: newRunId });
 
   } catch (error: any) {
-    // THIS IS THE MOST IMPORTANT LOGGING BLOCK
-    let errorMessage = 'An unknown error occurred.';
-    if (error.response) {
-        // Axios error structure
-        errorMessage = `Request failed with status ${error.response.status}. Data: ${JSON.stringify(error.response.data)}`;
-    } else {
-        errorMessage = error.message;
-    }
-    
-    console.error(`[/api/solve] CRITICAL ERROR for run_id ${newRunId}. Full error object:`, JSON.stringify(error, null, 2));
-    
+    const errorMessage = error.message || 'An unknown error occurred.';
+    console.error(`[/api/solve] CRITICAL ERROR for run_id ${newRunId}: ${errorMessage}`, error);
+
     if (newRunId) {
-        console.log(`[/api/solve] Marking run ${newRunId} as FAILED in database due to critical error.`);
-        await supabase
-          .from('runs')
-          .update({ status: 'FAILED', error_text: `Vercel function error: ${errorMessage}` })
-          .eq('id', newRunId);
+      console.log(`[/api/solve] Marking run ${newRunId} as FAILED in database due to task creation failure.`);
+      await supabase
+        .from('runs')
+        .update({ status: 'FAILED', error_text: `Vercel function error: ${errorMessage}` })
+        .eq('id', newRunId);
     }
     
     return res.status(500).json({ error: 'Failed to initiate schedule generation.', details: errorMessage });
