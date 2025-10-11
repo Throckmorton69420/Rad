@@ -1,3 +1,6 @@
+from gevent import monkey
+monkey.patch_all() # MONKEY PATCHING MUST BE DONE FIRST
+
 import os
 import traceback
 from flask import Flask, request, jsonify
@@ -32,8 +35,9 @@ def solve_schedule(app_context, run_id: str):
     with app_context.app_context():
         app.logger.info(f"[{run_id}] Background greenlet execution beginning inside app context.")
         try:
-            app.logger.info(f"[{run_id}] Attempting to update run status to SOLVING.")
-            supabase.table("runs").update({"status": "SOLVING", "progress": 5}).eq("id", run_id).execute()
+            # IMMEDIATE PROGRESS UPDATE
+            app.logger.info(f"[{run_id}] Attempting to update run status to SOLVING and progress to 1%.")
+            supabase.table("runs").update({"status": "SOLVING", "progress": 1}).eq("id", run_id).execute()
             app.logger.info(f"[{run_id}] Successfully updated run status. Fetching data...")
 
             # 1. Fetch all necessary data from Supabase
@@ -42,6 +46,9 @@ def solve_schedule(app_context, run_id: str):
                 raise Exception(f"Run ID {run_id} not found.")
             run_data = run_data_req.data
             app.logger.info(f"[{run_id}] Fetched run data for period: {run_data['start_date']} to {run_data['end_date']}.")
+            
+            supabase.table("runs").update({"progress": 5}).eq("id", run_id).execute()
+            app.logger.info(f"[{run_id}] Progress at 5%. Fetching resources...")
 
             all_resources_req = supabase.table("resources").select("*").eq("isArchived", False).execute()
             all_resources = all_resources_req.data
