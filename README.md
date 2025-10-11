@@ -54,22 +54,20 @@ This service account provides secure credentials for your Vercel functions to au
 2.  Go to the **"KEYS"** tab.
 3.  Click **"ADD KEY"** -> **"Create new key"**.
 4.  Select **JSON** as the key type and click **"CREATE"**.
-5.  A JSON file will download. **Treat this file as a password and never commit it to git.**
+5.  A JSON file will download. **Treat this file as a password and never commit it to git.** You will need its contents for the Vercel setup.
 
 ### 3. Vercel Environment Variables Setup
 
 In your Vercel project dashboard, go to **Settings > Environment Variables**. Add the following variables:
 
-| Variable Name                 | Value                                                                                                 |
-| ----------------------------- | ----------------------------------------------------------------------------------------------------- |
-| `VITE_SUPABASE_URL`           | Your Supabase Project URL.                                                                            |
-| `VITE_SUPABASE_ANON_KEY`      | Your Supabase `anon` (public) key.                                                                    |
-| `SUPABASE_SERVICE_ROLE_KEY`   | Your Supabase `service_role` (secret) key.                                                            |
-| `GCP_PROJECT_ID`              | `scheduler-474709`                                                                                    |
-| `SOLVER_URL`                  | The URL of your deployed Google Cloud Run service (from the next step).                               |
-| `INTERNAL_API_TOKEN`          | A long, random, secret string you create. Used for an extra layer of security.                        |
-| `GCP_CLIENT_EMAIL`            | The `client_email` from the downloaded JSON key file.                                                 |
-| `GCP_PRIVATE_KEY`             | The entire `private_key` from the JSON key file, including the `-----BEGIN...` and `-----END...` lines. |
+| Variable Name                       | Value                                                                                                                                                                                                                                   |
+| ----------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `VITE_SUPABASE_URL`                 | Your Supabase Project URL.                                                                                                                                                                                                              |
+| `VITE_SUPABASE_ANON_KEY`            | Your Supabase `anon` (public) key.                                                                                                                                                                                                      |
+| `SUPABASE_SERVICE_ROLE_KEY`         | Your Supabase `service_role` (secret) key.                                                                                                                                                                                              |
+| `GCP_PROJECT_ID`                    | `scheduler-474709`                                                                                                                                                                                                                      |
+| `SOLVER_URL`                        | The URL of your deployed Google Cloud Run service (from the next step).                                                                                                                                                                 |
+| `GCP_SERVICE_ACCOUNT_KEY_BASE64`    | The **Base64 encoded** content of your downloaded JSON key file. To generate this: <br/> 1. On **macOS/Linux**, run: `base64 -w 0 your-key-file.json` <br/> 2. On **Windows (PowerShell)**, run: `[Convert]::ToBase64String([IO.File]::ReadAllBytes("your-key-file.json"))` <br/> 3. Paste the resulting single-line string here. |
 
 ### 4. Backend Deployment to Google Cloud Run
 
@@ -84,14 +82,13 @@ In your Vercel project dashboard, go to **Settings > Environment Variables**. Ad
       --service-account="Default compute service account" \
       --set-env-vars="SUPABASE_URL=YOUR_SUPABASE_URL" \
       --set-env-vars="SUPABASE_KEY=YOUR_SUPABASE_SERVICE_ROLE_KEY" \
-      --set-env-vars="INTERNAL_API_TOKEN=YOUR_SECRET_TOKEN" \
       --timeout=900 \
       --cpu=1 \
       --memory=2Gi \
       --min-instances=1 \
       --ingress=all
     ```
-    -   Replace `YOUR_SUPABASE_URL`, `YOUR_SUPABASE_SERVICE_ROLE_KEY`, and `YOUR_SECRET_TOKEN` with the actual values from your Supabase and Vercel settings.
+    -   Replace `YOUR_SUPABASE_URL` and `YOUR_SUPABASE_SERVICE_ROLE_KEY` with the actual values from your Supabase settings.
     -   **Note on `--ingress=all`**: This flag allows your service to receive requests from the internet. This is required because the Vercel functions that trigger the solver run outside of your Google Cloud project's private network. The service remains secure because it is still protected by IAM and requires an authenticated OIDC token from a service account with the "Cloud Run Invoker" role.
 
 3.  After deployment, copy the **Service URL** provided by Cloud Run and paste it into the `SOLVER_URL` environment variable in Vercel.
