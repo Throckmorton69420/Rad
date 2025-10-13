@@ -1321,7 +1321,6 @@
     "isArchived": false,
     "pairedResourceIds": ["casecomp_auntminnie_thoracic", "discord_chest_3", "discord_chest_4", "discord_chest_5", "discord_chest_6", "discord_chest_7", "qbank_bv_thoracic", "qbank_qevlar_thorax", "titan_chest_p1"]
   },
-  ,
   {
     "id": "ctc_v1_ch2_sec4",
     "title": "Infection",
@@ -6162,7 +6161,6 @@
     "isArchived": false,
     "pairedResourceIds": ["qbank_nis_informatics_a", "qbank_nis_informatics_b", "huda_qb_informatics_image_theory", "qbank_bv_nis", "qbank_qevlar_nis", "wm_part2"]
   },
-  ,
   {
     "id": "qbank_qevlar_peds",
     "title": "QEVLAR QB: Peds",
@@ -11449,7 +11447,6 @@
     "isOptional": true,
     "pairedResourceIds": []
   },
-  ,
   {
     "id": "core_rad_5_3_3",
     "title": "Core Radiology - 5.3.3 Pseudoaneurysm",
