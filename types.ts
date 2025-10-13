@@ -356,31 +356,3 @@ export interface PrintModalProps {
     source: string | 'all';
   };
 }
-
-// From user spec: Definitions for new Supabase tables
-export interface Run {
-  id: string; // uuid
-  created_at: string; // timestamptz
-  status: 'PENDING' | 'SOLVING' | 'COMPLETE' | 'FAILED';
-  start_date: string; // date
-  end_date: string; // date
-  objective_values?: Record<string, any>; // jsonb
-  error_text?: string; // text
-  progress?: number;
-}
-
-export interface ScheduleSlot {
-  id: string; // uuid
-  run_id: string; // uuid
-  resource_id: string; // uuid, references resources table
-  date: string; // date
-  start_minute: number; // integer
-  end_minute: number; // integer
-  pass_index?: number; // integer
-  violation_flags?: Record<string, any>; // jsonb
-
-  // Added from resources for easier display
-  title: string;
-  domain: Domain;
-  type: ResourceType;
-}

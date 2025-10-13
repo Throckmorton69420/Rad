@@ -6,8 +6,6 @@ export interface ModalStates {
   isModifyDayTasksModalOpen: boolean;
   isResourceEditorOpen: boolean;
   isWelcomeModalOpen: boolean;
-  // FIX: Added state for the print modal to integrate it with the modal manager.
-  isPrintModalOpen: boolean;
   confirmationState: ConfirmationModalProps;
 }
 
@@ -21,8 +19,6 @@ export const useModalManager = () => {
     isModifyDayTasksModalOpen: false,
     isResourceEditorOpen: false,
     isWelcomeModalOpen: false,
-    // FIX: Initialized state for the print modal.
-    isPrintModalOpen: false,
     confirmationState: { isOpen: false, title: '', message: '', onConfirm: () => {}, onClose: () => {}},
   });
 

@@ -1,3 +1,4 @@
+// FIX: Imported Dispatch and SetStateAction to fix missing React namespace error.
 import { useState, useEffect, useCallback, Dispatch, SetStateAction } from 'react';
 
 export function usePersistentState<T>(key: string, initialValue: T | (() => T)): [T, Dispatch<SetStateAction<T>>] {

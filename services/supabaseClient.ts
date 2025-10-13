@@ -1,18 +1,59 @@
-// services/supabaseClient.ts
 import { createClient } from '@supabase/supabase-js';
+import { PlanDataBlob } from '../types';
 
-// These variables are expected to be set in the environment,
-// typically through a .env file locally or in Vercel project settings.
-// Vite exposes env vars prefixed with VITE_ to the client-side code.
-// FIX: Cast import.meta to any to resolve TypeScript error in Vite environment.
 const supabaseUrl = (import.meta as any).env.VITE_SUPABASE_URL;
 const supabaseAnonKey = (import.meta as any).env.VITE_SUPABASE_ANON_KEY;
 
 if (!supabaseUrl || !supabaseAnonKey) {
-  // This error is thrown during initialization to ensure the app doesn't
-  // run without proper Supabase configuration.
-  throw new Error('Supabase URL and Anon Key must be defined in environment variables.');
+  const errorMessage = "Configuration Error: VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY are not defined. For local development, create a '.env' file in the project root. For deployment, ensure these are set as Environment Variables in your hosting provider's settings (e.g., Vercel, Netlify).";
+  
+  // Display error to the user in the UI, as this is a client-side app
+  const root = document.getElementById('root');
+  if (root) {
+    root.innerHTML = `<div style="padding: 2rem; text-align: center; color: #fecaca; background-color: #7f1d1d; border: 1px solid #991b1b; margin: 1rem; border-radius: 0.5rem;">
+      <h1 style="font-size: 1.5rem; font-weight: bold; margin-bottom: 1rem;">Configuration Error</h1>
+      <p style="font-family: monospace; font-size: 0.9rem;">${errorMessage}</p>
+    </div>`
+  }
+  throw new Error(errorMessage);
 }
 
-// Create and export the Supabase client instance
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+// A type for JSON as Supabase expects it. This helps TypeScript's inference.
+export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[];
+
+// Define the shape of our database tables for TypeScript.
+// For this app, we are using one table to store all synced state.
+export interface Database {
+  public: {
+    Tables: {
+      study_plans: { // The table name created by the user
+        Row: { // The data shape of a row
+          id: number;
+          created_at: string;
+          plan_data: Json;
+        };
+        Insert: { // The data shape for inserting a new row
+          id: number;
+          plan_data: Json;
+        };
+        Update: { // The data shape for updating a row
+          plan_data?: Json;
+        };
+      };
+    };
+    Views: {
+      [_ in never]: never;
+    };
+    Functions: {
+      [_ in never]: never;
+    };
+    Enums: {
+      [_ in never]: never;
+    };
+    CompositeTypes: {
+      [_ in never]: never;
+    };
+  };
+}
+
+export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey);

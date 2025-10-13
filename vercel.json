@@ -4,5 +4,8 @@
       "main": false,
       "master": false
     }
-  }
+  },
+  "rewrites": [
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
 }

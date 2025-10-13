@@ -41,14 +41,6 @@ self.addEventListener('activate', event => {
 
 // Fetch event: Serve cached content or fetch from network with robust fallbacks
 self.addEventListener('fetch', event => {
-  const url = new URL(event.request.url);
-
-  // CRITICAL FIX: Do not cache API calls. Always go to the network.
-  if (url.pathname.startsWith('/api/')) {
-    event.respondWith(fetch(event.request));
-    return;
-  }
-
   // For navigation requests (e.g., loading the app), use a "Network Falling Back to Cache" strategy.
   // This ensures the user gets the latest version if online, but the app still loads offline or if there's a routing error.
   if (event.request.mode === 'navigate') {

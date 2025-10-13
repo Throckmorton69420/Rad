@@ -1,3 +1,4 @@
+// FIX: Imported React to resolve namespace errors.
 import * as React from 'react';
 import { useState, useRef, useCallback, useEffect } from 'react';
 
@@ -39,38 +40,6 @@ export const useDragSelect = () => {
     }
   }, [state]);
 
-  const handleTouchMove = useCallback((e: TouchEvent) => {
-    if (state.mode === 'pending') {
-      const dx = Math.abs(e.touches[0].clientX - state.startX);
-      const dy = Math.abs(e.touches[0].clientY - state.startY);
-      if (dx > 10 || dy > 10) {
-        if (state.longPressTimeout) clearTimeout(state.longPressTimeout);
-        state.mode = 'scrolling';
-      }
-    }
-    if (state.mode === 'dragging') {
-      e.preventDefault();
-      dragSelectionMove(e.touches[0].clientX, e.touches[0].clientY);
-    }
-  }, [state]);
-  
-  const handleMouseMove = useCallback((e: MouseEvent) => {
-    if (state.mode === 'pending') {
-      const dx = Math.abs(e.clientX - state.startX);
-      const dy = Math.abs(e.clientY - state.startY);
-      if (dx > 10 || dy > 10) {
-        if (state.longPressTimeout) clearTimeout(state.longPressTimeout);
-        if (state.anchorId) {
-            startDragSelection(state.anchorId);
-        }
-      }
-    }
-    if (state.mode === 'dragging') {
-      e.preventDefault();
-      dragSelectionMove(e.clientX, e.clientY);
-    }
-  }, [state]);
-
   const endInteraction = useCallback(() => {
     window.removeEventListener('touchmove', handleTouchMove);
     window.removeEventListener('touchend', handleTouchEnd);
@@ -86,51 +55,8 @@ export const useDragSelect = () => {
     
     setHoveredId(null);
     state.mode = 'idle';
-  }, [state, stopAutoScroll, handleTouchMove, handleMouseMove]);
+  }, [state, stopAutoScroll]);
 
-  const handleTouchEnd = useCallback((e: TouchEvent) => {
-    if (state.mode === 'pending') {
-      const targetId = getResourceIdFromTarget(e.target);
-      if (targetId) {
-        const now = Date.now();
-        // Double tap detection
-        if (now - state.lastTapTimestamp < 300) {
-            setSelection(prev => {
-                const newSet = new Set(prev);
-                if (newSet.has(targetId)) {
-                    newSet.delete(targetId);
-                } else {
-                    newSet.add(targetId);
-                }
-                return newSet;
-            });
-        }
-        state.lastTapTimestamp = now;
-      }
-    }
-    endInteraction();
-  }, [state, endInteraction]);
-  
-  const handleMouseUp = useCallback((e: MouseEvent) => {
-    if (state.mode === 'pending') {
-        const targetId = getResourceIdFromTarget(e.target);
-        if (targetId) {
-            setSelection(prev => {
-                const newSet = new Set(prev);
-                if (e.ctrlKey || e.metaKey) {
-                    if (newSet.has(targetId)) newSet.delete(targetId);
-                    else newSet.add(targetId);
-                } else {
-                    newSet.clear();
-                    newSet.add(targetId);
-                }
-                return newSet;
-            });
-        }
-    }
-    endInteraction();
-  }, [state, endInteraction]);
-  
   const startDragSelection = useCallback((resourceId: string) => {
     if (state.mode !== 'pending') return;
 
@@ -148,7 +74,7 @@ export const useDragSelect = () => {
     });
 
   }, [state]);
-  
+
   const dragSelectionMove = useCallback((x: number, y: number) => {
       const listEl = listRef.current;
       if (!listEl) return;
@@ -160,7 +86,7 @@ export const useDragSelect = () => {
       else if (y > listRect.bottom - scrollZone) scrollSpeed = 10;
       
       if (scrollSpeed !== 0 && !state.autoScrollInterval) {
-        state.autoScrollInterval = window.setInterval(() => { if(listEl) listEl.scrollTop += scrollSpeed }, 50);
+        state.autoScrollInterval = window.setInterval(() => listEl.scrollTop += scrollSpeed, 50);
       } else if (scrollSpeed === 0) {
         stopAutoScroll();
       }
@@ -170,7 +96,8 @@ export const useDragSelect = () => {
       
       if (currentId && state.anchorId) {
         const children = Array.from(listEl.children);
-        const visibleIds = children.map((child: Element) => child.getAttribute('data-resource-id')!).filter(Boolean);
+        // FIX: Add explicit 'Element' type to child to resolve getAttribute error on type 'unknown'.
+        const visibleIds = children.map((child: Element) => child.getAttribute('data-resource-id')!);
         const anchorIndex = visibleIds.indexOf(state.anchorId);
         const currentIndex = visibleIds.indexOf(currentId);
 
@@ -191,53 +118,108 @@ export const useDragSelect = () => {
       }
   }, [state, stopAutoScroll]);
 
-  const handleTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
-    if (state.mode !== 'idle') return;
-    const resourceId = getResourceIdFromTarget(e.target);
-    if (!resourceId) return;
+  // FIX: Added native TouchEvent type to resolve type errors.
+  const handleTouchMove = (e: TouchEvent) => {
+    if (state.mode === 'pending') {
+      const dx = Math.abs(e.touches[0].clientX - state.startX);
+      const dy = Math.abs(e.touches[0].clientY - state.startY);
+      if (dx > 10 || dy > 10) {
+        if (state.longPressTimeout) clearTimeout(state.longPressTimeout);
+        state.mode = 'scrolling';
+      }
+    }
+    if (state.mode === 'dragging') {
+      e.preventDefault();
+      dragSelectionMove(e.touches[0].clientX, e.touches[0].clientY);
+    }
+  };
 
+  // FIX: Added native MouseEvent type to resolve type errors.
+  const handleMouseMove = (e: MouseEvent) => {
+    if (state.mode === 'pending') {
+      const dx = Math.abs(e.clientX - state.startX);
+      const dy = Math.abs(e.clientY - state.startY);
+      if (dx > 10 || dy > 10) {
+        if (state.longPressTimeout) clearTimeout(state.longPressTimeout);
+        startDragSelection(state.anchorId!);
+      }
+    }
+    if (state.mode === 'dragging') {
+      e.preventDefault();
+      dragSelectionMove(e.clientX, e.clientY);
+    }
+  };
+
+  // FIX: Added native TouchEvent type to resolve type errors.
+  const handleTouchEnd = (e: TouchEvent) => {
+      const resourceId = getResourceIdFromTarget(e.changedTouches[0].target);
+      if (state.mode === 'pending' && resourceId) {
+        const now = Date.now();
+        if (now - state.lastTapTimestamp < 300) {
+          setSelection(prev => {
+            const newSet = new Set(prev);
+            if (newSet.has(resourceId)) newSet.delete(resourceId);
+            else newSet.add(resourceId);
+            return newSet;
+          });
+        }
+        state.lastTapTimestamp = now;
+      }
+      endInteraction();
+  };
+
+  // FIX: Added native MouseEvent type to resolve type errors.
+  const handleMouseUp = (e: MouseEvent) => {
+      const resourceId = getResourceIdFromTarget(e.target);
+      if (state.mode === 'pending' && resourceId) {
+        setSelection(prev => {
+            const newSet = new Set(prev);
+            if (newSet.has(resourceId)) newSet.delete(resourceId);
+            else newSet.add(resourceId);
+            return newSet;
+        });
+      }
+      endInteraction();
+  };
+  
+  const handleTouchStart = useCallback((e: React.TouchEvent<HTMLDivElement>) => {
+    const resourceId = getResourceIdFromTarget(e.target as EventTarget);
+    if (!resourceId) return;
+    
     state.mode = 'pending';
     state.startX = e.touches[0].clientX;
     state.startY = e.touches[0].clientY;
     state.anchorId = resourceId;
 
+    setHoveredId(resourceId);
+
+    state.longPressTimeout = window.setTimeout(() => startDragSelection(resourceId), 400);
+
     window.addEventListener('touchmove', handleTouchMove, { passive: false });
     window.addEventListener('touchend', handleTouchEnd);
     window.addEventListener('touchcancel', handleTouchEnd);
-    
-    state.longPressTimeout = window.setTimeout(() => {
-        startDragSelection(resourceId);
-    }, 500); // Long press delay
-  };
+  }, [state, startDragSelection]);
 
-  const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (state.mode !== 'idle' || e.button !== 0) return;
-    const resourceId = getResourceIdFromTarget(e.target);
+  const handleMouseDown = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    if (e.button !== 0) return;
+    const resourceId = getResourceIdFromTarget(e.target as EventTarget);
     if (!resourceId) return;
-
+    
+    e.preventDefault();
     state.mode = 'pending';
     state.startX = e.clientX;
     state.startY = e.clientY;
     state.anchorId = resourceId;
 
+    setHoveredId(resourceId);
+
     window.addEventListener('mousemove', handleMouseMove);
     window.addEventListener('mouseup', handleMouseUp);
-  };
-  
+  }, [state]);
+
   useEffect(() => {
-    // Cleanup event listeners on unmount
-    return () => {
-      endInteraction();
-    };
+    return () => endInteraction();
   }, [endInteraction]);
 
-
-  return { 
-    selection, 
-    setSelection,
-    hoveredId,
-    listRef, 
-    handleTouchStart,
-    handleMouseDown
-  };
+  return { selection, setSelection, hoveredId, listRef, handleTouchStart, handleMouseDown };
 };

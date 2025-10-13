@@ -22,51 +22,10 @@ const DailyTaskList: React.FC<DailyTaskListProps> = ({
 }) => {
   const [pulsingTaskId, setPulsingTaskId] = useState<string | null>(null);
   const [isTimeEditorOpen, setIsTimeEditorOpen] = useState(false);
-  
+  const [editedTime, setEditedTime] = useState(dailySchedule.totalStudyTimeMinutes);
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
 
-  // Guard clause to prevent destructuring null
-  if (!dailySchedule) {
-    return (
-      <div className="relative animate-pulse"> 
-        <div className="flex-shrink-0">
-          <div className="flex justify-between items-center mb-1">
-            <Button variant="ghost" size="sm" className="!px-2.5" disabled><i className="fas fa-chevron-left"></i></Button>
-            <div className="text-center">
-              <div className="h-6 bg-gray-700/50 rounded w-32 mx-auto"></div>
-              <div className="h-4 bg-gray-700/50 rounded w-40 mx-auto mt-2"></div>
-            </div>
-            <Button variant="ghost" size="sm" className="!px-2.5" disabled><i className="fas fa-chevron-right"></i></Button>
-          </div>
-          
-          <div className="mt-4 mb-4 p-3 glass-panel rounded-lg">
-            <div className="h-12 bg-gray-700/50 rounded"></div>
-          </div>
-        </div>
-        
-        <div>
-          <div className="p-1 rounded-lg pb-32 space-y-2">
-            <div className="h-24 bg-gray-700/50 rounded-lg"></div>
-            <div className="h-24 bg-gray-700/50 rounded-lg"></div>
-            <div className="h-24 bg-gray-700/50 rounded-lg"></div>
-          </div>
-        </div>
-
-        <div className="sticky bottom-0 pt-3 glass-chrome pb-[calc(1rem+env(safe-area-inset-bottom))]">
-          <div className="flex space-x-2">
-            <Button disabled variant="primary" className="flex-grow">
-              <i className="fas fa-edit mr-2"></i> Modify Schedule
-            </Button>
-            <Button disabled variant="secondary" title="Add a quick custom task"><i className="fas fa-plus"></i></Button>
-            <Button disabled variant="secondary" title="Convert to Rest Day"><i className="fas fa-coffee"></i></Button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-  
   const { date, tasks, totalStudyTimeMinutes, isRestDay, dayName } = dailySchedule;
-  const [editedTime, setEditedTime] = useState(totalStudyTimeMinutes);
   const displayDate = parseDateString(date);
 
   useEffect(() => {
