@@ -1,0 +1,4 @@
+ortools==9.9.3963
+supabase==2.5.0
+Flask==3.0.3
+gunicorn==22.0.0

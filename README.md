@@ -80,26 +80,32 @@ This is a **manual** process you run from the terminal on your computer.
       --region us-central1 \
       --no-allow-unauthenticated \
       --set-env-vars="SUPABASE_URL=https://wwjibyasyzrlycrvogzy.supabase.co" \
-      --set-env-vars="SUPABASE_KEY=YOUR_SUPABASE_SERVICE_ROLE_KEY_HERE" \
+      --set-env-vars="SUPABASE_KEY=PASTE_YOUR_SUPABASE_SERVICE_ROLE_KEY_DIRECTLY_HERE" \
       --timeout=900 \
       --cpu=1 \
       --memory=2Gi \
       --min-instances=0
     ```
+    
+    **IMPORTANT:** When replacing `PASTE_YOUR_SUPABASE_SERVICE_ROLE_KEY_DIRECTLY_HERE`, paste only the key itself. Do **not** include `SUPABASE_KEY=` inside the quotes.
+    
+    -   **Correct:** `--set-env-vars="SUPABASE_KEY=eyJh..."`
+    -   **Incorrect:** `--set-env-vars="SUPABASE_KEY=SUPABASE_KEY=eyJh..."`
+
 3.  The deployment process will take several minutes. When it's finished, it will output the **Service URL**. This is the URL you need to copy and paste into the `SOLVER_URL` environment variable in your Vercel project settings.
 
 ### Step 3: Grant Invoke Permissions (CRITICAL FINAL STEP)
 
 The new service is private. You must grant your Vercel project permission to call it.
 
-1.  Go to your Google Cloud project and create a service account (e.g., `vercel-invoker`). Grant it the `Service Account Token Creator` role.
+1.  Go to your Google Cloud project and create a service account (e.g., `Vercel-task-creator`). Grant it the `Service Account Token Creator` role.
 2.  Generate a JSON key for this service account and Base64 encode it to use for the `GCP_SERVICE_ACCOUNT_KEY_BASE64` variable in Vercel.
 3.  Open the **Google Cloud Shell** in your browser.
 4.  Run the following command to grant the service account permission to invoke your Cloud Run service. Replace the email with your service account's email.
 
     ```bash
     gcloud run services add-iam-policy-binding radiology-solver \
-      --member="serviceAccount:YOUR_SERVICE_ACCOUNT_EMAIL@YOUR_PROJECT_ID.iam.gserviceaccount.com" \
+      --member="serviceAccount:vercel-task-creator@scheduler-474709.iam.gserviceaccount.com" \
       --role="roles/run.invoker" \
       --region="us-central1"
     ```
