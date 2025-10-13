@@ -53,7 +53,6 @@ export interface StudyResource {
   startPage?: number;
   endPage?: number;
   questionCount?: number;
-  // FIX: Added caseCount to the StudyResource interface to allow this property in masterResourcePool.
   caseCount?: number;
   bookSource?: string;
   videoSource?: string;
