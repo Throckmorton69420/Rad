@@ -551,6 +551,10 @@ const App: React.FC = () => {
     }
   };
 
+  const selectedDaySchedule = studyPlan ? studyPlan.schedule.find(day => day.date === selectedDate) : null;
+  const currentPomodoroTask = currentPomodoroTaskId && studyPlan ? studyPlan.schedule.flatMap(d => d.tasks).find(t => t.id === currentPomodoroTaskId) : null;
+  
+
   if (isLoading && !studyPlan) {
     return <div className="flex flex-col items-center justify-center min-h-screen bg-black text-white p-4"><i className="fas fa-brain fa-spin fa-3x mb-6 text-[var(--accent-purple)]"></i><h1 className="text-3xl font-bold mb-3">{APP_TITLE}</h1><p className="text-lg mb-6">Connecting to the cloud...</p></div>;
   }
@@ -559,9 +563,6 @@ const App: React.FC = () => {
      return <div className="flex flex-col items-center justify-center min-h-screen bg-black text-white p-4"><i className="fas fa-exclamation-triangle fa-3x text-[var(--accent-red)] mb-4"></i><h1 className="text-2xl font-bold mb-2">Error</h1><p className="text-red-400 text-center mb-6">{systemNotification?.message || 'An unknown error occurred.'}</p><Button onClick={() => loadSchedule(true)} variant="primary">Try Again</Button></div>;
   }
 
-  const selectedDaySchedule = studyPlan.schedule.find(day => day.date === selectedDate);
-  const currentPomodoroTask = currentPomodoroTaskId ? studyPlan.schedule.flatMap(d => d.tasks).find(t => t.id === currentPomodoroTaskId) : null;
-  
   const MainAppContent = (
       <div className="h-full w-full bg-transparent text-[var(--text-primary)] flex flex-col print:hidden">
         <div className={`lg:hidden fixed inset-y-0 left-0 z-[var(--z-sidebar-mobile)] transform transition-transform duration-300 ease-in-out ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
