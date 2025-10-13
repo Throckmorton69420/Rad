@@ -1,4 +1,5 @@
 import React from 'react';
+// FIX: Corrected import path for types.
 import { StudyPlan, Domain } from '../types';
 import { getDomainColorStyle } from '../utils/timeFormatter';
 import { formatDuration } from '../utils/timeFormatter';
@@ -10,9 +11,11 @@ interface ProgressDisplayProps {
 const ProgressDisplay: React.FC<ProgressDisplayProps> = ({ studyPlan }) => {
   const { progressPerDomain } = studyPlan;
 
-  // FIX: Add explicit types for 'domain' parameter in reduce callbacks to avoid it being inferred as 'unknown'.
-  const totalCompletedMinutes = Object.values(progressPerDomain).reduce((acc, domain: { completedMinutes: number; } | undefined) => acc + (domain?.completedMinutes || 0), 0);
-  const totalMinutes = Object.values(progressPerDomain).reduce((acc, domain: { totalMinutes: number; } | undefined) => acc + (domain?.totalMinutes || 0), 0);
+  // FIX: Explicitly type the entries from progressPerDomain to ensure type safety in reduce calls.
+  const progressEntries: [string, { completedMinutes: number; totalMinutes: number } | undefined][] = Object.entries(progressPerDomain);
+
+  const totalCompletedMinutes = progressEntries.reduce((acc, [, domainData]) => acc + (domainData?.completedMinutes || 0), 0);
+  const totalMinutes = progressEntries.reduce((acc, [, domainData]) => acc + (domainData?.totalMinutes || 0), 0);
   const overallProgress = totalMinutes > 0 ? (totalCompletedMinutes / totalMinutes) * 100 : 0;
 
   return (
@@ -32,10 +35,9 @@ const ProgressDisplay: React.FC<ProgressDisplayProps> = ({ studyPlan }) => {
       <div className="p-4 glass-panel rounded-lg">
         <h3 className="text-xl font-bold text-white mb-4">Progress by Topic</h3>
         <div className="space-y-4">
-          {Object.entries(progressPerDomain)
+          {progressEntries
             .sort(([domainA], [domainB]) => domainA.localeCompare(domainB))
-            // FIX: Add explicit type for 'progress' parameter in map callback to avoid it being inferred as 'unknown'.
-            .map(([domain, progress]: [string, { completedMinutes: number; totalMinutes: number; } | undefined]) => {
+            .map(([domain, progress]) => {
             if (!progress || progress.totalMinutes === 0) return null;
             const percentage = (progress.completedMinutes / progress.totalMinutes) * 100;
             const colorStyle = getDomainColorStyle(domain as Domain);

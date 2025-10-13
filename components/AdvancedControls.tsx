@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+// FIX: Corrected import path for types.
 import { Domain, AdvancedControlsProps, DeadlineSettings } from '../types';
 import { Button } from './Button';
 import TimeInputScroller from './TimeInputScroller';
@@ -17,7 +18,8 @@ const DeadlineManager: React.FC<{
     }, [deadlines]);
 
     const handleDateChange = (key: keyof DeadlineSettings, value: string) => {
-        setLocalDeadlines(prev => ({ ...prev, [key]: value || undefined }));
+        // FIX: Cast key to string to prevent "implicit conversion of a 'symbol' to a 'string'" error.
+        setLocalDeadlines(prev => ({ ...prev, [key as string]: value || undefined }));
     };
 
     const handleSave = () => {

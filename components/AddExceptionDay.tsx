@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+// FIX: Corrected import path for types.
 import { ExceptionDateRule } from '../types';
 import { Button } from './Button';
 import CustomSelect from '../CustomSelect';

@@ -1,7 +1,6 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { DailySchedule, StudyPlan, ScheduledTask, PomodoroSettings, ViewMode, Domain, ResourceType, AddTaskModalProps, StudyResource, ResourceEditorModalProps, ExceptionDateRule, DeadlineSettings, RebalanceOptions, ShowConfirmationOptions, PrintOptions } from './types';
-import { EXAM_DATE_START, APP_TITLE, ALL_DOMAINS, POMODORO_DEFAULT_STUDY_MINS, POMODORO_DEFAULT_REST_MINS } from './constants';
-import { addResourceToGlobalPool } from './services/studyResources';
+import { EXAM_DATE_START, APP_TITLE, ALL_DOMAINS, POMODORO_DEFAULT_STUDY_MINS, POMODORO_DEFAULT_REST_MINS, STUDY_START_DATE, STUDY_END_DATE } from './constants';
 import { generateGlassMaps } from './utils/glassEffectGenerator';
 
 import { usePersistentState } from './hooks/usePersistentState';
@@ -28,6 +27,7 @@ import PrintModal from './components/PrintModal';
 import ProgressReport from './components/ProgressReport';
 import ContentReport from './components/ContentReport';
 import { formatDuration, getTodayInNewYork, parseDateString } from './utils/timeFormatter';
+import { addResourceToGlobalPool } from './services/studyResources';
 
 interface SidebarContentProps {
     isSidebarOpen: boolean;
@@ -166,7 +166,6 @@ const App: React.FC = () => {
   const [isSettingsOpen, setIsSettingsOpen] = useState(true);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 1024);
 
-  // FIX: Reordered hooks to resolve circular dependency. `useModalManager` no longer depends on `isNewUser` at initialization.
   const {
     modalStates, modalData,
     openModal, closeModal,
@@ -174,7 +173,6 @@ const App: React.FC = () => {
     showConfirmation, handleConfirm,
   } = useModalManager();
 
-  // FIX: Correctly passed the `showConfirmation` function to `useStudyPlanManager`, resolving the "Expected 1 arguments, but got 0" error.
   const {
     studyPlan, setStudyPlan, previousStudyPlan,
     globalMasterResourcePool, setGlobalMasterResourcePool,
@@ -205,26 +203,19 @@ const App: React.FC = () => {
   const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
   const [printableContent, setPrintableContent] = useState<React.ReactNode | null>(null);
   
-  // Progress Tab Filter State - Lifted from ProgressDisplay
   const [progressDomainFilter, setProgressDomainFilter] = useState<Domain | 'all'>('all');
   const [progressTypeFilter, setProgressTypeFilter] = useState<ResourceType | 'all'>('all');
   const [progressSourceFilter, setProgressSourceFilter] = useState<string | 'all'>('all');
 
 
   useEffect(() => {
-    // Generate maps for a generic square size. This scales better across
-    // different component aspect ratios.
     const { displacement, highlight } = generateGlassMaps({});
-
     const displacementEl = document.getElementById('displacementMapImage') as unknown as SVGImageElement | null;
     const highlightEl = document.getElementById('specularHighlightImage') as unknown as SVGImageElement | null;
-
     if (displacementEl) displacementEl.setAttribute('href', displacement);
     if (highlightEl) highlightEl.setAttribute('href', highlight);
-    
   }, []);
 
-  // FIX: Added a useEffect to open the welcome modal when isNewUser becomes true, breaking the hook dependency cycle.
   useEffect(() => {
     if (isNewUser) {
       openModal('isWelcomeModalOpen');
@@ -450,7 +441,10 @@ const App: React.FC = () => {
 
   const scheduledResourceIds = useMemo(() => {
     if (!studyPlan) return new Set<string>();
-    return new Set(studyPlan.schedule.flatMap(day => day.tasks.map(task => task.originalResourceId || task.resourceId)));
+    const ids = studyPlan.schedule
+      .flatMap(day => day.tasks.map(task => task.originalResourceId || task.resourceId))
+      .filter((id): id is string => !!id);
+    return new Set(ids);
   }, [studyPlan?.schedule]);
 
   const handleHighlightDatesForResource = useCallback((resourceId: string) => {

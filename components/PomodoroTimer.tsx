@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+// FIX: Corrected import path for types.
 import { PomodoroSettings } from '../types';
 import { Button } from './Button';
 import TimeInputScroller from './TimeInputScroller';

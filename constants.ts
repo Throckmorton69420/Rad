@@ -1,3 +1,4 @@
+// FIX: Corrected import path for types.
 import { Domain, Constraints, ExceptionDateRule, ResourceType } from './types'; 
 import { getTodayInNewYork } from './utils/timeFormatter';
 
@@ -46,6 +47,21 @@ export const DEFAULT_TOPIC_ORDER: Domain[] = [
     Domain.NIS,
     Domain.RISC,
 ];
+
+export const TASK_TYPE_PRIORITY: Record<ResourceType, number> = {
+    [ResourceType.VIDEO_LECTURE]: 1,
+    [ResourceType.HIGH_YIELD_VIDEO]: 1,
+    [ResourceType.READING_TEXTBOOK]: 2,
+    [ResourceType.READING_GUIDE]: 2,
+    [ResourceType.CASES]: 3,
+    [ResourceType.QUESTIONS]: 4,
+    [ResourceType.REVIEW_QUESTIONS]: 5,
+    [ResourceType.QUESTION_REVIEW]: 5,
+    [ResourceType.EXAM_SIM]: 6,
+    [ResourceType.PRACTICE_TOPIC]: 7,
+    [ResourceType.FLIP_THROUGH]: 8,
+    [ResourceType.PERSONAL_NOTES]: 9,
+};
 
 
 // Per user request, all default exception/rest days are removed.

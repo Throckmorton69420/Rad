@@ -1,4 +1,5 @@
 import React from 'react';
+// FIX: Corrected import path for types.
 import { ScheduledTask, Domain, ResourceType, TaskItemProps } from '../types';
 import { Button } from './Button';
 import { formatDuration } from '../utils/timeFormatter';

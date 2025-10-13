@@ -1,11 +1,12 @@
 import { useState, useCallback } from 'react';
-import { StudyResource, ShowConfirmationOptions, ConfirmationModalProps } from '../types';
+import { StudyResource, ShowConfirmationOptions, ConfirmationModalProps, PrintModalProps } from '../types';
 
 export interface ModalStates {
   isAddTaskModalOpen: boolean;
   isModifyDayTasksModalOpen: boolean;
   isResourceEditorOpen: boolean;
   isWelcomeModalOpen: boolean;
+  isPrintModalOpen: boolean;
   confirmationState: ConfirmationModalProps;
 }
 
@@ -19,6 +20,7 @@ export const useModalManager = () => {
     isModifyDayTasksModalOpen: false,
     isResourceEditorOpen: false,
     isWelcomeModalOpen: false,
+    isPrintModalOpen: false,
     confirmationState: { isOpen: false, title: '', message: '', onConfirm: () => {}, onClose: () => {}},
   });
 

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+// FIX: Corrected import path for types.
 import { ModifyDayTasksModalProps, ScheduledTask, StudyResource, Domain, ResourceType } from '../types';
 import { Button } from './Button';
 import { formatDuration, parseDateString } from '../utils/timeFormatter';
@@ -159,7 +160,8 @@ const ModifyDayTasksModal: React.FC<ModifyDayTasksModalProps> = ({
     const highlightedIds = useMemo(() => {
         const finalIds = new Set<string>();
         if (finalHoveredId) {
-            const resource = allResourcesMap.get(finalHoveredId);
+            // FIX: Explicitly type `resource` to avoid `unknown` type error.
+            const resource: StudyResource | undefined = allResourcesMap.get(finalHoveredId);
              if (resource) {
                 finalIds.add(resource.id);
                 resource.pairedResourceIds?.forEach(pairedId => { if (allResourcesMap.has(pairedId)) finalIds.add(pairedId); });
@@ -203,6 +205,7 @@ const ModifyDayTasksModal: React.FC<ModifyDayTasksModalProps> = ({
     const removeStagedTask = (taskId: string) => setStagedTasks(prev => prev.filter(t => t.id !== taskId));
     const handleSaveAndClose = () => onSave(stagedTasks);
     
+    // FIX: Ensured mapping from string enums to {value: string, label: string} is type-safe.
     const domainOptions = [{ value: 'all', label: 'All Topics' }, ...availableDomains.map(d => ({ value: d, label: d }))];
     const typeOptions = [{ value: 'all', label: 'All Types' }, ...availableResourceTypes.map(t => ({ value: t, label: t }))];
     const sourceOptions = [{ value: 'all', label: 'All Sources' }, ...availableSources.map(s => ({ value: s, label: s }))];

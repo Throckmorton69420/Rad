@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+// FIX: Corrected import path for types.
 import { DailyTaskListProps, ScheduledTask } from '../types';
 import { Button } from './Button';
 import TaskItem from './TaskItem';

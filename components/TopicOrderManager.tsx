@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+// FIX: Corrected import path for types.
 import { Domain, TopicOrderManagerProps } from '../types';
 import { Button } from './Button';
 

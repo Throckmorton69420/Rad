@@ -1,16 +1,27 @@
 import path from 'path';
-import { defineConfig } from 'vite';
-
-const __dirname = new URL('.', import.meta.url).pathname;
+import { defineConfig, loadEnv } from 'vite';
+// FIX: Import 'process' to provide correct types for process.cwd() and avoid type errors.
+import process from 'process';
 
 // https://vitejs.dev/config/
-export default defineConfig({
-  resolve: {
-    alias: {
-      '@': path.resolve(__dirname, '.'),
+export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, process.cwd(), '');
+  return {
+    resolve: {
+      alias: {
+        // FIX: __dirname is not available in this module context. Using process.cwd() is a reliable way to get the project root.
+        '@': path.resolve(process.cwd(), './'),
+        'components': path.resolve(process.cwd(), './components'),
+        'hooks': path.resolve(process.cwd(), './hooks'),
+        'services': path.resolve(process.cwd(), './services'),
+        'utils': path.resolve(process.cwd(), './utils'),
+      },
     },
-  },
-  // The 'define' block has been removed. Vite automatically handles environment
-  // variables prefixed with VITE_ in client-side code, making this block
-  // unnecessary and potentially problematic.
+    define: {
+      'process.env': {
+        'VITE_SUPABASE_URL': JSON.stringify(env.VITE_SUPABASE_URL),
+        'VITE_SUPABASE_ANON_KEY': JSON.stringify(env.VITE_SUPABASE_ANON_KEY)
+      }
+    }
+  }
 });

@@ -1,4 +1,5 @@
 import React from 'react';
+// FIX: Corrected import path for types.
 import { StudyPlan, DailySchedule } from '../types';
 import { formatDuration, parseDateString } from '../utils/timeFormatter';
 

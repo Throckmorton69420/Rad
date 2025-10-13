@@ -1,22 +1,4 @@
-import React from 'react';
-
-// Utility type to Omit properties from a type
-export type Omit<T, K extends keyof T> = Pick<T, Exclude<keyof T, K>>;
-
-export enum ResourceType {
-  READING_TEXTBOOK = 'Textbook Reading',
-  READING_GUIDE = 'Study Guide Reading',
-  VIDEO_LECTURE = 'Video Lecture',
-  CASES = 'Case Review',
-  QUESTIONS = 'Question Bank',
-  REVIEW_QUESTIONS = 'Review Questions',
-  QUESTION_REVIEW = 'Question Review',
-  EXAM_SIM = 'Exam Simulation',
-  HIGH_YIELD_VIDEO = 'High-Yield Video',
-  PERSONAL_NOTES = 'Personal Notes Review',
-  FLIP_THROUGH = 'Visual Flip-Through',
-  PRACTICE_TOPIC = 'Practice Topic',
-}
+// types.ts
 
 export enum Domain {
   PHYSICS = 'Physics',
@@ -38,7 +20,22 @@ export enum Domain {
   WEAK_AREA_REVIEW = 'Weak Area Review',
   QUESTION_BANK_CATCHUP = 'Question Bank Catchup',
   FINAL_REVIEW = 'Final Review',
-  LIGHT_REVIEW = 'Light Review'
+  LIGHT_REVIEW = 'Light Review',
+}
+
+export enum ResourceType {
+  READING_TEXTBOOK = 'Textbook Reading',
+  READING_GUIDE = 'Study Guide Reading',
+  VIDEO_LECTURE = 'Video Lecture',
+  HIGH_YIELD_VIDEO = 'High-Yield Video',
+  QUESTIONS = 'Question Bank',
+  QUESTION_REVIEW = 'Question Review',
+  CASES = 'Case Review',
+  REVIEW_QUESTIONS = 'Review Questions',
+  EXAM_SIM = 'Exam Simulation',
+  PRACTICE_TOPIC = 'Practice Topic',
+  FLIP_THROUGH = 'Flip Through',
+  PERSONAL_NOTES = 'Personal Notes',
 }
 
 export interface StudyResource {
@@ -47,43 +44,38 @@ export interface StudyResource {
   type: ResourceType;
   domain: Domain;
   durationMinutes: number;
-  sequenceOrder?: number;
+  isPrimaryMaterial: boolean;
+  isSplittable: boolean;
+  isArchived: boolean;
+  isOptional?: boolean;
+  schedulingPriority?: 'high' | 'medium' | 'low';
   pages?: number;
   startPage?: number;
   endPage?: number;
   questionCount?: number;
+  // FIX: Added caseCount to the StudyResource interface to allow this property in masterResourcePool.
+  caseCount?: number;
   bookSource?: string;
-  chapterNumber?: number;
   videoSource?: string;
+  chapterNumber?: number;
+  sequenceOrder?: number;
   pairedResourceIds?: string[];
-  isPrimaryMaterial: boolean;
-  isSplittable?: boolean;
-  isSplitSource?: boolean; 
-  sourceDocument?: string;
-  specificDetail?: string;
-  initialPass?: boolean; 
-  reviewPass?: boolean;  
-  baseResourceId?: string; 
-  requiresImmediateReview?: boolean; 
-  originalResourceId?: string; 
-  partNumber?: number; 
-  totalParts?: number;
-  isArchived: boolean;
-  isOptional?: boolean;
-  schedulingPriority?: 'high' | 'medium' | 'low';
+  dependencies?: string[];
+  priorityTier?: 1 | 2 | 3;
 }
 
 export interface ScheduledTask {
   id: string;
   resourceId: string;
+  originalResourceId?: string;
   title: string;
   type: ResourceType;
-  originalTopic: Domain; 
+  originalTopic: Domain;
   durationMinutes: number;
-  status: 'pending' | 'completed' | 'in-progress';
-  order: number; 
-  startTime?: string;
+  status: 'pending' | 'completed';
+  order: number;
   isOptional?: boolean;
+  isPrimaryMaterial?: boolean;
   actualStudyTimeMinutes?: number;
   pages?: number;
   startPage?: number;
@@ -91,26 +83,88 @@ export interface ScheduledTask {
   caseCount?: number;
   questionCount?: number;
   chapterNumber?: number;
-  originalResourceId?: string; 
-  partNumber?: number;
-  totalParts?: number;
-  isSplitPart?: boolean;     
-  isPrimaryMaterial?: boolean;
   bookSource?: string;
   videoSource?: string;
-  schedulingPriority?: 'high' | 'medium' | 'low';
 }
 
 export interface DailySchedule {
-  date: string;
+  date: string; // YYYY-MM-DD
+  dayName: string;
   tasks: ScheduledTask[];
   totalStudyTimeMinutes: number;
   isRestDay: boolean;
-  dayType: 'workday' | 'high-capacity' | 'exception' | 'rest' | 'holiday' | 'exam-day' | 'workday-exception' | 'high-capacity-exception' | 'rest-exception' | 'specific-rest' | 'weekday-moonlighting' | 'weekend-moonlighting' | 'final-review';
-  dayName?: string;
-  isManuallyModified?: boolean;
+  isManuallyModified: boolean;
 }
 
+export interface DeadlineSettings {
+  allContent?: string;
+  physicsContent?: string;
+  nucMedContent?: string;
+  otherContent?: string;
+}
+
+export interface StudyPlan {
+  schedule: DailySchedule[];
+  progressPerDomain: Partial<Record<Domain, { completedMinutes: number; totalMinutes: number }>>;
+  startDate: string;
+  endDate: string;
+  firstPassEndDate: string | null;
+  topicOrder: Domain[];
+  cramTopicOrder: Domain[];
+  deadlines: DeadlineSettings;
+  isCramModeActive: boolean;
+  areSpecialTopicsInterleaved: boolean;
+}
+
+export interface PomodoroSettings {
+  studyDuration: number;
+  restDuration: number;
+  isActive: boolean;
+  isStudySession: boolean;
+  timeLeft: number;
+}
+
+export enum ViewMode {
+  DAILY = 'Daily',
+  WEEKLY = 'Weekly',
+  MONTHLY = 'Monthly',
+}
+
+export interface ExceptionDateRule {
+    date: string;
+    dayType: 'specific-rest' | 'weekday-moonlighting' | 'weekend-moonlighting' | 'exception';
+    isRestDayOverride: boolean;
+    targetMinutes?: number;
+}
+
+export interface Constraints {
+    dailyTimeBudget: [number, number];
+    physicsFrequencyDays: number;
+    exceptionDates: ExceptionDateRule[];
+}
+
+export interface GeneratedStudyPlanOutcome {
+    plan: StudyPlan;
+    notifications: { type: 'error' | 'warning' | 'info', message: string }[];
+}
+
+export type RebalanceType = 'standard' | 'topic-time';
+export interface StandardRebalanceOptions { type: 'standard'; }
+export interface TopicTimeRebalanceOptions {
+    type: 'topic-time';
+    date: string;
+    topics: Domain[];
+    totalTimeMinutes: number;
+}
+export type RebalanceOptions = StandardRebalanceOptions | TopicTimeRebalanceOptions;
+
+export interface PlanDataBlob {
+  plan: StudyPlan;
+  resources: StudyResource[];
+  exceptions: ExceptionDateRule[];
+}
+
+// Component Prop Types
 export interface DailyTaskListProps {
   dailySchedule: DailySchedule;
   onTaskToggle: (taskId: string) => void;
@@ -125,154 +179,70 @@ export interface DailyTaskListProps {
   isLoading: boolean;
 }
 
-export interface TaskItemProps {
-  task: ScheduledTask;
-  onToggle: (taskId: string) => void;
-  isCurrentPomodoroTask: boolean;
-  onSetPomodoro: () => void;
-  isPulsing: boolean;
-}
-
-export interface DeadlineSettings {
-  allContent?: string; // YYYY-MM-DD
-  physicsContent?: string;
-  nucMedContent?: string;
-  otherContent?: string;
-}
-
-export interface StudyPlan {
-  startDate: string;
-  endDate: string;
-  schedule: DailySchedule[];
-  progressPerDomain: Partial<Record<Domain, { completedMinutes: number; totalMinutes: number }>>;
-  firstPassEndDate?: string;
-  topicOrder: Domain[];
-  cramTopicOrder: Domain[];
-  isCramModeActive?: boolean;
-  deadlines: DeadlineSettings;
-  areSpecialTopicsInterleaved: boolean;
-}
-
-export interface ExceptionDateRule {
-  date: string;
-  targetMinutes?: number;
-  dayType: 'workday-exception' | 'high-capacity-exception' | 'rest-exception' | 'specific-rest' | 'weekday-moonlighting' | 'weekend-moonlighting' | 'final-review' | 'exception';
-  isRestDayOverride?: boolean;
-}
-
-export interface Constraints {
-  dailyTimeBudget: [number, number]; 
-  physicsFrequencyDays: number; 
-  exceptionDates?: ExceptionDateRule[];
-}
-
-export interface PomodoroSettings {
-  studyDuration: number;
-  restDuration: number;
-  isActive: boolean;
-  isStudySession: boolean;
-  timeLeft: number;
-}
-
 export interface AddTaskModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (taskData: {
-    title: string;
-    durationMinutes: number;
-    domain: Domain;
-    type: ResourceType;
+  onSave: (taskData: { 
+    title: string; 
+    durationMinutes: number; 
+    domain: Domain; 
+    type: ResourceType,
     pages?: number;
     caseCount?: number;
     questionCount?: number;
     chapterNumber?: number;
   }) => void;
   availableDomains: Domain[];
-  selectedDate?: string;
+  selectedDate: string;
 }
 
-export interface ModifyDayTasksModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onSave: (updatedTasks: ScheduledTask[]) => void;
-  tasksForDay: ScheduledTask[];
-  allResources: StudyResource[];
-  selectedDate: string;
-  showConfirmation: (options: ShowConfirmationOptions) => void;
-  onEditResource: (resource: StudyResource) => void;
-  onArchiveResource: (resourceId: string) => void;
-  onRestoreResource: (resourceId: string) => void;
-  onPermanentDeleteResource: (resourceId: string) => void;
-  openAddResourceModal: () => void;
-  isCramModeActive: boolean;
+export interface TaskItemProps {
+  task: ScheduledTask;
+  onToggle: (taskId: string) => void;
+  isCurrentPomodoroTask: boolean;
+  isPulsing: boolean;
+  onSetPomodoro: () => void;
 }
 
 export interface ResourceEditorModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (resourceData: Omit<StudyResource, 'id' | 'isArchived'> & { id?: string, isArchived: boolean }) => void;
+  onSave: (resourceData: Omit<StudyResource, 'id'> & { id?: string }) => void;
   onRequestArchive: (resourceId: string) => void;
-  initialResource?: StudyResource | null;
+  initialResource: StudyResource | null;
   availableDomains: Domain[];
   availableResourceTypes: ResourceType[];
 }
 
-export type RebalanceOptions =
-  | { type: 'standard' }
-  | {
-      type: 'topic-time';
-      date: string; 
-      topics: Domain[];
-      totalTimeMinutes: number;
-    };
-
-
-export enum ViewMode {
-  DAILY = 'Daily',
-  WEEKLY = 'Weekly',
-  MONTHLY = 'Monthly',
-}
-
-export interface DailyStats {
-  actualStudyMinutes: number;
-  actualBreakMinutes: number;
-}
-
-export interface GeneratedStudyPlanOutcome {
-  plan: StudyPlan;
-  notifications?: { type: 'warning' | 'info' | 'error', message: string }[];
-}
-
-
-export interface StudyBlock {
-  id: string;
-  domain: Domain;
-  totalDuration: number;
-  tasks: StudyResource[];
-  sequenceOrder: number;
-}
-
 export interface ConfirmationModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+  onCancel?: () => void;
+  title: string;
+  message: string | React.ReactNode;
+  confirmText?: string;
+  cancelText?: string;
+  confirmVariant?: 'primary' | 'secondary' | 'danger' | 'ghost';
+}
+
+export interface ModifyDayTasksModalProps {
     isOpen: boolean;
     onClose: () => void;
-    onConfirm: () => void;
-    onCancel?: () => void;
-    title: string;
-    message: string | React.ReactElement;
-    confirmText?: string;
-    cancelText?: string;
-    confirmVariant?: 'primary' | 'danger';
+    onSave: (updatedTasks: ScheduledTask[]) => void;
+    tasksForDay: ScheduledTask[];
+    allResources: StudyResource[];
+    selectedDate: string;
+    showConfirmation: (options: ShowConfirmationOptions) => void;
+    openAddResourceModal: () => void;
+    onEditResource: (resource: StudyResource) => void;
+    onArchiveResource: (resourceId: string) => void;
+    onRestoreResource: (resourceId: string) => void;
+    onPermanentDeleteResource: (resourceId: string) => void;
+    isCramModeActive: boolean;
 }
 
-export interface ShowConfirmationOptions {
-    title: string;
-    message: string | React.ReactElement;
-    onConfirm: () => void;
-    cancelText?: string;
-    onCancel?: () => void;
-    confirmText?: string;
-    confirmVariant?: 'primary' | 'danger';
-}
+export interface ShowConfirmationOptions extends Omit<ConfirmationModalProps, 'isOpen' | 'onClose'> { }
 
 export interface TopicOrderManagerProps {
   topicOrder: Domain[];
@@ -286,62 +256,36 @@ export interface TopicOrderManagerProps {
 }
 
 export interface AdvancedControlsProps {
-  onRebalance: (options: RebalanceOptions) => void;
-  isLoading: boolean;
-  selectedDate: string;
-  isCramModeActive: boolean;
-  onToggleCramMode: (isActive: boolean) => void;
-  deadlines: DeadlineSettings;
-  onUpdateDeadlines: (newDeadlines: DeadlineSettings) => void;
-  startDate: string;
-  endDate: string;
-  onUpdateDates: (startDate: string, endDate: string) => void;
-}
-
-
-export interface PlanDataBlob {
-  plan: StudyPlan;
-  resources: StudyResource[];
-  exceptions: ExceptionDateRule[];
-}
-
-export interface MasterResourcePoolViewerProps {
-  resources: StudyResource[];
-  onOpenAddResourceModal: () => void;
-  onEditResource: (resource: StudyResource) => void;
-  onArchiveResource: (resourceId: string) => void;
-  onRestoreResource: (resourceId: string) => void;
-  onPermanentDeleteResource: (resourceId: string) => void;
-  scheduledResourceIds: Set<string>;
-  onGoToDate: (resourceId: string) => void;
-  onHighlightDates: (resourceId: string) => void;
-  onClearHighlights: () => void;
-}
-
-export interface PrintScheduleOptions {
-  reportType: 'full' | 'range' | 'currentDay' | 'currentWeek';
-  startDate?: string;
-  endDate?: string;
-  pageBreakPerWeek: boolean;
-}
-
-export interface PrintProgressOptions {
-  includeSummary: boolean;
-  includeDeadlines: boolean;
-  includeTopic: boolean;
-  includeType: boolean;
-  includeSource: boolean;
-}
-
-export interface PrintContentOptions {
-  filter: 'all' | 'scheduled' | 'unscheduled' | 'archived';
-  sortBy: 'sequenceOrder' | 'title' | 'domain' | 'durationMinutesAsc' | 'durationMinutesDesc';
+    onRebalance: (options: RebalanceOptions) => void;
+    isLoading: boolean;
+    selectedDate: string;
+    isCramModeActive: boolean;
+    onToggleCramMode: (isActive: boolean) => void;
+    deadlines: DeadlineSettings;
+    onUpdateDeadlines: (newDeadlines: DeadlineSettings) => void;
+    startDate: string;
+    endDate: string;
+    onUpdateDates: (startDate: string, endDate: string) => void;
 }
 
 export interface PrintOptions {
-  schedule: PrintScheduleOptions;
-  progress: PrintProgressOptions;
-  content: PrintContentOptions;
+  schedule: {
+    reportType: 'full' | 'range' | 'currentDay' | 'currentWeek';
+    pageBreakPerWeek: boolean;
+    startDate?: string;
+    endDate?: string;
+  };
+  progress: {
+    includeSummary: boolean;
+    includeDeadlines: boolean;
+    includeTopic: boolean;
+    includeType: boolean;
+    includeSource: boolean;
+  };
+  content: {
+    filter: 'all' | 'scheduled' | 'unscheduled' | 'archived';
+    sortBy: 'sequenceOrder' | 'title' | 'domain' | 'durationMinutesAsc' | 'durationMinutesDesc';
+  };
 }
 
 export interface PrintModalProps {

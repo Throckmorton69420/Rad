@@ -39,7 +39,6 @@ const ContentReport: React.FC<ContentReportProps> = ({ resources, title }) => {
           ))}
         </tbody>
       </table>
-
       <footer className="mt-8 pt-4 border-t text-center text-xs text-gray-500">
         End of Report
       </footer>

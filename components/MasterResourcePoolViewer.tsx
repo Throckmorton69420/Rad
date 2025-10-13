@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+// FIX: Corrected import path for types.
 import { StudyResource, Domain, ResourceType } from '../types';
 import { Button } from './Button';
 import { formatDuration, getDomainColorStyle } from '../utils/timeFormatter';

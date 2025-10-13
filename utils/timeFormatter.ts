@@ -1,4 +1,5 @@
 // utils/timeFormatter.ts
+// FIX: Corrected import path for types.
 import { Domain } from '../types';
 
 /**

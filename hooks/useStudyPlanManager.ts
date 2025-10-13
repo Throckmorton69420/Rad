@@ -40,18 +40,17 @@ export const useStudyPlanManager = (showConfirmation: (options: ShowConfirmation
                 if (error && error.code !== 'PGRST116') { // PGRST116 is "No rows found"
                     throw new Error(error.message);
                 }
-
-                if (data && data.plan_data) {
-                    const loadedData = data.plan_data as PlanDataBlob;
+                
+                if (data && (data as any).plan_data) {
+                    const loadedData = (data as any).plan_data as PlanDataBlob;
                     
-                    // --- Reconciliation Logic ---
                     const freshCodePool = initialMasterResourcePool;
                     const dbResources = loadedData.resources || [];
                     
                     const archivedIds = new Set<string>();
                     const customResources: StudyResource[] = [];
 
-                    dbResources.forEach(res => {
+                    dbResources.forEach((res: StudyResource) => {
                         if (res.isArchived) {
                             archivedIds.add(res.id);
                         }
@@ -66,7 +65,6 @@ export const useStudyPlanManager = (showConfirmation: (options: ShowConfirmation
                     }));
                     
                     reconciledPool.push(...customResources);
-                    // --- End Reconciliation ---
 
                     const loadedPlan = loadedData.plan;
                     // Backwards compatibility checks
@@ -84,7 +82,7 @@ export const useStudyPlanManager = (showConfirmation: (options: ShowConfirmation
                     setUserExceptions(loadedData.exceptions || []);
                     
                     setIsNewUser(false);
-                    setSystemNotification({ type: 'info', message: 'Welcome back! Your plan has been restored and updated.' });
+                    setSystemNotification({ type: 'info', message: 'Welcome back! Your plan has been restored.' });
                     setTimeout(() => setSystemNotification(null), 3000);
                     setSaveStatus('saved');
                     setTimeout(() => setSaveStatus('idle'), 2000);
@@ -94,22 +92,18 @@ export const useStudyPlanManager = (showConfirmation: (options: ShowConfirmation
                 }
             }
 
-            // This block runs for new users OR for a manual regeneration.
-            const poolForGeneration = planStateRef.current.globalMasterResourcePool;
+            const poolForGeneration = regenerate ? initialMasterResourcePool : planStateRef.current.globalMasterResourcePool;
             const exceptionsForGeneration = regenerate ? [] : planStateRef.current.userExceptions;
             if (regenerate) {
                 setUserExceptions([]);
-                setGlobalMasterResourcePool(initialMasterResourcePool); // Reset pool on full regen
+                setGlobalMasterResourcePool(initialMasterResourcePool); 
             }
 
-            const currentTopicOrder = planStateRef.current.studyPlan?.topicOrder;
+            const currentTopicOrder = planStateRef.current.studyPlan?.topicOrder || DEFAULT_TOPIC_ORDER;
             const defaultDeadlines: DeadlineSettings = {
                 allContent: '2025-11-05',
-                physicsContent: '2025-10-26',
-                nucMedContent: '2025-10-26',
-                otherContent: '2025-10-31',
             };
-            const outcome: GeneratedStudyPlanOutcome = generateInitialSchedule(poolForGeneration, exceptionsForGeneration, currentTopicOrder, defaultDeadlines);
+            const outcome: GeneratedStudyPlanOutcome = generateInitialSchedule(poolForGeneration, exceptionsForGeneration, currentTopicOrder, defaultDeadlines, STUDY_START_DATE, STUDY_END_DATE);
 
             setStudyPlan(outcome.plan);
             setPreviousStudyPlan(null);
@@ -140,7 +134,6 @@ export const useStudyPlanManager = (showConfirmation: (options: ShowConfirmation
 
         debounceTimerRef.current = window.setTimeout(async () => {
             if (!studyPlan) return;
-            console.log("Saving state to Supabase...");
             const stateToSave: PlanDataBlob = {
                 plan: studyPlan,
                 resources: globalMasterResourcePool,
@@ -152,7 +145,6 @@ export const useStudyPlanManager = (showConfirmation: (options: ShowConfirmation
                 setSystemNotification({ type: 'error', message: "Failed to save progress to the cloud." });
                 setSaveStatus('error');
             } else {
-                console.log("State saved successfully.");
                 setSaveStatus('saved');
                 setTimeout(() => setSaveStatus('idle'), 2000);
             }
@@ -370,7 +362,6 @@ export const useStudyPlanManager = (showConfirmation: (options: ShowConfirmation
         updatePreviousStudyPlan(studyPlan);
         const reorderedTasks = updatedTasks.map((task, index) => ({ ...task, order: index }));
         
-        // Bug Fix: Sum all tasks user manually places on the day, including optional.
         const newTotalTime = reorderedTasks.reduce((sum, t) => sum + t.durationMinutes, 0);
 
         const newSchedule = studyPlan.schedule.map(day => {

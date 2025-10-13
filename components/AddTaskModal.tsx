@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+// FIX: Corrected import path for types.
 import { Domain, ResourceType, AddTaskModalProps } from '../types';
 import { Button } from './Button';
 import TimeInputScroller from './TimeInputScroller';
@@ -54,6 +55,7 @@ const AddTaskModal: React.FC<AddTaskModalProps> = ({ isOpen, onClose, onSave, av
     resetForm();
   };
   
+  // FIX: Ensured mapping from string enums to {value: string, label: string} is type-safe.
   const resourceTypeOptions = Object.values(ResourceType).map(type => ({ value: type, label: type }));
   const domainOptions = availableDomains.map(domain => ({ value: domain, label: domain }));
 

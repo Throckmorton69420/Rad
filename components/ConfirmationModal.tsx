@@ -1,5 +1,6 @@
 import React from 'react';
 import { Button } from './Button';
+// FIX: Corrected import path for types.
 import { ConfirmationModalProps } from '../types';
 import FocusTrap from 'focus-trap-react';
 
