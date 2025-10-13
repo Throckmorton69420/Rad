@@ -41,9 +41,10 @@ export const useStudyPlanManager = (showConfirmation: (options: ShowConfirmation
                     throw new Error(error.message);
                 }
                 
-                if (data && (data as any).plan_data) {
-                    const loadedData = (data as any).plan_data as PlanDataBlob;
-                    
+                const loadedData = (data as any)?.plan_data as PlanDataBlob;
+                
+                // FIX: Add robust validation to prevent crashes from malformed data from the DB.
+                if (loadedData && loadedData.plan && Array.isArray(loadedData.plan.schedule)) {
                     const freshCodePool = initialMasterResourcePool;
                     const dbResources = loadedData.resources || [];
                     
@@ -92,6 +93,7 @@ export const useStudyPlanManager = (showConfirmation: (options: ShowConfirmation
                 }
             }
 
+            // Fallback to generating a new schedule if no valid data was found or if regeneration is requested.
             const poolForGeneration = regenerate ? initialMasterResourcePool : planStateRef.current.globalMasterResourcePool;
             const exceptionsForGeneration = regenerate ? [] : planStateRef.current.userExceptions;
             if (regenerate) {
