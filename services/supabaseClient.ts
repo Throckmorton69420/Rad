@@ -17,7 +17,8 @@ if (!supabaseUrl || !supabaseAnonKey) {
   throw new Error(errorMessage);
 }
 
-export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[];
+// FIX: Replaced generic Json type with specific PlanDataBlob for type safety.
+// export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[];
 
 export interface Database {
   public: {
@@ -26,14 +27,14 @@ export interface Database {
         Row: {
           id: number;
           created_at: string;
-          plan_data: Json | null;
+          plan_data: PlanDataBlob | null;
         };
         Insert: {
           id?: number;
-          plan_data?: Json | null;
+          plan_data?: PlanDataBlob | null;
         };
         Update: {
-          plan_data?: Json | null;
+          plan_data?: PlanDataBlob | null;
         };
       };
     };

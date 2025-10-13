@@ -41,7 +41,8 @@ export const useStudyPlanManager = (showConfirmation: (options: ShowConfirmation
                     throw new Error(error.message);
                 }
                 
-                const loadedData = (data as any)?.plan_data as PlanDataBlob;
+                // FIX: Improve type safety by using the typed response from Supabase client.
+                const loadedData = data?.plan_data;
                 
                 // FIX: Add robust validation to prevent crashes from malformed data from the DB.
                 if (loadedData && loadedData.plan && Array.isArray(loadedData.plan.schedule)) {
@@ -141,7 +142,8 @@ export const useStudyPlanManager = (showConfirmation: (options: ShowConfirmation
                 resources: globalMasterResourcePool,
                 exceptions: userExceptions,
             };
-            const { error } = await supabase.from('study_plans').upsert({ id: 1, plan_data: stateToSave as any });
+            // FIX: The upsert method expects an array of objects. Wrap the single object in an array to fix the overload error.
+            const { error } = await supabase.from('study_plans').upsert([{ id: 1, plan_data: stateToSave }]);
             if (error) {
                 console.error("Supabase save error:", error);
                 setSystemNotification({ type: 'error', message: "Failed to save progress to the cloud." });

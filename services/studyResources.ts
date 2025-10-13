@@ -1,4 +1,4 @@
-import { StudyResource, Domain, ResourceType } from '../types';
+import { StudyResource } from '../types';
 import resourceData from './studyResources.json';
 
 // By explicitly casting the imported JSON, we ensure type safety

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { parseDateString } from '../utils/timeFormatter';
 
 interface CountdownTimerProps {
@@ -6,7 +6,9 @@ interface CountdownTimerProps {
 }
 
 const CountdownTimer: React.FC<CountdownTimerProps> = ({ examDate }) => {
-  const calculateTimeLeft = () => {
+  // FIX: Wrap calculateTimeLeft in useCallback to memoize it based on examDate.
+  // This prevents re-creating the function on every render unless examDate changes.
+  const calculateTimeLeft = useCallback(() => {
     const targetDate = parseDateString(examDate); // Safely parse as UTC midnight
     const difference = +targetDate - +new Date(); // Difference from now (local) to target
 
@@ -34,18 +36,24 @@ const CountdownTimer: React.FC<CountdownTimerProps> = ({ examDate }) => {
       timeLeft.seconds = Math.floor((difference / 1000) % 60);
     }
     return timeLeft;
-  };
+  }, [examDate]);
 
   const [timeLeft, setTimeLeft] = useState(calculateTimeLeft());
   const formattedExamDate = parseDateString(examDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
 
   useEffect(() => {
+    // FIX: The dependency array was empty, causing the timer to use a stale `examDate` if the prop changed.
+    // Now, this effect re-runs whenever `calculateTimeLeft` is updated (i.e., when `examDate` changes).
+    
+    // Update the time left immediately when the component mounts or examDate changes.
+    setTimeLeft(calculateTimeLeft());
+
     const timerId = setInterval(() => {
       setTimeLeft(calculateTimeLeft());
     }, 1000);
 
     return () => clearInterval(timerId);
-  }, []); // Empty dependency array ensures this runs only once on mount.
+  }, [calculateTimeLeft]);
 
   const formatPlural = (value: number, unit: string) => `${value} ${unit}${value !== 1 ? 's' : ''}`;
 

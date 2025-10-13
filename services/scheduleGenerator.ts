@@ -6,16 +6,20 @@ const calculateResourceDuration = (resource: StudyResource): number => {
   switch (resource.type) {
     case ResourceType.READING_TEXTBOOK:
     case ResourceType.READING_GUIDE:
+      // 30 seconds per page
       return Math.round((resource.pages || 0) * 0.5);
     case ResourceType.VIDEO_LECTURE:
     case ResourceType.HIGH_YIELD_VIDEO:
+      // Watched at ~1.33x speed
       return Math.round(resource.durationMinutes * 0.75);
     case ResourceType.CASES:
+      // 1 minute per case
       return (resource.caseCount || 0) * 1;
     case ResourceType.QUESTIONS:
     case ResourceType.REVIEW_QUESTIONS:
     case ResourceType.QUESTION_REVIEW:
-      return Math.round((resource.questionCount || 0) * 1.5);
+      // 1 minute per question (more efficient pace)
+      return Math.round((resource.questionCount || 0) * 1.0);
     default:
       return resource.durationMinutes;
   }
