@@ -1,8 +1,8 @@
 import { createClient } from '@supabase/supabase-js';
 import { PlanDataBlob } from '../types';
 
-const supabaseUrl = process.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY;
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 if (!supabaseUrl || !supabaseAnonKey) {
   const errorMessage = "Configuration Error: VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY are not defined. For local development, create a '.env' file in the project root. For deployment, ensure these are set as Environment Variables in your hosting provider's settings (e.g., Vercel, Netlify).";
