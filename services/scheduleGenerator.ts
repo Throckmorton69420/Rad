@@ -23,14 +23,13 @@ import {
 import { getTodayInNewYork, parseDateString } from '../utils/timeFormatter';
 
 /**
- * Core fixes implemented:
- * 1) Do NOT filter the pool to primary-only; Phase 1 blocks include paired items (e.g., Qevlar/CTC) that may be non-primary. 
- * 2) Build blocks by following pairedResourceIds (BFS), keeping all paired items together and sorted by TASK_TYPE_PRIORITY.
- * 3) Strict round-robin distribution:
- *    - Pass 1a: Titan video anchors → whole block to Day k; if not enough time, try next day; only split if the block cannot fit in any single day and contains non-splittable items.
- *    - Pass 1b: Huda videos in the same manner, continuing the day cursor where Titan pass ended.
- *    - Pass 1c: Other primary videos (e.g., War Machine anchors) likewise.
- * 4) Phase 2 and Phase 3 retained, but they never preempt or dilute Phase 1 ordering.
+ * Scheduling algorithm implementation that matches the user's spec:
+ * - Phase 1 (strict): Round-robin distribution of complete topic blocks in priority order: Titan → Huda → Other primaries.
+ *   Blocks include paired resources, even if those are not flagged as primary.
+ * - Phase 2 (daily requirements): Ensure daily placement for Nuc Med and NIS/RISC, plus context-aware Board Vitals.
+ * - Phase 2b (primary fill to capacity): After Phase 1+2, greedily fill the remaining minutes of each day with remaining primary resources until days reach their per-day cap.
+ * - Phase 3 (supplementary only after all primaries placed): Topic-aware then general fill. Discord priority over Core Radiology.
+ * - No supplementary resources are scheduled if any primary items remain unscheduled.
  */
 
 const isoDate = (d: Date) => d.toISOString().split('T')[0];
@@ -57,6 +56,8 @@ const chunkLargeResources = (resources: StudyResource[]): StudyResource[] => {
   }
   return out;
 };
+
+const sumDay = (day: DailySchedule) => day.tasks.reduce((s, t) => s + t.durationMinutes, 0);
 
 type Block = {
   anchorId: string;
@@ -85,7 +86,7 @@ class Scheduler {
     deadlines: DeadlineSettings,
     areSpecialTopicsInterleaved: boolean
   ) {
-    // Critical fix: do not pre-filter to primary material here; Phase 1 blocks include paired content that may be non-primary.
+    // Do not pre-filter by primary here; paired resources in Phase 1 may be non-primary.
     const chunked = chunkLargeResources(resourcePool);
     this.allResources = new Map(chunked.map(r => [r.id, r]));
     this.remaining = new Set(chunked.map(r => r.id));
@@ -118,7 +119,7 @@ class Scheduler {
   }
 
   private remainingTime(day: DailySchedule): number {
-    return day.totalStudyTimeMinutes - day.tasks.reduce((s, t) => s + t.durationMinutes, 0);
+    return day.totalStudyTimeMinutes - sumDay(day);
   }
 
   private toTask(res: StudyResource, order: number): ScheduledTask {
@@ -147,7 +148,6 @@ class Scheduler {
     };
   }
 
-  // BFS over pairedResourceIds to gather a complete block; includes non-primary paired materials.
   private buildBlockFromAnchor(anchor: StudyResource): Block {
     const seen = new Set<string>();
     const q: string[] = [anchor.id];
@@ -167,10 +167,8 @@ class Scheduler {
       }
     }
 
-    // Sort by type priority (videos → readings → cases → questions → …)
     items.sort((a, b) => (TASK_TYPE_PRIORITY[a.type] || 99) - (TASK_TYPE_PRIORITY[b.type] || 99));
     const total = items.reduce((s, r) => s + r.durationMinutes, 0);
-
     return { anchorId: anchor.id, domain: anchor.domain, items, totalMinutes: total };
   }
 
@@ -178,7 +176,8 @@ class Scheduler {
     for (let i = 0; i < this.studyDays.length; i++) {
       const idx = (dayIndexStart + i) % this.studyDays.length;
       const day = this.studyDays[idx];
-      if (this.remainingTime(day) >= block.totalMinutes) return idx;
+      const liveBlockMinutes = block.items.filter(it => this.remaining.has(it.id)).reduce((s, r) => s + r.durationMinutes, 0);
+      if (this.remainingTime(day) >= liveBlockMinutes) return idx;
     }
     return null;
   }
@@ -186,15 +185,11 @@ class Scheduler {
   private placeBlockStrictRoundRobin(blocks: Block[], startCursor: number): number {
     let cursor = startCursor;
     for (const block of blocks) {
-      // Skip if block already consumed externally
       const liveItems = block.items.filter(it => this.remaining.has(it.id));
       if (liveItems.length === 0) { cursor++; continue; }
 
-      // Preferred: whole block on a single day (round-robin search)
-      const fitDay = this.tryPlaceWholeBlockOnDay(
-        { ...block, items: liveItems, totalMinutes: liveItems.reduce((s, r) => s + r.durationMinutes, 0) },
-        cursor
-      );
+      const tempBlock: Block = { ...block, items: liveItems, totalMinutes: liveItems.reduce((s, r) => s + r.durationMinutes, 0) };
+      const fitDay = this.tryPlaceWholeBlockOnDay(tempBlock, cursor);
 
       if (fitDay !== null) {
         const day = this.studyDays[fitDay];
@@ -206,12 +201,10 @@ class Scheduler {
         continue;
       }
 
-      // Fallback: ordered multi-day placement without reordering within the block
+      // Fallback: preserve within-block order, place sequentially across days
       let placedAny = false;
       for (const r of liveItems) {
         let placed = false;
-
-        // If a single resource can't fit any day and is splittable chunks already created, they will be separate items; otherwise try all days
         for (let i = 0; i < this.studyDays.length; i++) {
           const idx = (cursor + i) % this.studyDays.length;
           const day = this.studyDays[idx];
@@ -224,9 +217,7 @@ class Scheduler {
             break;
           }
         }
-
         if (!placed) {
-          // Could not place this resource anywhere
           this.notifications.push({ type: 'warning', message: `Block item could not fit: "${r.title}" (${r.durationMinutes} min)` });
         }
       }
@@ -239,7 +230,6 @@ class Scheduler {
     return cursor;
   }
 
-  // Phase 1a: Titan Radiology
   private phase1a_distributeTitan(cursorStart: number): number {
     const anchors: StudyResource[] = [...this.allResources.values()]
       .filter(r => this.remaining.has(r.id)
@@ -247,12 +237,10 @@ class Scheduler {
         && r.videoSource === 'Titan Radiology');
 
     anchors.sort((a, b) => (a.sequenceOrder || 9999) - (b.sequenceOrder || 9999));
-
     const blocks = anchors.map(a => this.buildBlockFromAnchor(a));
     return this.placeBlockStrictRoundRobin(blocks, cursorStart);
   }
 
-  // Phase 1b: Huda Physics
   private phase1b_distributeHuda(cursorStart: number): number {
     const anchors: StudyResource[] = [...this.allResources.values()]
       .filter(r => this.remaining.has(r.id)
@@ -260,12 +248,10 @@ class Scheduler {
         && r.videoSource === 'Huda Physics');
 
     anchors.sort((a, b) => (a.sequenceOrder || 9999) - (b.sequenceOrder || 9999));
-
     const blocks = anchors.map(a => this.buildBlockFromAnchor(a));
     return this.placeBlockStrictRoundRobin(blocks, cursorStart);
   }
 
-  // Phase 1c: Other primary anchors (e.g., War Machine)
   private phase1c_distributeOtherPrimaries(cursorStart: number): number {
     const anchors: StudyResource[] = [...this.allResources.values()]
       .filter(r => this.remaining.has(r.id)
@@ -275,14 +261,11 @@ class Scheduler {
         && r.isPrimaryMaterial);
 
     anchors.sort((a, b) => (a.sequenceOrder || 9999) - (b.sequenceOrder || 9999));
-
     const blocks = anchors.map(a => this.buildBlockFromAnchor(a));
     return this.placeBlockStrictRoundRobin(blocks, cursorStart);
   }
 
-  // Phase 2: Daily requirements (conservative first-fit; never preempts Phase 1)
   private phase2_dailyFirstFit(): void {
-    // Build pools from remaining
     const remainingResources = [...this.remaining].map(id => this.allResources.get(id)!).filter(Boolean);
 
     const nucMed = remainingResources
@@ -305,31 +288,23 @@ class Scheduler {
         for (const t of this.studyDays[i].tasks) covered.add(t.originalTopic);
       }
 
-      // Fit one Nuc Med
-      for (let i = 0; i < nucMed.length; i++) {
-        const r = nucMed[i];
-        if (!this.remaining.has(r.id)) continue;
-        if (this.remainingTime(day) >= r.durationMinutes) {
-          day.tasks.push(this.toTask(r, day.tasks.length));
-          this.remaining.delete(r.id);
-          nucMed.splice(i, 1);
-          break;
+      const tryFit = (pool: StudyResource[]) => {
+        for (let i = 0; i < pool.length; i++) {
+          const r = pool[i];
+          if (!this.remaining.has(r.id)) continue;
+          if (this.remainingTime(day) >= r.durationMinutes) {
+            day.tasks.push(this.toTask(r, day.tasks.length));
+            this.remaining.delete(r.id);
+            pool.splice(i, 1);
+            return true;
+          }
         }
-      }
+        return false;
+      };
 
-      // Fit one NIS/RISC
-      for (let i = 0; i < nisRisc.length; i++) {
-        const r = nisRisc[i];
-        if (!this.remaining.has(r.id)) continue;
-        if (this.remainingTime(day) >= r.durationMinutes) {
-          day.tasks.push(this.toTask(r, day.tasks.length));
-          this.remaining.delete(r.id);
-          nisRisc.splice(i, 1);
-          break;
-        }
-      }
+      tryFit(nucMed);
+      tryFit(nisRisc);
 
-      // Context-aware Board Vitals: only if topic already covered
       for (let i = 0; i < boardVitals.length; i++) {
         const r = boardVitals[i];
         if (!this.remaining.has(r.id)) continue;
@@ -344,8 +319,53 @@ class Scheduler {
     }
   }
 
-  // Phase 3: Supplementary fill (topic-aware then general)
+  // New: Phase 2b — fill remaining day capacity with any remaining primary resources before scheduling any supplementary
+  private phase2b_fillPrimariesToCapacity(): void {
+    // Build a list of remaining primaries
+    const remainingPrimaries = [...this.remaining]
+      .map(id => this.allResources.get(id)!)
+      .filter(r => r && r.isPrimaryMaterial);
+
+    // Sort by: type priority, then sequenceOrder, then shorter first (to fit more)
+    remainingPrimaries.sort((a, b) => {
+      const typeCmp = (TASK_TYPE_PRIORITY[a.type] || 99) - (TASK_TYPE_PRIORITY[b.type] || 99);
+      if (typeCmp !== 0) return typeCmp;
+      const seqCmp = (a.sequenceOrder || 9999) - (b.sequenceOrder || 9999);
+      if (seqCmp !== 0) return seqCmp;
+      return a.durationMinutes - b.durationMinutes;
+    });
+
+    if (remainingPrimaries.length === 0) return;
+
+    // For each day, fill to capacity with primaries
+    for (const day of this.studyDays) {
+      if (day.isRestDay) continue;
+      let rt = this.remainingTime(day);
+      if (rt <= 0) continue;
+
+      for (let i = 0; i < remainingPrimaries.length && rt > 0; ) {
+        const r = remainingPrimaries[i];
+        if (!this.remaining.has(r.id)) { remainingPrimaries.splice(i, 1); continue; }
+        if (r.durationMinutes <= rt) {
+          day.tasks.push(this.toTask(r, day.tasks.length));
+          this.remaining.delete(r.id);
+          rt -= r.durationMinutes;
+          remainingPrimaries.splice(i, 1);
+        } else {
+          i++;
+        }
+      }
+    }
+  }
+
   private phase3_supplementaryFill(): void {
+    // If any primary resources remain, do NOT schedule supplementary. This enforces the user's rule.
+    const anyPrimaryLeft = [...this.remaining].some(id => this.allResources.get(id)?.isPrimaryMaterial);
+    if (anyPrimaryLeft) {
+      this.notifications.push({ type: 'info', message: 'Primary resources remain; supplementary scheduling deferred.' });
+      return;
+    }
+
     const pool = [...this.remaining].map(id => this.allResources.get(id)!).filter(Boolean);
 
     const supplementary = pool
@@ -358,6 +378,7 @@ class Scheduler {
 
     // Topic-aware pass
     for (const day of this.studyDays) {
+      if (day.isRestDay) continue;
       const topics = new Set(day.tasks.map(t => t.originalTopic));
       for (let i = supplementary.length - 1; i >= 0; i--) {
         const r = supplementary[i];
@@ -372,6 +393,7 @@ class Scheduler {
 
     // General fill pass
     for (const day of this.studyDays) {
+      if (day.isRestDay) continue;
       for (let i = supplementary.length - 1; i >= 0; i--) {
         const r = supplementary[i];
         if (!this.remaining.has(r.id)) { supplementary.splice(i, 1); continue; }
@@ -385,10 +407,8 @@ class Scheduler {
   }
 
   private finalize(): void {
-    // Sort tasks within each day (by their insertion order already coherent)
-    for (const day of this.schedule) {
-      day.tasks.sort((a, b) => a.order - b.order);
-    }
+    // Sort tasks within each day by insertion order
+    for (const day of this.schedule) day.tasks.sort((a, b) => a.order - b.order);
     // Report unscheduled
     for (const id of this.remaining) {
       const r = this.allResources.get(id);
@@ -416,15 +436,21 @@ class Scheduler {
       };
     }
 
-    // Phase 1: Strict block round-robin in priority order
+    // Phase 1: strict blocks, round-robin
     let cursor = 0;
-    cursor = this.phase1a_distributeTitan(cursor);    // Pass 1a
-    cursor = this.phase1b_distributeHuda(cursor);     // Pass 1b
-    cursor = this.phase1c_distributeOtherPrimaries(cursor); // Pass 1c
-    // Phase 2: Daily requirements
+    cursor = this.phase1a_distributeTitan(cursor);
+    cursor = this.phase1b_distributeHuda(cursor);
+    cursor = this.phase1c_distributeOtherPrimaries(cursor);
+
+    // Phase 2: daily requirements
     this.phase2_dailyFirstFit();
-    // Phase 3: Supplementary backfill
+
+    // Phase 2b: fill remaining capacity with any remaining primaries (to reach up to daily caps)
+    this.phase2b_fillPrimariesToCapacity();
+
+    // Phase 3: supplementary only if all primaries are placed
     this.phase3_supplementaryFill();
+
     // Finalize
     this.finalize();
 
@@ -487,7 +513,6 @@ export const rebalanceSchedule = (
 
   const past = currentPlan.schedule.filter(d => d.date < rebalanceStart);
 
-  // Determine completed original resource IDs
   const completed = new Set<string>();
   for (const day of currentPlan.schedule) {
     for (const t of day.tasks) {

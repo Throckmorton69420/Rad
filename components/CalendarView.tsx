@@ -103,12 +103,12 @@ const CalendarView: React.FC<CalendarViewProps> = ({ schedule, selectedDate, onD
                         data-date={dateStr}
                         role="gridcell"
                         aria-selected={isSelected}
-                        aria-label={`${parseDateString(dateStr).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', timeZone: 'UTC' })}. ${daySchedule ? (daySchedule.isRestDay ? 'Rest Day' : `${Math.round(daySchedule.totalStudyTimeMinutes / 60)} hours assigned.`) : 'No tasks.'}`}
+                        aria-label={`${parseDateString(dateStr).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', timeZone: 'UTC' })}. ${daySchedule ? (daySchedule.isRestDay ? 'Rest Day' : `${Math.round((daySchedule.tasks.reduce((s,t)=>s+t.durationMinutes,0))/60)} hours scheduled.`) : 'No tasks.'}`}
                     >
                         <span className={`${isSelected ? 'font-bold' : ''}`}>{dayOfMonth}</span>
-                        {daySchedule && !daySchedule.isRestDay && daySchedule.totalStudyTimeMinutes > 0 && (
+                        {daySchedule && !daySchedule.isRestDay && daySchedule.tasks.length > 0 && (
                             <span className={`mt-auto text-xxs px-1 py-0.5 rounded ${isSelected ? 'bg-black/30' : 'bg-black/50'}`}>
-                                {Math.round(daySchedule.totalStudyTimeMinutes / 60)}h
+                                {Math.round((daySchedule.tasks.reduce((s,t)=>s+t.durationMinutes,0))/60)}h
                             </span>
                         )}
                         {daySchedule?.isRestDay && (
