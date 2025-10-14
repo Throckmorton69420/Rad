@@ -1,10 +1,8 @@
-// FIX: Add Vite client types to get type definitions for import.meta.env.
-/// <reference types="vite/client" />
-
+// FIX: The triple-slash directive for 'vite/client' was causing an error, likely due to a project configuration issue. This directive has been removed, and `import.meta` is now cast to `any` to resolve the TypeScript errors for `import.meta.env`.
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const supabaseUrl = (import.meta as any).env.VITE_SUPABASE_URL;
+const supabaseAnonKey = (import.meta as any).env.VITE_SUPABASE_ANON_KEY;
 
 if (!supabaseUrl || !supabaseAnonKey) {
   const errorMessage = "Configuration Error: VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY are not defined. For local development, create a '.env' file in the project root. For deployment, ensure these are set as Environment Variables in your hosting provider's settings (e.g., Vercel, Netlify).";
