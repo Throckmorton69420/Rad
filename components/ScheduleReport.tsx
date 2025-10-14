@@ -53,7 +53,7 @@ const ScheduleReport: React.FC<ScheduleReportProps> = ({ studyPlan, schedule }) 
                     </thead>
                     <tbody>
                       {day.tasks.map(task => (
-                        <tr key={task.id} className="border-b border-gray-200">
+                        <tr key={task.id} className="border-b border-gray-200 print-no-break">
                           <td className="py-1 pr-2">{task.title}</td>
                           <td className="py-1 px-2">{formatDuration(task.durationMinutes)}</td>
                           <td className="py-1 pl-2">{task.originalTopic}</td>

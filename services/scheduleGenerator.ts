@@ -18,8 +18,8 @@ const calculateResourceDuration = (resource: StudyResource): number => {
     case ResourceType.QUESTIONS:
     case ResourceType.REVIEW_QUESTIONS:
     case ResourceType.QUESTION_REVIEW:
-      // 1 minute per question (more efficient pace)
-      return Math.round((resource.questionCount || 0) * 1.0);
+      // 1 minute per question to do, 30 seconds to review = 1.5 minutes total
+      return Math.round((resource.questionCount || 0) * 1.5);
     default:
       return resource.durationMinutes;
   }
@@ -59,8 +59,7 @@ export const generateInitialSchedule = (
   endDate: string,
   areSpecialTopicsInterleaved: boolean = true,
 ): GeneratedStudyPlanOutcome => {
-    let schedule: DailySchedule[] = [];
-    const scheduledResourceIds = new Set<string>();
+    const schedule: DailySchedule[] = [];
     const notifications: { type: 'error' | 'warning' | 'info'; message: string }[] = [];
     const exceptionMap = new Map(exceptionDates.map(e => [e.date, e]));
     
@@ -70,7 +69,6 @@ export const generateInitialSchedule = (
     while (currentDate <= finalDate) {
         const dateStr = currentDate.toISOString().split('T')[0];
         const exception = exceptionMap.get(dateStr);
-        // FIX: Removed logic that auto-assigns weekends as rest days. All days are now study days by default.
         const isRestDay = exception ? exception.isRestDayOverride : false;
         
         schedule.push({
@@ -86,29 +84,28 @@ export const generateInitialSchedule = (
     
     const availableResources = masterResourcePool.filter(r => !r.isArchived);
     const resourceMap = new Map(availableResources.map(r => [r.id, r]));
+    const scheduledResourceIds = new Set<string>();
     
-    let currentTopicIndex = 0;
+    let topicOrderIndex = 0;
     const coveredDomains = new Set<Domain>();
 
-    // --- PASS 1: Primary Content & Daily Requirements ---
+    // --- PASS 1: Primary Content ---
     for (const day of schedule) {
-        if (day.isRestDay) {
-            day.tasks.forEach(task => coveredDomains.add(task.originalTopic));
-            continue;
-        }
+        if (day.isRestDay) continue;
 
-        let remainingTime = day.totalStudyTimeMinutes - day.tasks.reduce((sum, task) => sum + task.durationMinutes, 0);
+        let remainingTime = day.totalStudyTimeMinutes;
         let taskOrder = day.tasks.length;
-
-        const scheduleResourceSet = (mainResourceId: string, isOptional = false): boolean => {
+        const topicsToday = new Set<Domain>();
+        
+        const scheduleResourceSet = (mainResourceId: string, isOptional: boolean = false): boolean => {
             const mainResource = resourceMap.get(mainResourceId);
-            if (!mainResource || scheduledResourceIds.has(mainResourceId)) return false;
+            if (!mainResource || scheduledResourceIds.has(mainResourceId) || (isOptional && !mainResource.isPrimaryMaterial)) return false;
 
             const resourceSet = [mainResource];
             (mainResource.pairedResourceIds || []).forEach(id => {
                 const paired = resourceMap.get(id);
                 if (paired && !scheduledResourceIds.has(id) && paired.isPrimaryMaterial) {
-                    resourceSet.push(paired);
+                   resourceSet.push(paired);
                 }
             });
 
@@ -125,61 +122,45 @@ export const generateInitialSchedule = (
                         day.tasks.push(task);
                         remainingTime -= task.durationMinutes;
                         scheduledResourceIds.add(res.id);
-                        coveredDomains.add(res.domain);
+                        topicsToday.add(res.domain);
                     });
                 return true;
             }
             return false;
         };
-        
-        // **NEW LOGIC**: Schedule Primary Topic of the day FIRST
-        let topicScheduled = false;
-        let attempts = 0;
-        while (!topicScheduled && attempts < topicOrder.length && remainingTime > 30) {
-            const topic = topicOrder[currentTopicIndex % topicOrder.length];
-            const nextResource = availableResources.find(r => 
-                r.domain === topic && 
-                r.isPrimaryMaterial && 
-                r.type === ResourceType.VIDEO_LECTURE && 
-                !scheduledResourceIds.has(r.id)
-            );
-            
-            if (nextResource && scheduleResourceSet(nextResource.id)) {
-                topicScheduled = true;
-            } else {
-                currentTopicIndex++;
-            }
-            attempts++;
+
+        // Main Topic Block
+        const currentTopic = topicOrder[topicOrderIndex % topicOrder.length];
+        const titanVideo = availableResources.find(r => !scheduledResourceIds.has(r.id) && r.videoSource === 'Titan Radiology' && r.domain === currentTopic && r.isPrimaryMaterial);
+        if (titanVideo && scheduleResourceSet(titanVideo.id)) {
+            topicOrderIndex++; // Only advance topic if main block is scheduled
         }
-        if (topicScheduled) currentTopicIndex++;
 
-        // **NEW LOGIC**: Schedule daily requirements IF interleaving is on
-        if (areSpecialTopicsInterleaved) {
-            // Schedule Daily Physics
-            const nextHudaPhysics = availableResources.find(r => r.videoSource === 'Huda' && !scheduledResourceIds.has(r.id));
-            if (nextHudaPhysics) {
-                scheduleResourceSet(nextHudaPhysics.id);
-            } else {
-                const nextTitanPhysics = availableResources.find(r => r.domain === Domain.PHYSICS && r.videoSource === 'Titan Radiology' && !scheduledResourceIds.has(r.id));
-                if (nextTitanPhysics) scheduleResourceSet(nextTitanPhysics.id);
-            }
-
-            // Schedule Daily Nucs
-            const nextNucs = availableResources.find(r => r.domain === Domain.NUCLEAR_MEDICINE && r.isPrimaryMaterial && !scheduledResourceIds.has(r.id));
-            if(nextNucs) scheduleResourceSet(nextNucs.id);
+        // Daily Requirements
+        // Physics (Huda first, then Titan/War Machine)
+        const hudaPhys = availableResources.find(r => !scheduledResourceIds.has(r.id) && r.videoSource === 'Huda' && r.isPrimaryMaterial);
+        if (!hudaPhys || !scheduleResourceSet(hudaPhys.id)) {
+            const titanPhys = availableResources.find(r => !scheduledResourceIds.has(r.id) && r.videoSource === 'Titan Radiology' && r.domain === Domain.PHYSICS && r.isPrimaryMaterial);
+            if (titanPhys) scheduleResourceSet(titanPhys.id);
         }
-        
-        // Schedule Daily NIS/RISC (Always daily)
-        const nextNis = availableResources.find(r => r.domain === Domain.NIS && r.isPrimaryMaterial && !scheduledResourceIds.has(r.id));
-        if(nextNis) scheduleResourceSet(nextNis.id);
-        
-        const nextRisc = availableResources.find(r => r.domain === Domain.RISC && r.isPrimaryMaterial && !scheduledResourceIds.has(r.id));
-        if(nextRisc) scheduleResourceSet(nextRisc.id);
 
-        // Schedule Board Vitals (Mixed review on covered topics)
-        const coveredArray = Array.from(coveredDomains);
-        const nextBoardVitals = availableResources.find(r => r.bookSource === 'Board Vitals' && !scheduledResourceIds.has(r.id) && coveredArray.includes(r.domain));
-        if(nextBoardVitals) scheduleResourceSet(nextBoardVitals.id);
+        // Nucs
+        const nucsResource = availableResources.find(r => !scheduledResourceIds.has(r.id) && r.domain === Domain.NUCLEAR_MEDICINE && r.isPrimaryMaterial);
+        if (nucsResource) scheduleResourceSet(nucsResource.id);
+        
+        // NIS & RISC
+        const nisResource = availableResources.find(r => !scheduledResourceIds.has(r.id) && r.domain === Domain.NIS && r.isPrimaryMaterial);
+        if (nisResource) scheduleResourceSet(nisResource.id);
+        const riscResource = availableResources.find(r => !scheduledResourceIds.has(r.id) && r.domain === Domain.RISC && r.isPrimaryMaterial);
+        if (riscResource) scheduleResourceSet(riscResource.id);
+        
+        // Board Vitals on cumulatively covered topics
+        const cumulativelyCoveredArray = Array.from(coveredDomains);
+        const boardVitalsResource = availableResources.find(r => !scheduledResourceIds.has(r.id) && r.bookSource === 'Board Vitals' && cumulativelyCoveredArray.includes(r.domain));
+        if (boardVitalsResource) scheduleResourceSet(boardVitalsResource.id);
+        
+        // Update cumulative domains after all primary scheduling for the day
+        topicsToday.forEach(topic => coveredDomains.add(topic));
     }
 
     // Pass 2: Supplementary Lectures (Discord)
@@ -209,7 +190,7 @@ export const generateInitialSchedule = (
         day.tasks.forEach(t => allCoveredTopicsCumulative.add(t.originalTopic));
         if (day.isRestDay) continue;
         let remainingTime = day.totalStudyTimeMinutes - day.tasks.reduce((sum, t) => sum + t.durationMinutes, 0);
-        if (remainingTime <= 15) continue;
+        if (remainingTime <= 5) continue;
 
         const coreReadings = availableResources
             .filter(r => r.bookSource === 'Core Radiology' && !scheduledResourceIds.has(r.id) && allCoveredTopicsCumulative.has(r.domain))
@@ -224,10 +205,10 @@ export const generateInitialSchedule = (
             }
         }
     }
-
-    // Pass 4: Finalization
+    
+    // Finalization Pass
     schedule.forEach(day => {
-        day.tasks.sort((a,b) => a.order - b.order);
+        day.tasks.sort((a, b) => a.order - b.order);
         day.tasks.forEach((task, index) => task.order = index);
     });
 
@@ -253,6 +234,7 @@ export const generateInitialSchedule = (
     
     return { plan, notifications };
 };
+
 
 export const rebalanceSchedule = (
   currentPlan: StudyPlan,
