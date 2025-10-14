@@ -52,7 +52,7 @@ const ScheduleReport: React.FC<ScheduleReportProps> = ({ studyPlan, schedule }) 
                       </tr>
                     </thead>
                     <tbody>
-                      {(() => { const tasksSorted = [...day.tasks].sort((a,b)=>{ const pa=a.isPrimaryMaterial?0:1; const pb=b.isPrimaryMaterial?0:1; if(pa!==pb) return pa-pb; const ta=(TASK_TYPE_PRIORITY[a.type]??99); const tb=(TASK_TYPE_PRIORITY[b.type]??99); if(ta!==tb) return ta-tb; return (a.order??0)-(b.order??0); }); return tasksSorted; })().map((task, index) => (
+                      {day.tasks.map((task, index) => (
                         <tr key={task.id} className={`border-b border-gray-200 print-no-break ${index % 2 !== 0 ? 'bg-gray-50' : ''}`}>
                           <td className="py-1.5 px-2">{task.title}</td>
                           <td className="py-1.5 px-2 text-right">{formatDuration(task.durationMinutes)}</td>
