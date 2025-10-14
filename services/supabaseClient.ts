@@ -1,6 +1,7 @@
-// FIX: The triple-slash directive for 'vite/client' was causing an error, likely due to a project configuration issue. This directive has been removed, and `import.meta` is now cast to `any` to resolve the TypeScript errors for `import.meta.env`.
 import { createClient } from '@supabase/supabase-js';
 
+// FIX: Cast `import.meta` to any to bypass TypeScript error for Vite environment variables.
+// This is necessary because a `vite-env.d.ts` file cannot be added to provide the correct types.
 const supabaseUrl = (import.meta as any).env.VITE_SUPABASE_URL;
 const supabaseAnonKey = (import.meta as any).env.VITE_SUPABASE_ANON_KEY;
 
@@ -17,9 +18,6 @@ if (!supabaseUrl || !supabaseAnonKey) {
   throw new Error(errorMessage);
 }
 
-// FIX: The complex 'PlanDataBlob' type was causing Supabase's generic type inference to fail, resulting in a 'never' type for the table.
-// Replacing the specific type or a generic 'Json' type with 'any' resolves this inference issue, allowing both select and upsert operations to be correctly typed.
-// Type safety is preserved by casting the 'any' type back to 'PlanDataBlob' when the data is consumed.
 export interface Database {
   public: {
     Tables: {

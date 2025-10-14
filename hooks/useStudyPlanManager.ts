@@ -335,6 +335,16 @@ export const useStudyPlanManager = (showConfirmation: (options: ShowConfirmation
         setSystemNotification({ type: 'info', message: `Interleaving is now ${isActive ? 'ON' : 'OFF'}. Rebalancing...` });
     };
 
+    // FIX: Add function to handle deadline updates and rebalance.
+    const handleUpdateDeadlines = (newDeadlines: DeadlineSettings) => {
+        if (!studyPlan) return;
+        updatePreviousStudyPlan(studyPlan);
+        const updatedPlan = { ...studyPlan, deadlines: newDeadlines };
+        setStudyPlan(updatedPlan);
+        triggerRebalance(updatedPlan, { type: 'standard' });
+        setSystemNotification({ type: 'info', message: `Deadlines updated. Rebalancing schedule.` });
+    };
+
     const handleTaskToggle = (taskId: string, selectedDate: string) => {
         setStudyPlan((prevPlan): StudyPlan | null => {
             if (!prevPlan) return null;
@@ -408,6 +418,8 @@ export const useStudyPlanManager = (showConfirmation: (options: ShowConfirmation
         systemNotification,
         setSystemNotification,
         isNewUser,
+        // FIX: Export setIsNewUser to be used by the WelcomeModal.
+        setIsNewUser,
         loadSchedule,
         handleRebalance,
         handleUpdatePlanDates,
@@ -422,5 +434,7 @@ export const useStudyPlanManager = (showConfirmation: (options: ShowConfirmation
         saveStatus,
         handleToggleRestDay,
         handleAddOrUpdateException,
+        // FIX: Export the new handler.
+        handleUpdateDeadlines,
     };
 };
