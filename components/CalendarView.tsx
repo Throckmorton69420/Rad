@@ -106,11 +106,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ schedule, selectedDate, onD
                         aria-label={`${parseDateString(dateStr).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', timeZone: 'UTC' })}. ${daySchedule ? (daySchedule.isRestDay ? 'Rest Day' : `${Math.round((daySchedule.tasks.reduce((s,t)=>s+t.durationMinutes,0))/60)} hours scheduled.`) : 'No tasks.'}`}
                     >
                         <span className={`${isSelected ? 'font-bold' : ''}`}>{dayOfMonth}</span>
-                        {daySchedule && !daySchedule.isRestDay && daySchedule.tasks.length > 0 && (
-                            <span className={`mt-auto text-xxs px-1 py-0.5 rounded ${isSelected ? 'bg-black/30' : 'bg-black/50'}`}>
-                                {Math.round((daySchedule.tasks.reduce((s,t)=>s+t.durationMinutes,0))/60)}h
-                            </span>
-                        )}
+                        {(() => { const scheduledMins = daySchedule ? daySchedule.tasks.reduce((s,t)=>s+t.durationMinutes,0) : 0; const cap = daySchedule ? daySchedule.totalStudyTimeMinutes : 0; const util = cap>0 ? (scheduledMins/cap) : 0; const utilClass = util>=0.9 ? 'bg-red-500/35' : util>=0.75 ? 'bg-orange-500/30' : util>=0.5 ? 'bg-yellow-500/25' : util>=0.25 ? 'bg-green-500/20' : 'bg-green-500/10'; return (daySchedule && !daySchedule.isRestDay && scheduledMins>0) ? (<span className={`mt-auto text-xxs px-1 py-0.5 rounded ${isSelected ? 'bg-black/30' : utilClass}`}>{Math.round(scheduledMins/60)}h</span>) : null; })()}
                         {daySchedule?.isRestDay && (
                             <i className="fas fa-coffee text-xxs self-center mt-auto text-gray-500"></i>
                         )}

@@ -23,13 +23,14 @@ import {
 import { getTodayInNewYork, parseDateString } from '../utils/timeFormatter';
 
 /**
- * Scheduling algorithm implementation that matches the user's spec:
- * - Phase 1 (strict): Round-robin distribution of complete topic blocks in priority order: Titan → Huda → Other primaries.
- *   Blocks include paired resources, even if those are not flagged as primary.
- * - Phase 2 (daily requirements): Ensure daily placement for Nuc Med and NIS/RISC, plus context-aware Board Vitals.
- * - Phase 2b (primary fill to capacity): After Phase 1+2, greedily fill the remaining minutes of each day with remaining primary resources until days reach their per-day cap.
- * - Phase 3 (supplementary only after all primaries placed): Topic-aware then general fill. Discord priority over Core Radiology.
- * - No supplementary resources are scheduled if any primary items remain unscheduled.
+ * Scheduling algorithm per spec with enhancements:
+ * - Phase 1: Strict block round-robin (Titan → Huda → Other primaries), blocks include paired non-primary items.
+ * - Phase 2: Daily requirements (Nucs, NIS/RISC, context-aware Board Vitals).
+ * - Phase 2b: Fill remaining capacity with any remaining primaries (to reach day cap), before any supplementary.
+ * - Phase 3: Supplementary only when no primaries remain (Discord prioritized, then others), topic-aware then general.
+ * - Finalize: Tasks sorted within each day by primary-first, then TASK_TYPE_PRIORITY, then insertion order.
+ * - Guards: Prevent Phase 3 if any primaries remain; warn after finalize if any primaries unscheduled.
+ * - Titan anchors sorted by chapterNumber ascending (fallback to sequenceOrder), Physics/Nucs interleaving unchanged.
  */
 
 const isoDate = (d: Date) => d.toISOString().split('T')[0];
@@ -59,6 +60,16 @@ const chunkLargeResources = (resources: StudyResource[]): StudyResource[] => {
 
 const sumDay = (day: DailySchedule) => day.tasks.reduce((s, t) => s + t.durationMinutes, 0);
 
+const compareTasksByPriority = (a: ScheduledTask, b: ScheduledTask) => {
+  const pa = a.isPrimaryMaterial ? 0 : 1;
+  const pb = b.isPrimaryMaterial ? 0 : 1;
+  if (pa !== pb) return pa - pb;
+  const ta = TASK_TYPE_PRIORITY[a.type] ?? 99;
+  const tb = TASK_TYPE_PRIORITY[b.type] ?? 99;
+  if (ta !== tb) return ta - tb;
+  return (a.order ?? 0) - (b.order ?? 0);
+};
+
 type Block = {
   anchorId: string;
   domain: Domain;
@@ -86,7 +97,7 @@ class Scheduler {
     deadlines: DeadlineSettings,
     areSpecialTopicsInterleaved: boolean
   ) {
-    // Do not pre-filter by primary here; paired resources in Phase 1 may be non-primary.
+    // Do not pre-filter by primary; Phase 1 blocks include paired items that may be non-primary.
     const chunked = chunkLargeResources(resourcePool);
     this.allResources = new Map(chunked.map(r => [r.id, r]));
     this.remaining = new Set(chunked.map(r => r.id));
@@ -167,6 +178,7 @@ class Scheduler {
       }
     }
 
+    // within-block order by type priority, stable by input order via order tie
     items.sort((a, b) => (TASK_TYPE_PRIORITY[a.type] || 99) - (TASK_TYPE_PRIORITY[b.type] || 99));
     const total = items.reduce((s, r) => s + r.durationMinutes, 0);
     return { anchorId: anchor.id, domain: anchor.domain, items, totalMinutes: total };
@@ -236,7 +248,14 @@ class Scheduler {
         && (r.type === ResourceType.VIDEO_LECTURE || r.type === ResourceType.HIGH_YIELD_VIDEO)
         && r.videoSource === 'Titan Radiology');
 
-    anchors.sort((a, b) => (a.sequenceOrder || 9999) - (b.sequenceOrder || 9999));
+    // Titan chapter ascending → prefer chapterNumber, fallback sequenceOrder
+    anchors.sort((a, b) => {
+      const ca = a.chapterNumber ?? 9999;
+      const cb = b.chapterNumber ?? 9999;
+      if (ca !== cb) return ca - cb;
+      return (a.sequenceOrder || 9999) - (b.sequenceOrder || 9999);
+    });
+
     const blocks = anchors.map(a => this.buildBlockFromAnchor(a));
     return this.placeBlockStrictRoundRobin(blocks, cursorStart);
   }
@@ -319,15 +338,13 @@ class Scheduler {
     }
   }
 
-  // New: Phase 2b — fill remaining day capacity with any remaining primary resources before scheduling any supplementary
+  // Phase 2b — fill remaining capacity with remaining primaries before any supplementary
   private phase2b_fillPrimariesToCapacity(): void {
-    // Build a list of remaining primaries
-    const remainingPrimaries = [...this.remaining]
+    const primaries = [...this.remaining]
       .map(id => this.allResources.get(id)!)
       .filter(r => r && r.isPrimaryMaterial);
 
-    // Sort by: type priority, then sequenceOrder, then shorter first (to fit more)
-    remainingPrimaries.sort((a, b) => {
+    primaries.sort((a, b) => {
       const typeCmp = (TASK_TYPE_PRIORITY[a.type] || 99) - (TASK_TYPE_PRIORITY[b.type] || 99);
       if (typeCmp !== 0) return typeCmp;
       const seqCmp = (a.sequenceOrder || 9999) - (b.sequenceOrder || 9999);
@@ -335,22 +352,19 @@ class Scheduler {
       return a.durationMinutes - b.durationMinutes;
     });
 
-    if (remainingPrimaries.length === 0) return;
-
-    // For each day, fill to capacity with primaries
     for (const day of this.studyDays) {
       if (day.isRestDay) continue;
       let rt = this.remainingTime(day);
       if (rt <= 0) continue;
 
-      for (let i = 0; i < remainingPrimaries.length && rt > 0; ) {
-        const r = remainingPrimaries[i];
-        if (!this.remaining.has(r.id)) { remainingPrimaries.splice(i, 1); continue; }
+      for (let i = 0; i < primaries.length && rt > 0; ) {
+        const r = primaries[i];
+        if (!this.remaining.has(r.id)) { primaries.splice(i, 1); continue; }
         if (r.durationMinutes <= rt) {
           day.tasks.push(this.toTask(r, day.tasks.length));
           this.remaining.delete(r.id);
           rt -= r.durationMinutes;
-          remainingPrimaries.splice(i, 1);
+          primaries.splice(i, 1);
         } else {
           i++;
         }
@@ -359,7 +373,7 @@ class Scheduler {
   }
 
   private phase3_supplementaryFill(): void {
-    // If any primary resources remain, do NOT schedule supplementary. This enforces the user's rule.
+    // Guard: do not schedule supplementary if any primary remains
     const anyPrimaryLeft = [...this.remaining].some(id => this.allResources.get(id)?.isPrimaryMaterial);
     if (anyPrimaryLeft) {
       this.notifications.push({ type: 'info', message: 'Primary resources remain; supplementary scheduling deferred.' });
@@ -407,12 +421,17 @@ class Scheduler {
   }
 
   private finalize(): void {
-    // Sort tasks within each day by insertion order
-    for (const day of this.schedule) day.tasks.sort((a, b) => a.order - b.order);
+    // Canonical task ordering per day
+    for (const day of this.schedule) day.tasks.sort(compareTasksByPriority);
+
     // Report unscheduled
+    const primariesUnscheduled = [...this.remaining].filter(id => this.allResources.get(id)?.isPrimaryMaterial);
     for (const id of this.remaining) {
       const r = this.allResources.get(id);
       if (r) this.notifications.push({ type: 'warning', message: `Could not schedule: "${r.title}" (${r.durationMinutes} min)` });
+    }
+    if (primariesUnscheduled.length > 0) {
+      this.notifications.push({ type: 'warning', message: `Unscheduled primary items remain (${primariesUnscheduled.length}). Consider extending range or reducing exceptions.` });
     }
   }
 
@@ -445,10 +464,10 @@ class Scheduler {
     // Phase 2: daily requirements
     this.phase2_dailyFirstFit();
 
-    // Phase 2b: fill remaining capacity with any remaining primaries (to reach up to daily caps)
+    // Phase 2b: fill remaining capacity with primaries up to per-day caps
     this.phase2b_fillPrimariesToCapacity();
 
-    // Phase 3: supplementary only if all primaries are placed
+    // Phase 3: supplementary only if no primaries remain
     this.phase3_supplementaryFill();
 
     // Finalize
