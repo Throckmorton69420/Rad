@@ -148,7 +148,10 @@ export interface GeneratedStudyPlanOutcome {
 }
 
 export type RebalanceType = 'standard' | 'topic-time';
-export interface StandardRebalanceOptions { type: 'standard'; }
+export interface StandardRebalanceOptions {
+    type: 'standard';
+    rebalanceDate?: string;
+}
 export interface TopicTimeRebalanceOptions {
     type: 'topic-time';
     date: string;

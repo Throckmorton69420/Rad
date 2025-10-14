@@ -150,8 +150,7 @@ const SidebarContent = React.memo(({
                         <h2 className="text-lg font-semibold mb-3 border-b border-[var(--separator-primary)] pb-2 text-[var(--text-primary)]">Actions</h2>
                         <div className="space-y-2">
                             <Button onClick={handleUndo} variant="secondary" className="w-full" disabled={!previousStudyPlan || isLoading}><i className="fas fa-undo mr-2"></i> Undo Last Plan Change</Button>
-                            {/* FIX: Changed onConfirm to trigger a standard rebalance from today, instead of a full regeneration. */}
-                            <Button onClick={() => showConfirmation({title: "Regenerate Schedule?", message: "This will regenerate the schedule from today onwards, preserving past work. Are you sure?", confirmText: "Regenerate", confirmVariant: 'danger', onConfirm: () => handleRebalance({ type: 'standard' })})} variant="danger" className="w-full" disabled={isLoading}>Regenerate Schedule</Button>
+                            <Button onClick={() => showConfirmation({title: "Regenerate Schedule?", message: "This will regenerate the schedule from the currently selected day onwards, preserving past work. Are you sure?", confirmText: "Regenerate", confirmVariant: 'danger', onConfirm: () => handleRebalance({ type: 'standard', rebalanceDate: selectedDate })})} variant="danger" className="w-full" disabled={isLoading}>Regenerate Schedule</Button>
                             <Button onClick={() => showConfirmation({title: "Reset All Progress?", message: "Are you sure you want to mark all tasks as 'pending'?", confirmText: "Reset Progress", confirmVariant: 'danger', onConfirm: handleMasterResetTasks})} variant="danger" className="w-full" disabled={isLoading}>Reset Task Progress</Button>
                         </div>
                     </div>
