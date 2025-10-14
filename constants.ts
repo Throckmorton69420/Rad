@@ -10,7 +10,7 @@ export const EXAM_DATE_START = "2025-11-11";
 export const STUDY_START_DATE = "2025-10-10";
 export const STUDY_END_DATE = "2025-11-05"; 
 
-export const DEFAULT_DAILY_STUDY_MINS = 480; // 8 hours baseline
+export const DEFAULT_DAILY_STUDY_MINS = 840; // 14 hours baseline
 
 export const WEEKDAY_QUESTION_BLOCK_OVERFLOW_MINUTES = 45; // Allow Q&R block to exceed daily budget on weekdays
 export const WEEKEND_QUESTION_BLOCK_OVERFLOW_MINUTES = 90; // Allow Q&R block to exceed daily budget on weekends

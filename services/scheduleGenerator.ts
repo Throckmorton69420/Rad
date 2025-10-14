@@ -105,7 +105,7 @@ class Scheduler {
             days.push({
                 date: dateStr, dayName, tasks: [],
                 totalStudyTimeMinutes: exception?.targetMinutes ?? DEFAULT_DAILY_STUDY_MINS,
-                isRestDay: exception?.isRestDayOverride ?? (dt.getUTCDay() === 0 || dt.getUTCDay() === 6),
+                isRestDay: exception?.isRestDayOverride ?? false,
                 isManuallyModified: !!exception,
             });
         }
@@ -140,7 +140,6 @@ class Scheduler {
         const primaryResources = Array.from(this.resourcePool.values()).filter(r => r.isPrimaryMaterial);
         const usedIds = new Set<string>();
         const blocks: TopicBlock[] = [];
-
         const sortedAnchors = primaryResources.sort((a, b) => (a.sequenceOrder ?? 9999) - (b.sequenceOrder ?? 9999));
 
         for (const anchor of sortedAnchors) {
@@ -174,28 +173,58 @@ class Scheduler {
         }
         
         const processQueue = (queue: TopicBlock[]) => {
-            let dayIndex = 0;
-            for (const block of queue) {
-                let scheduled = false;
-                for (let i = 0; i < this.studyDays.length; i++) {
-                    const currentDayIndex = (dayIndex + i) % this.studyDays.length;
-                    const day = this.studyDays[currentDayIndex];
-                    if (this.getRemainingTimeForDay(day) >= block.totalDuration) {
-                        this.scheduleTask(day, block.anchorResource);
-                        block.associatedResources.forEach(res => this.scheduleTask(day, res));
-                        block.allResourceIds.forEach(id => this.resourcePool.delete(id));
-                        dayIndex = currentDayIndex + 1;
-                        scheduled = true;
-                        break;
-                    }
-                }
+            let nextBlockStartDayIndex = 0;
+            if (this.studyDays.length === 0) return;
 
-                if (!scheduled) {
-                    this.notifications.push({
-                        type: 'warning',
-                        message: `Could not schedule: "${block.anchorResource.title}" block (${formatDuration(block.totalDuration)}). Not enough time in any single day.`
-                    });
+            for (const block of queue) {
+                let resourcesToSchedule = [block.anchorResource, ...block.associatedResources];
+                resourcesToSchedule.sort((a, b) => (a.sequenceOrder ?? 9999) - (b.sequenceOrder ?? 9999));
+
+                let currentDayIndexForSpill = nextBlockStartDayIndex;
+
+                for (const resource of resourcesToSchedule) {
+                    let remainingDuration = resource.durationMinutes;
+                    let isSplit = false;
+                    
+                    while (remainingDuration > 0) {
+                        if (currentDayIndexForSpill >= this.studyDays.length) {
+                            this.notifications.push({ type: 'warning', message: `Ran out of days for block: "${block.anchorResource.title}". Some tasks unscheduled.` });
+                            break; 
+                        }
+
+                        const day = this.studyDays[currentDayIndexForSpill];
+                        const availableTime = this.getRemainingTimeForDay(day);
+
+                        if (availableTime <= 0) {
+                            currentDayIndexForSpill++;
+                            continue;
+                        }
+
+                        if (remainingDuration <= availableTime) {
+                            const taskResource = isSplit ? 
+                                {...resource, id: `${resource.id}_part_final`, title: `${resource.title} (Conclusion)`, durationMinutes: remainingDuration, isSplittable: false } :
+                                resource;
+                            this.scheduleTask(day, taskResource);
+                            remainingDuration = 0;
+                        } else {
+                            if (!resource.isSplittable || availableTime < MIN_DURATION_for_SPLIT_PART) {
+                                currentDayIndexForSpill++;
+                                continue;
+                            }
+                            const partDuration = availableTime;
+                            const partResource = {...resource, id: `${resource.id}_part_${currentDayIndexForSpill}`, title: `${resource.title} (Part)`, durationMinutes: partDuration, isSplittable: false };
+                            this.scheduleTask(day, partResource);
+                            
+                            remainingDuration -= partDuration;
+                            isSplit = true;
+                            currentDayIndexForSpill++;
+                        }
+                    }
+                     if (remainingDuration > 0) break;
                 }
+                
+                block.allResourceIds.forEach(id => this.resourcePool.delete(id));
+                nextBlockStartDayIndex = (nextBlockStartDayIndex + 1) % this.studyDays.length;
             }
         };
 
