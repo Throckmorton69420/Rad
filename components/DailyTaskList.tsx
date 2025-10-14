@@ -4,7 +4,6 @@ import { parseDateString, formatDuration } from '../utils/timeFormatter';
 import { Button } from './Button';
 import TaskGroupItem from './TaskGroupItem';
 import TaskItem from './TaskItem';
-import { getCategoryRankFromTask, CATEGORY_LABEL } from '../utils/taskPriority';
 
 interface DailyTaskListProps {
   day: DailySchedule;
@@ -15,78 +14,70 @@ interface DailyTaskListProps {
 
 type DragState = { fromId: string | null };
 
+const normalizeSource = (t: ScheduledTask) =>
+  (t.bookSource || t.videoSource || 'Custom Task').trim();
+
 const DailyTaskList: React.FC<DailyTaskListProps> = ({
   day,
   onToggleTask,
   onOpenModify,
   onReorderTasks,
 }) => {
-  // Preserve the exact on-screen order locally for DnD; reset when day.tasks changes
+  // Maintain on-screen order for DnD; reset when day changes
   const [ordered, setOrdered] = React.useState<ScheduledTask[]>(day.tasks);
   React.useEffect(() => setOrdered(day.tasks), [day.tasks]);
 
-  // Compute total minutes for header
-  const totalMinutes = React.useMemo(
-    () => ordered.reduce((sum, t) => sum + t.durationMinutes, 0),
-    [ordered]
-  );
-
-  // Group by your 12-tier categories, but keep the user’s current order
+  // Build grouped view by source, preserving current order
   const groups = React.useMemo(() => {
-    const byCat = new Map<number, ScheduledTask[]>();
+    const m = new Map<string, ScheduledTask[]>();
     for (const t of ordered) {
-      const cat = getCategoryRankFromTask(t) || 12;
-      if (!byCat.has(cat)) byCat.set(cat, []);
-      byCat.get(cat)!.push(t);
+      const key = normalizeSource(t);
+      if (!m.has(key)) m.set(key, []);
+      m.get(key)!.push(t);
     }
-    return byCat;
+    return m;
   }, [ordered]);
 
-  // Track which groups are expanded; default: groups that have tasks are expanded
+  // Expanded state per source; default expand sources that have tasks
   const initialExpanded = React.useMemo(() => {
-    const exp = new Set<number>();
-    for (let cat = 1; cat <= 12; cat++) {
-      if ((groups.get(cat) ?? []).length > 0) exp.add(cat);
-    }
-    return exp;
+    const s = new Set<string>();
+    for (const k of groups.keys()) s.add(k);
+    return s;
   }, [groups]);
 
-  const [expandedCats, setExpandedCats] = React.useState<Set<number>>(initialExpanded);
-  React.useEffect(() => setExpandedCats(initialExpanded), [initialExpanded]);
+  const [expanded, setExpanded] = React.useState<Set<string>>(initialExpanded);
+  React.useEffect(() => setExpanded(initialExpanded), [initialExpanded]);
 
-  const toggleCat = (cat: number) =>
-    setExpandedCats((prev) => {
+  const toggleGroup = (key: string) =>
+    setExpanded(prev => {
       const next = new Set(prev);
-      if (next.has(cat)) next.delete(cat);
-      else next.add(cat);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
       return next;
     });
 
-  // Native DnD across the entire day (keeps styling intact on each TaskItem)
+  // Total time for header
+  const totalMinutes = React.useMemo(
+    () => ordered.reduce((s, t) => s + t.durationMinutes, 0),
+    [ordered]
+  );
+
+  // Native drag-and-drop across entire day, no style changes
   const dragRef = React.useRef<DragState>({ fromId: null });
-
-  const onTaskDragStart = (taskId: string) => {
-    dragRef.current.fromId = taskId;
-  };
-
-  const onTaskDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-  };
-
+  const onTaskDragStart = (id: string) => (dragRef.current.fromId = id);
+  const onTaskDragOver = (e: React.DragEvent) => e.preventDefault();
   const onTaskDrop = (targetId: string) => {
     const fromId = dragRef.current.fromId;
     if (!fromId || fromId === targetId) return;
-
-    setOrdered((prev) => {
+    setOrdered(prev => {
       const next = [...prev];
-      const from = next.findIndex((t) => t.id === fromId);
-      const to = next.findIndex((t) => t.id === targetId);
+      const from = next.findIndex(t => t.id === fromId);
+      const to = next.findIndex(t => t.id === targetId);
       if (from < 0 || to < 0) return prev;
       const [moved] = next.splice(from, 1);
       next.splice(to, 0, moved);
       return next;
     });
-
     dragRef.current.fromId = null;
   };
 
@@ -95,40 +86,35 @@ const DailyTaskList: React.FC<DailyTaskListProps> = ({
     onReorderTasks?.(day.date, reindexed);
   };
 
-  const renderGroup = (cat: number) => {
-    const tasks = groups.get(cat) ?? [];
-    if (tasks.length === 0) return null;
-
-    const groupKey = `cat-${cat}`;
-    const label = CATEGORY_LABEL[cat] || `Category ${cat}`;
-    const isExpanded = expandedCats.has(cat);
-
+  // Render a single grouped section (source name, color, tasks)
+  const renderGroup = (sourceName: string, tasks: ScheduledTask[]) => {
+    const key = sourceName || 'Custom Task';
+    const isExpanded = expanded.has(key);
     return (
-      <div key={groupKey} className="mb-3">
+      <div key={key} className="mb-3">
         <TaskGroupItem
-          groupKey={groupKey}
-          sourceName={label}
+          groupKey={key}
+          sourceName={sourceName}
           tasks={tasks}
           isExpanded={isExpanded}
-          onToggle={() => toggleCat(cat)}
+          onToggle={() => toggleGroup(key)}
         />
         {isExpanded && (
-          <div id={`task-group-${groupKey}`} className="mt-2 space-y-1.5">
-            {tasks.map((task) => (
+          <div id={`task-group-${key}`} className="mt-2 space-y-1.5">
+            {tasks.map(task => (
               <div
                 key={task.id}
                 draggable
                 onDragStart={() => onTaskDragStart(task.id)}
                 onDragOver={onTaskDragOver}
                 onDrop={() => onTaskDrop(task.id)}
-                // DO NOT change styling; TaskItem keeps your original look
               >
                 <TaskItem
                   task={task}
                   onToggle={onToggleTask}
                   isCurrentPomodoroTask={false}
                   isPulsing={false}
-                  onSetPomodoro={() => { /* no-op here; your existing wiring handles this elsewhere */ }}
+                  onSetPomodoro={() => {}}
                 />
               </div>
             ))}
@@ -140,7 +126,7 @@ const DailyTaskList: React.FC<DailyTaskListProps> = ({
 
   return (
     <div className="space-y-3">
-      {/* Header - unchanged */}
+      {/* Header (unchanged) */}
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-semibold">
           {parseDateString(day.date).toLocaleDateString('en-US', {
@@ -165,9 +151,11 @@ const DailyTaskList: React.FC<DailyTaskListProps> = ({
         </div>
       </div>
 
-      {/* Category sections in 12‑tier order (original look preserved) */}
+      {/* Grouped by source (original look) */}
       <div>
-        {Array.from({ length: 12 }, (_, i) => i + 1).map((cat) => renderGroup(cat))}
+        {Array.from(groups.entries()).map(([sourceName, tasks]) =>
+          renderGroup(sourceName, tasks)
+        )}
       </div>
     </div>
   );
