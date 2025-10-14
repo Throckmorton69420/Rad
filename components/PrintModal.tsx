@@ -4,8 +4,8 @@ import { Button } from './Button';
 import FocusTrap from 'focus-trap-react';
 import CustomSelect from '../CustomSelect';
 
-const PrintModal: React.FC<PrintModalProps> = ({ isOpen, onClose, onGenerateReport, studyPlan, currentDate, activeFilters }) => {
-  const [activeTab, setActiveTab] = useState<'schedule' | 'progress' | 'content'>('schedule');
+const PrintModal: React.FC<PrintModalProps> = ({ isOpen, onClose, onGenerateReport, studyPlan, currentDate, activeFilters, initialTab }) => {
+  const [activeTab, setActiveTab] = useState<'schedule' | 'progress' | 'content'>(initialTab);
   const [printOptions, setPrintOptions] = useState<PrintOptions>({
     schedule: { reportType: 'full', pageBreakPerWeek: true, startDate: studyPlan.startDate, endDate: studyPlan.endDate },
     progress: { includeSummary: true, includeDeadlines: true, includeTopic: true, includeType: true, includeSource: true },

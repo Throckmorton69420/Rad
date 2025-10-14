@@ -258,28 +258,36 @@ const App: React.FC = () => {
   }, [printableContent]);
 
   const navigateDate = useCallback((direction: 'next' | 'prev') => {
-    const currentDateObj = parseDateString(selectedDate);
-    currentDateObj.setUTCDate(currentDateObj.getUTCDate() + (direction === 'next' ? 1 : -1));
-    const newDateStr = currentDateObj.toISOString().split('T')[0];
     if (!studyPlan) return;
-    if (newDateStr >= studyPlan.startDate && newDateStr <= studyPlan.endDate) {
-      setSelectedDate(newDateStr);
-    }
+    const { startDate, endDate } = studyPlan;
+    
+    setSelectedDate(currentSelectedDate => {
+        const currentDateObj = parseDateString(currentSelectedDate);
+        currentDateObj.setUTCDate(currentDateObj.getUTCDate() + (direction === 'next' ? 1 : -1));
+        const newDateStr = currentDateObj.toISOString().split('T')[0];
+        
+        if (newDateStr >= startDate && newDateStr <= endDate) {
+          return newDateStr;
+        }
+        return currentSelectedDate; // Return original date if out of bounds
+    });
     setHighlightedDates([]);
-  }, [selectedDate, studyPlan]);
+  }, [studyPlan, setSelectedDate, setHighlightedDates]);
   
   const navigatePeriod = useCallback((direction: 'next' | 'prev', viewMode: 'Weekly' | 'Monthly') => {
-    const currentDateObj = parseDateString(selectedDate);
-    if (viewMode === 'Weekly') {
-      currentDateObj.setUTCDate(currentDateObj.getUTCDate() + (direction === 'next' ? 7 : -7));
-    } else if (viewMode === 'Monthly') {
-      const currentMonth = currentDateObj.getUTCMonth();
-      currentDateObj.setUTCMonth(currentMonth + (direction === 'next' ? 1 : -1));
-    }
-    const newDateStr = currentDateObj.toISOString().split('T')[0];
-    setSelectedDate(newDateStr);
+    setSelectedDate(currentSelectedDate => {
+        const currentDateObj = parseDateString(currentSelectedDate);
+        if (viewMode === 'Weekly') {
+            currentDateObj.setUTCDate(currentDateObj.getUTCDate() + (direction === 'next' ? 7 : -7));
+        } else if (viewMode === 'Monthly') {
+            const currentMonth = currentDateObj.getUTCMonth();
+            currentDateObj.setUTCMonth(currentMonth + (direction === 'next' ? 1 : -1));
+        }
+        return currentDateObj.toISOString().split('T')[0];
+    });
     setHighlightedDates([]);
-  }, [selectedDate]);
+  }, [setSelectedDate, setHighlightedDates]);
+
 
   const handleUpdateTimeForDay = useCallback((newTotalMinutes: number) => {
     const newRule: ExceptionDateRule = {
@@ -712,7 +720,7 @@ const App: React.FC = () => {
         {modalStates.isModifyDayTasksModalOpen && selectedDaySchedule && <ModifyDayTasksModal isOpen={modalStates.isModifyDayTasksModalOpen} onClose={() => closeModal('isModifyDayTasksModalOpen')} onSave={onDayTasksSave} tasksForDay={selectedDaySchedule.tasks} allResources={globalMasterResourcePool} selectedDate={selectedDate} showConfirmation={showConfirmation} onEditResource={openResourceEditor} onArchiveResource={handleRequestArchive} onRestoreResource={handleRestoreResource} onPermanentDeleteResource={handlePermanentDelete} openAddResourceModal={() => openResourceEditor(null)} isCramModeActive={studyPlan.isCramModeActive ?? false} />}
         {modalStates.isResourceEditorOpen && <ResourceEditorModal isOpen={modalStates.isResourceEditorOpen} onClose={closeResourceEditor} onSave={handleSaveResource} onRequestArchive={handleRequestArchive} initialResource={modalData.editingResource} availableDomains={ALL_DOMAINS} availableResourceTypes={Object.values(ResourceType)}/>}
         <ConfirmationModal {...modalStates.confirmationState} onConfirm={handleConfirm} onClose={modalStates.confirmationState.onClose} />
-        {isPrintModalOpen && <PrintModal isOpen={isPrintModalOpen} onClose={() => setIsPrintModalOpen(false)} onGenerateReport={handleGenerateReport} studyPlan={studyPlan} currentDate={selectedDate} activeFilters={{domain: progressDomainFilter, type: progressTypeFilter, source: progressSourceFilter}} />}
+        {isPrintModalOpen && <PrintModal isOpen={isPrintModalOpen} onClose={() => setIsPrintModalOpen(false)} onGenerateReport={handleGenerateReport} studyPlan={studyPlan} currentDate={selectedDate} activeFilters={{domain: progressDomainFilter, type: progressTypeFilter, source: progressSourceFilter}} initialTab={activeTab} />}
       </div>
   );
   

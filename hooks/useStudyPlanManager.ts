@@ -43,7 +43,8 @@ export const useStudyPlanManager = (showConfirmation: (options: ShowConfirmation
                 
                 // FIX: Improve type safety by using the typed response from Supabase client.
                 // Explicitly check if data exists before accessing its properties, as .single() can return null data.
-                const loadedData = data ? data.plan_data : null;
+                // FIX: Cast plan_data from Json to the specific PlanDataBlob type. This resolves the 'never' type error.
+                const loadedData = data ? data.plan_data as PlanDataBlob | null : null;
                 
                 // FIX: Add robust validation to prevent crashes from malformed data from the DB.
                 if (loadedData && loadedData.plan && Array.isArray(loadedData.plan.schedule)) {
@@ -144,6 +145,7 @@ export const useStudyPlanManager = (showConfirmation: (options: ShowConfirmation
                 exceptions: userExceptions,
             };
             // FIX: The upsert method expects an array of objects. Wrap the single object in an array to fix the overload error.
+            // FIX: The root cause of the 'never' type was in the database type definitions. With that fixed, this call is now valid.
             const { error } = await supabase.from('study_plans').upsert([{ id: 1, plan_data: stateToSave }]);
             if (error) {
                 console.error("Supabase save error:", error);

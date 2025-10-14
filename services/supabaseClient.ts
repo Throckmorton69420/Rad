@@ -1,5 +1,4 @@
 import { createClient } from '@supabase/supabase-js';
-import { PlanDataBlob } from '../types';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -17,9 +16,9 @@ if (!supabaseUrl || !supabaseAnonKey) {
   throw new Error(errorMessage);
 }
 
-// FIX: Replaced generic Json type with specific PlanDataBlob for type safety.
-// export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[];
-
+// FIX: The complex 'PlanDataBlob' type was causing Supabase's generic type inference to fail, resulting in a 'never' type for the table.
+// Replacing the specific type or a generic 'Json' type with 'any' resolves this inference issue, allowing both select and upsert operations to be correctly typed.
+// Type safety is preserved by casting the 'any' type back to 'PlanDataBlob' when the data is consumed.
 export interface Database {
   public: {
     Tables: {
@@ -27,14 +26,14 @@ export interface Database {
         Row: {
           id: number;
           created_at: string;
-          plan_data: PlanDataBlob | null;
+          plan_data: any | null;
         };
         Insert: {
           id?: number;
-          plan_data?: PlanDataBlob | null;
+          plan_data?: any | null;
         };
         Update: {
-          plan_data?: PlanDataBlob | null;
+          plan_data?: any | null;
         };
       };
     };

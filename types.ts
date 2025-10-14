@@ -298,4 +298,5 @@ export interface PrintModalProps {
     type: ResourceType | 'all';
     source: string | 'all';
   };
+  initialTab: 'schedule' | 'progress' | 'content';
 }

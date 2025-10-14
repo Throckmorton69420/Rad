@@ -70,7 +70,8 @@ export const generateInitialSchedule = (
     while (currentDate <= finalDate) {
         const dateStr = currentDate.toISOString().split('T')[0];
         const exception = exceptionMap.get(dateStr);
-        const isRestDay = exception ? exception.isRestDayOverride : [0, 6].includes(currentDate.getUTCDay());
+        // FIX: Removed logic that auto-assigns weekends as rest days. All days are now study days by default.
+        const isRestDay = exception ? exception.isRestDayOverride : false;
         
         schedule.push({
             date: dateStr,
