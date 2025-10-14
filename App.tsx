@@ -29,16 +29,6 @@ import ContentReport from './components/ContentReport';
 import { formatDuration, getTodayInNewYork, parseDateString } from './utils/timeFormatter';
 import { addResourceToGlobalPool } from './services/studyResources';
 
-// Add this inside App component, before render
-const handleReorderTasks = React.useCallback((date: string, tasks: ScheduledTask[]) => {
-  setStudyPlan(prev => {
-    if (!prev) return prev;
-    const updatedSchedule = prev.schedule.map(day =>
-      day.date === date ? { ...day, tasks } : day
-    );
-    return { ...prev, schedule: updatedSchedule };
-  });
-}, [setStudyPlan]);
 
 // FIX: Define the shape of the content UI filters to be shared between components.
 export interface ContentUiFilters {
@@ -249,8 +239,15 @@ const App: React.FC = () => {
     showArchived: false,
   });
 
-  const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
-  const [printableContent, setPrintableContent] = useState<React.ReactNode | null>(null);
+  const handleReorderTasks = React.useCallback((date: string, tasks: ScheduledTask[]) => {
+    setStudyPlan(prev => {
+      if (!prev) return prev;
+      const updatedSchedule = prev.schedule.map(day =>
+        day.date === date ? { ...day, tasks } : day
+      );
+      return { ...prev, schedule: updatedSchedule };
+    });
+  }, [setStudyPlan]);
 
   useEffect(() => {
     const { displacement, highlight } = generateGlassMaps({});
