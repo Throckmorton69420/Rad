@@ -2,23 +2,40 @@ import { StudyPlan, RebalanceOptions, ExceptionDateRule, StudyResource, Generate
 import { getTodayInNewYork, parseDateString } from '../utils/timeFormatter';
 import { TASK_TYPE_PRIORITY } from '../constants';
 
+/**
+ * Calculates the real-world study duration for a resource based on its type and metrics.
+ * This function applies the user-defined conversion factors.
+ * - Reading: 30 seconds per page
+ * - Videos: Watched at ~1.33x speed (75% of original duration)
+ * - Cases: 1 minute per case
+ * - Questions: 1.5 minutes per question (to account for review time)
+ * @param resource The study resource to calculate the duration for.
+ * @returns The calculated duration in minutes.
+ */
 const calculateResourceDuration = (resource: StudyResource): number => {
+  let duration = 0;
   switch (resource.type) {
     case ResourceType.READING_TEXTBOOK:
     case ResourceType.READING_GUIDE:
-      return Math.round((resource.pages || 0) * 0.5); // 30 seconds per page
+      duration = (resource.pages || 0) * 0.5; // 30 seconds per page
+      break;
     case ResourceType.VIDEO_LECTURE:
     case ResourceType.HIGH_YIELD_VIDEO:
-      return Math.round(resource.durationMinutes * 0.75); // Watched at ~1.33x speed
+      duration = resource.durationMinutes * 0.75; // Watched at ~1.33x speed
+      break;
     case ResourceType.CASES:
-      return (resource.caseCount || 0) * 1; // 1 minute per case
+      duration = (resource.caseCount || 0) * 1; // 1 minute per case
+      break;
     case ResourceType.QUESTIONS:
     case ResourceType.REVIEW_QUESTIONS:
     case ResourceType.QUESTION_REVIEW:
-      return Math.round((resource.questionCount || 0) * 1.5); // 1.5 minutes per question (do + review)
+      duration = (resource.questionCount || 0) * 1.5; // 1.5 minutes per question (do + review)
+      break;
     default:
-      return resource.durationMinutes;
+      duration = resource.durationMinutes;
+      break;
   }
+  return Math.round(duration);
 };
 
 const resourceToTask = (resource: StudyResource, order: number, isOptionalOverride = false): ScheduledTask => {
@@ -79,93 +96,67 @@ export const generateInitialSchedule = (
     }
     
     const availableResources = masterResourcePool.filter(r => !r.isArchived);
-    const resourceMap = new Map(availableResources.map(r => [r, r.id]));
     const scheduledResourceIds = new Set<string>();
     
-    let topicOrderIndex = 0;
-    const coveredDomains = new Set<Domain>();
+    let coveredDomains = new Set<Domain>();
 
-    // --- PASS 1: Primary Content (Balanced Distribution) ---
-    const primaryResources = availableResources.filter(r => r.isPrimaryMaterial);
-    const totalPrimaryDuration = primaryResources.reduce((sum, r) => sum + calculateResourceDuration(r), 0);
+    // --- GLOBAL PASS 1: Primary Content (Balanced Distribution) ---
+    // This pass now uses a global queue and fills each day to a minimum target to ensure better distribution.
+    const primaryResources = availableResources
+      .filter(r => r.isPrimaryMaterial)
+      .sort((a, b) => {
+          const topicA_Index = topicOrder.indexOf(a.domain);
+          const topicB_Index = topicOrder.indexOf(b.domain);
+          if (topicA_Index !== topicB_Index) return topicA_Index - topicB_Index;
+          return (a.sequenceOrder ?? 999) - (b.sequenceOrder ?? 999);
+      });
+      
+    const primaryResourceQueue = [...primaryResources];
+    const totalPrimaryDuration = primaryResourceQueue.reduce((sum, r) => sum + calculateResourceDuration(r), 0);
     const studyDays = schedule.filter(d => !d.isRestDay);
     const dailyPrimaryTarget = studyDays.length > 0 ? totalPrimaryDuration / studyDays.length : 0;
-
-    for (const day of schedule) {
-        if (day.isRestDay) continue;
-
+    
+    for (const day of studyDays) {
         let timeScheduledForPrimary = 0;
         let taskOrder = day.tasks.length;
-        const topicsToday = new Set<Domain>();
+        
+        while(timeScheduledForPrimary < dailyPrimaryTarget && primaryResourceQueue.length > 0) {
+            const nextResource = primaryResourceQueue[0]; // Peek at the next resource
+            if (!nextResource) break;
 
-        const scheduleResourceSet = (mainResourceId: string): boolean => {
-            const mainResource = availableResources.find(r => r.id === mainResourceId);
-            if (!mainResource || scheduledResourceIds.has(mainResourceId)) return false;
-
-            const resourceSet = [mainResource];
-            (mainResource.pairedResourceIds || []).forEach(id => {
-                const paired = availableResources.find(r => r.id === id);
-                if (paired && !scheduledResourceIds.has(id) && paired.isPrimaryMaterial) {
-                   resourceSet.push(paired);
+            const resourceSet = [nextResource];
+            (nextResource.pairedResourceIds || []).forEach(id => {
+                const pairedIndex = primaryResourceQueue.findIndex(r => r.id === id);
+                if (pairedIndex > -1) {
+                    resourceSet.push(primaryResourceQueue[pairedIndex]);
                 }
             });
 
-            const totalDuration = resourceSet.reduce((sum, r) => sum + calculateResourceDuration(r), 0);
-
-            // Check if adding this set keeps the day's primary content around the daily target
-            if ((timeScheduledForPrimary + totalDuration) <= (dailyPrimaryTarget + 90)) { // Add a buffer
-                const depsMet = resourceSet.every(res => (res.dependencies || []).every(depId => scheduledResourceIds.has(depId)));
-                if (!depsMet) return false;
-
-                resourceSet
+            const totalSetDuration = resourceSet.reduce((sum, r) => sum + calculateResourceDuration(r), 0);
+            
+            // If the set fits within the day's total limit, schedule it.
+            if ((day.tasks.reduce((s,t) => s + t.durationMinutes, 0) + totalSetDuration) <= day.totalStudyTimeMinutes) {
+                 resourceSet
                     .sort((a, b) => (TASK_TYPE_PRIORITY[a.type] || 99) - (TASK_TYPE_PRIORITY[b.type] || 99))
                     .forEach(res => {
                         const task = resourceToTask(res, taskOrder++);
                         day.tasks.push(task);
                         timeScheduledForPrimary += task.durationMinutes;
                         scheduledResourceIds.add(res.id);
-                        topicsToday.add(res.domain);
-                    });
-                return true;
-            }
-            return false;
-        };
-        
-        // Main Topic Block for the day
-        if (topicOrderIndex < topicOrder.length) {
-            const currentTopic = topicOrder[topicOrderIndex];
-            const titanVideo = availableResources.find(r => !scheduledResourceIds.has(r.id) && r.videoSource === 'Titan Radiology' && r.domain === currentTopic && r.isPrimaryMaterial);
-            if (titanVideo && scheduleResourceSet(titanVideo.id)) {
-                topicOrderIndex++;
-            }
-        }
-        
-        // Daily Physics Requirement
-        const hudaPhys = availableResources.find(r => !scheduledResourceIds.has(r.id) && r.videoSource === 'Huda' && r.isPrimaryMaterial);
-        if (!hudaPhys || !scheduleResourceSet(hudaPhys.id)) {
-             const titanPhys = availableResources.find(r => !scheduledResourceIds.has(r.id) && r.videoSource === 'Titan Radiology' && r.domain === Domain.PHYSICS && !r.title.includes("MCQ Review"));
-             if (titanPhys) scheduleResourceSet(titanPhys.id);
-        }
+                        coveredDomains.add(res.domain);
 
-        // Daily Nucs Requirement
-        const nucsResource = availableResources.find(r => !scheduledResourceIds.has(r.id) && r.domain === Domain.NUCLEAR_MEDICINE && r.isPrimaryMaterial);
-        if (nucsResource) scheduleResourceSet(nucsResource.id);
-        
-        // Daily NIS & RISC Requirement
-        const nisResource = availableResources.find(r => !scheduledResourceIds.has(r.id) && r.domain === Domain.NIS && r.isPrimaryMaterial);
-        if (nisResource) scheduleResourceSet(nisResource.id);
-        const riscResource = availableResources.find(r => !scheduledResourceIds.has(r.id) && r.domain === Domain.RISC && r.isPrimaryMaterial);
-        if (riscResource) scheduleResourceSet(riscResource.id);
-        
-        // Board Vitals on cumulatively covered topics
-        const cumulativelyCoveredArray = Array.from(coveredDomains);
-        const boardVitalsResource = availableResources.find(r => !scheduledResourceIds.has(r.id) && r.bookSource === 'Board Vitals' && cumulativelyCoveredArray.includes(r.domain));
-        if (boardVitalsResource) scheduleResourceSet(boardVitalsResource.id);
-        
-        topicsToday.forEach(topic => coveredDomains.add(topic));
+                        // Remove from queue
+                        const queueIndex = primaryResourceQueue.findIndex(r => r.id === res.id);
+                        if (queueIndex > -1) primaryResourceQueue.splice(queueIndex, 1);
+                    });
+            } else {
+                // If the set doesn't fit, we stop adding primary content for this day to avoid breaking up logical sets.
+                break;
+            }
+        }
     }
 
-    // Pass 2: Supplementary Lectures (Discord) to fill remaining time
+    // --- GLOBAL PASS 2: Supplementary Lectures (Discord) ---
     for (const day of schedule) {
         if (day.isRestDay) continue;
         let remainingTime = day.totalStudyTimeMinutes - day.tasks.reduce((sum, t) => sum + t.durationMinutes, 0);
@@ -186,7 +177,7 @@ export const generateInitialSchedule = (
         }
     }
 
-    // Pass 3: Optional Textbook (Core Radiology) to fill any final gaps
+    // --- GLOBAL PASS 3: Optional Textbook (Core Radiology) ---
     let allCoveredTopicsCumulative = new Set<Domain>();
     for (const day of schedule) {
         day.tasks.forEach(t => allCoveredTopicsCumulative.add(t.originalTopic));

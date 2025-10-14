@@ -150,7 +150,8 @@ const SidebarContent = React.memo(({
                         <h2 className="text-lg font-semibold mb-3 border-b border-[var(--separator-primary)] pb-2 text-[var(--text-primary)]">Actions</h2>
                         <div className="space-y-2">
                             <Button onClick={handleUndo} variant="secondary" className="w-full" disabled={!previousStudyPlan || isLoading}><i className="fas fa-undo mr-2"></i> Undo Last Plan Change</Button>
-                            <Button onClick={() => showConfirmation({title: "Regenerate Schedule?", message: "This will regenerate the entire schedule from scratch based on the current resource pool and save it to the cloud. Are you sure?", confirmText: "Regenerate", confirmVariant: 'danger', onConfirm: () => loadSchedule(true)})} variant="danger" className="w-full" disabled={isLoading}>Regenerate Schedule</Button>
+                            {/* FIX: Changed onConfirm to trigger a standard rebalance from today, instead of a full regeneration. */}
+                            <Button onClick={() => showConfirmation({title: "Regenerate Schedule?", message: "This will regenerate the schedule from today onwards, preserving past work. Are you sure?", confirmText: "Regenerate", confirmVariant: 'danger', onConfirm: () => handleRebalance({ type: 'standard' })})} variant="danger" className="w-full" disabled={isLoading}>Regenerate Schedule</Button>
                             <Button onClick={() => showConfirmation({title: "Reset All Progress?", message: "Are you sure you want to mark all tasks as 'pending'?", confirmText: "Reset Progress", confirmVariant: 'danger', onConfirm: handleMasterResetTasks})} variant="danger" className="w-full" disabled={isLoading}>Reset Task Progress</Button>
                         </div>
                     </div>
@@ -280,6 +281,8 @@ const App: React.FC = () => {
         if (viewMode === 'Weekly') {
             currentDateObj.setUTCDate(currentDateObj.getUTCDate() + (direction === 'next' ? 7 : -7));
         } else if (viewMode === 'Monthly') {
+            // FIX: Set date to 1 to prevent month-skipping bugs (e.g., going from Oct 31 to Dec 1)
+            currentDateObj.setUTCDate(1);
             const currentMonth = currentDateObj.getUTCMonth();
             currentDateObj.setUTCMonth(currentMonth + (direction === 'next' ? 1 : -1));
         }
