@@ -56,7 +56,8 @@ export const generateInitialSchedule = (
   topicOrder: Domain[] = [],
   deadlines: DeadlineSettings = {},
   startDate: string,
-  endDate: string
+  endDate: string,
+  areSpecialTopicsInterleaved: boolean = true,
 ): GeneratedStudyPlanOutcome => {
     let schedule: DailySchedule[] = [];
     const scheduledResourceIds = new Set<string>();
@@ -91,7 +92,6 @@ export const generateInitialSchedule = (
     // --- PASS 1: Primary Content & Daily Requirements ---
     for (const day of schedule) {
         if (day.isRestDay) {
-            // Add any topics from tasks on rest days (if manually added before) to coveredDomains
             day.tasks.forEach(task => coveredDomains.add(task.originalTopic));
             continue;
         }
@@ -120,42 +120,29 @@ export const generateInitialSchedule = (
                 resourceSet
                     .sort((a, b) => (TASK_TYPE_PRIORITY[a.type] || 99) - (TASK_TYPE_PRIORITY[b.type] || 99))
                     .forEach(res => {
-                        day.tasks.push(resourceToTask(res, taskOrder++, isOptional || !res.isPrimaryMaterial));
+                        const task = resourceToTask(res, taskOrder++, isOptional || !res.isPrimaryMaterial);
+                        day.tasks.push(task);
+                        remainingTime -= task.durationMinutes;
                         scheduledResourceIds.add(res.id);
                         coveredDomains.add(res.domain);
                     });
-                remainingTime -= totalDuration;
                 return true;
             }
             return false;
         };
         
-        // Schedule Daily Physics
-        const nextHudaPhysics = availableResources.find(r => r.videoSource === 'Huda' && !scheduledResourceIds.has(r.id));
-        if (nextHudaPhysics) {
-            scheduleResourceSet(nextHudaPhysics.id);
-        } else {
-            const nextTitanPhysics = availableResources.find(r => r.domain === Domain.PHYSICS && r.videoSource === 'Titan Radiology' && !scheduledResourceIds.has(r.id));
-            if (nextTitanPhysics) scheduleResourceSet(nextTitanPhysics.id);
-        }
-
-        // Schedule Daily Nucs
-        const nextNucs = availableResources.find(r => r.domain === Domain.NUCLEAR_MEDICINE && r.isPrimaryMaterial && !scheduledResourceIds.has(r.id));
-        if(nextNucs) scheduleResourceSet(nextNucs.id);
-        
-        // Schedule Daily NIS/RISC
-        const nextNis = availableResources.find(r => r.domain === Domain.NIS && r.isPrimaryMaterial && !scheduledResourceIds.has(r.id));
-        if(nextNis) scheduleResourceSet(nextNis.id);
-        
-        const nextRisc = availableResources.find(r => r.domain === Domain.RISC && r.isPrimaryMaterial && !scheduledResourceIds.has(r.id));
-        if(nextRisc) scheduleResourceSet(nextRisc.id);
-
-        // Schedule Primary Topic of the day
+        // **NEW LOGIC**: Schedule Primary Topic of the day FIRST
         let topicScheduled = false;
         let attempts = 0;
         while (!topicScheduled && attempts < topicOrder.length && remainingTime > 30) {
             const topic = topicOrder[currentTopicIndex % topicOrder.length];
-            const nextResource = availableResources.find(r => r.domain === topic && r.isPrimaryMaterial && r.type === ResourceType.VIDEO_LECTURE && !scheduledResourceIds.has(r.id));
+            const nextResource = availableResources.find(r => 
+                r.domain === topic && 
+                r.isPrimaryMaterial && 
+                r.type === ResourceType.VIDEO_LECTURE && 
+                !scheduledResourceIds.has(r.id)
+            );
+            
             if (nextResource && scheduleResourceSet(nextResource.id)) {
                 topicScheduled = true;
             } else {
@@ -163,8 +150,31 @@ export const generateInitialSchedule = (
             }
             attempts++;
         }
-        if (topicScheduled) currentTopicIndex++; // Move to next topic for the next day
+        if (topicScheduled) currentTopicIndex++;
+
+        // **NEW LOGIC**: Schedule daily requirements IF interleaving is on
+        if (areSpecialTopicsInterleaved) {
+            // Schedule Daily Physics
+            const nextHudaPhysics = availableResources.find(r => r.videoSource === 'Huda' && !scheduledResourceIds.has(r.id));
+            if (nextHudaPhysics) {
+                scheduleResourceSet(nextHudaPhysics.id);
+            } else {
+                const nextTitanPhysics = availableResources.find(r => r.domain === Domain.PHYSICS && r.videoSource === 'Titan Radiology' && !scheduledResourceIds.has(r.id));
+                if (nextTitanPhysics) scheduleResourceSet(nextTitanPhysics.id);
+            }
+
+            // Schedule Daily Nucs
+            const nextNucs = availableResources.find(r => r.domain === Domain.NUCLEAR_MEDICINE && r.isPrimaryMaterial && !scheduledResourceIds.has(r.id));
+            if(nextNucs) scheduleResourceSet(nextNucs.id);
+        }
         
+        // Schedule Daily NIS/RISC (Always daily)
+        const nextNis = availableResources.find(r => r.domain === Domain.NIS && r.isPrimaryMaterial && !scheduledResourceIds.has(r.id));
+        if(nextNis) scheduleResourceSet(nextNis.id);
+        
+        const nextRisc = availableResources.find(r => r.domain === Domain.RISC && r.isPrimaryMaterial && !scheduledResourceIds.has(r.id));
+        if(nextRisc) scheduleResourceSet(nextRisc.id);
+
         // Schedule Board Vitals (Mixed review on covered topics)
         const coveredArray = Array.from(coveredDomains);
         const nextBoardVitals = availableResources.find(r => r.bookSource === 'Board Vitals' && !scheduledResourceIds.has(r.id) && coveredArray.includes(r.domain));
@@ -230,7 +240,7 @@ export const generateInitialSchedule = (
     const plan: StudyPlan = {
         schedule, progressPerDomain: {}, startDate, endDate, firstPassEndDate,
         topicOrder, cramTopicOrder: topicOrder, deadlines,
-        isCramModeActive: false, areSpecialTopicsInterleaved: true,
+        isCramModeActive: false, areSpecialTopicsInterleaved,
     };
     
     Object.values(Domain).forEach(domain => {
@@ -313,20 +323,17 @@ export const rebalanceSchedule = (
     
     const availableForReschedule = masterResourcePool.filter(r => !completedResourceIds.has(r.id) && !r.isArchived);
     
-    const generationOutcome = generateInitialSchedule(availableForReschedule, exceptionDates, currentPlan.topicOrder, currentPlan.deadlines, rebalanceStartDate, currentPlan.endDate);
+    const generationOutcome = generateInitialSchedule(availableForReschedule, exceptionDates, currentPlan.topicOrder, currentPlan.deadlines, rebalanceStartDate, currentPlan.endDate, currentPlan.areSpecialTopicsInterleaved);
     
     const futureScheduleMap = new Map(generationOutcome.plan.schedule.map(d => [d.date, d]));
     
     const finalSchedule = preservedSchedule.map(day => {
-        // Keep past days or manually modified days that are not the target of a topic-time rebalance
         if (day.date < rebalanceStartDate || (day.isManuallyModified && (options.type !== 'topic-time' || day.date !== options.date))) {
             return day;
         }
-        // If it's the day we just modified with topic-time, keep it
         if (options.type === 'topic-time' && day.date === options.date) {
             return day;
         }
-        // Otherwise, take the newly generated future day
         return futureScheduleMap.get(day.date) || day;
     });
 

@@ -42,7 +42,8 @@ export const useStudyPlanManager = (showConfirmation: (options: ShowConfirmation
                 }
                 
                 // FIX: Improve type safety by using the typed response from Supabase client.
-                const loadedData = data?.plan_data;
+                // Explicitly check if data exists before accessing its properties, as .single() can return null data.
+                const loadedData = data ? data.plan_data : null;
                 
                 // FIX: Add robust validation to prevent crashes from malformed data from the DB.
                 if (loadedData && loadedData.plan && Array.isArray(loadedData.plan.schedule)) {
