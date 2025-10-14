@@ -240,8 +240,6 @@ const App: React.FC = () => {
   });
 
   const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
-  const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
-  const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
   const [printableContent, setPrintableContent] = useState<React.ReactNode | null>(null);
 
   useEffect(() => {
