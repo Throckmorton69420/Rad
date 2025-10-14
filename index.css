@@ -273,10 +273,10 @@ div.glass-chrome {
 @media print {
   @page {
     size: letter;
-    margin: 0.75in;
+    margin: 0.7in;
   }
 
-  body, #root {
+  body, html, #root {
     overflow: visible !important;
     height: auto !important;
     background: white !important;
@@ -294,18 +294,42 @@ div.glass-chrome {
   .print-only-container {
     display: block !important;
   }
+  
+  .print-header-footer {
+    position: fixed;
+    width: calc(100% - 1.4in); /* 100% minus left/right margins */
+    background: white;
+  }
+
+  .printable-report header .print-header-footer {
+    top: 0;
+    left: 0.7in;
+    right: 0.7in;
+  }
+  
+  .printable-report footer.print-header-footer {
+    bottom: 0;
+    left: 0.7in;
+    right: 0.7in;
+  }
 
   .printable-report {
     font-family: 'Times New Roman', Times, serif;
+    margin: 0;
+    padding: 0;
   }
   
-  .printable-report header {
+  .printable-report header, .printable-report footer {
     page-break-after: avoid;
+    page-break-before: avoid;
   }
 
   .printable-report h1, .printable-report h2, .printable-report h3, .printable-report h4, .printable-report th {
-    font-family: 'Helvetica', 'Arial', sans-serif;
+    font-family: 'Helvetica Neue', 'Arial', sans-serif;
   }
+  
+  .printable-report h1 { font-size: 18pt; }
+  .printable-report h2 { font-size: 14pt; }
 
   .printable-report table {
     width: 100%;
@@ -314,26 +338,35 @@ div.glass-chrome {
   }
 
   .printable-report th, .printable-report td {
-    border: 1px solid #ccc;
-    padding: 4px 6px;
+    padding: 6px 8px;
     text-align: left;
     word-break: break-word;
   }
   
-  .printable-report thead th {
-    background-color: #f2f2f2 !important;
-    font-weight: bold;
-  }
-
-  .printable-report tr {
+  .printable-report thead tr {
     page-break-inside: avoid;
   }
   
+  .printable-report thead th {
+    background-color: #E5E7EB !important; /* A light gray */
+    font-weight: 600;
+    border-bottom: 2px solid #9CA3AF; /* A darker gray */
+  }
+
+  .printable-report tbody tr {
+    page-break-inside: avoid;
+    page-break-after: auto;
+  }
+  
+  .printable-report tbody tr:nth-child(even) {
+    background-color: #F9FAFB !important; /* Very light gray for alternate rows */
+  }
+
   .print-page-break {
-    page-break-before: always;
+    page-break-before: always !important;
   }
 
   .print-no-break {
-    page-break-inside: avoid;
+    page-break-inside: avoid !important;
   }
 }
