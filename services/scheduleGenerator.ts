@@ -147,20 +147,27 @@ class Scheduler {
         let dayIndex = 0;
         const processQueue = (queue: TopicBlock[], nextQueue: TopicBlock[]) => {
             while (queue.length > 0) {
-                if (this.studyDays.every(d => this.getRemainingTimeForDay(d) < 15)) {
-                    this.notifications.push({ type: 'warning', message: 'Ran out of schedulable time for primary content.' });
-                    return;
+                const startSearchIndex = dayIndex % this.studyDays.length;
+                let foundSpot = false;
+                
+                // Search for the next available day with at least 15 mins
+                for (let i = 0; i < this.studyDays.length; i++) {
+                    const currentDayTryIndex = (startSearchIndex + i) % this.studyDays.length;
+                    if (this.getRemainingTimeForDay(this.studyDays[currentDayTryIndex]) >= 15) {
+                        dayIndex = currentDayTryIndex;
+                        foundSpot = true;
+                        break;
+                    }
                 }
                 
-                let currentDay = this.studyDays[dayIndex % this.studyDays.length];
-                let remainingTime = this.getRemainingTimeForDay(currentDay);
-                
-                while (remainingTime < 15) {
-                    dayIndex++;
-                    currentDay = this.studyDays[dayIndex % this.studyDays.length];
-                    remainingTime = this.getRemainingTimeForDay(currentDay);
+                if (!foundSpot) {
+                    this.notifications.push({ type: 'warning', message: 'Ran out of schedulable time for primary content.' });
+                    queue.forEach(block => block.allResourceIds.forEach(id => this.resourcePool.delete(id)));
+                    return; // Exit this processing function
                 }
 
+                const currentDay = this.studyDays[dayIndex];
+                const remainingTime = this.getRemainingTimeForDay(currentDay);
                 const blockToProcess = queue.shift()!;
 
                 if (blockToProcess.totalDuration <= remainingTime) {
@@ -201,7 +208,7 @@ class Scheduler {
                     }
                 }
                 blockToProcess.allResourceIds.forEach(id => this.resourcePool.delete(id));
-                dayIndex++;
+                dayIndex++; // Move to the next day for the next block
             }
         };
 

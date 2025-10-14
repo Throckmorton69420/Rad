@@ -29,6 +29,16 @@ import ContentReport from './components/ContentReport';
 import { formatDuration, getTodayInNewYork, parseDateString } from './utils/timeFormatter';
 import { addResourceToGlobalPool } from './services/studyResources';
 
+// FIX: Define the shape of the content UI filters to be shared between components.
+export interface ContentUiFilters {
+  searchTerm: string;
+  domain: Domain | 'all';
+  type: ResourceType | 'all';
+  source: string | 'all';
+  status: 'all' | 'scheduled' | 'unscheduled';
+  showArchived: boolean;
+}
+
 interface SidebarContentProps {
     isSidebarOpen: boolean;
     setIsSidebarOpen: React.Dispatch<React.SetStateAction<boolean>>;
@@ -104,7 +114,7 @@ const SidebarContent = React.memo(({
                             onDateSelect={(d) => {setSelectedDate(d); if (isMobile) setIsSidebarOpen(false);}} 
                             viewMode={ViewMode.MONTHLY}
                             currentDisplayDate={selectedDate} 
-                            onNavigatePeriod={(dir) => navigatePeriod(dir)} 
+                            onNavigatePeriod={navigatePeriod} 
                             highlightedDates={highlightedDates} 
                             today={todayInNewYork}
                         />
@@ -152,7 +162,7 @@ const SidebarContent = React.memo(({
                             <Button onClick={handleUndo} variant="secondary" className="w-full" disabled={!previousStudyPlan || isLoading}><i className="fas fa-undo mr-2"></i> Undo Last Plan Change</Button>
                             <Button onClick={() => showConfirmation({
                                 title: "Regenerate Full Schedule?",
-                                message: "This will erase your entire schedule and all progress, creating a new plan from scratch starting from today. This action cannot be undone.",
+                                message: "This will erase your entire schedule and all progress, creating a new plan from scratch using the current resource pool. This action cannot be undone.",
                                 confirmText: "Yes, Regenerate",
                                 confirmVariant: 'danger',
                                 onConfirm: () => loadSchedule(true)
@@ -194,7 +204,6 @@ const App: React.FC = () => {
     globalMasterResourcePool, setGlobalMasterResourcePool,
     isLoading, systemNotification, setSystemNotification,
     isNewUser,
-    // FIX: Destructure setIsNewUser to manage the welcome modal state.
     setIsNewUser,
     loadSchedule, handleRebalance, handleUpdatePlanDates, handleUpdateTopicOrderAndRebalance, handleUpdateCramTopicOrderAndRebalance,
     handleToggleCramMode,
@@ -204,7 +213,6 @@ const App: React.FC = () => {
     saveStatus,
     handleToggleRestDay,
     handleAddOrUpdateException,
-    // FIX: Destructure handleUpdateDeadlines to pass to children.
     handleUpdateDeadlines,
   } = useStudyPlanManager(showConfirmation);
 
@@ -220,434 +228,560 @@ const App: React.FC = () => {
   const [highlightedDates, setHighlightedDates] = useState<string[]>([]);
   const [isPomodoroCollapsed, setIsPomodoroCollapsed] = usePersistentState('radiology_pomodoro_collapsed', true);
   
+  // FIX: Lifted state from MasterResourcePoolViewer to be shared with PrintModal and report generation.
+  const [contentUiFilters, setContentUiFilters] = useState<ContentUiFilters>({
+    searchTerm: '',
+    domain: 'all',
+    type: 'all',
+    source: 'all',
+    status: 'all',
+    showArchived: false,
+  });
+
   const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
   const [printableContent, setPrintableContent] = useState<React.ReactNode | null>(null);
-  
-  const [contentFilters, setContentFilters] = useState({
-    domain: 'all' as Domain | 'all',
-    type: 'all' as ResourceType | 'all',
-    source: 'all' as string | 'all',
-  });
-  
-  const [printModalInitialTab, setPrintModalInitialTab] = useState<'schedule' | 'progress' | 'content'>('schedule');
-
-  useEffect(() => {
-    const checkSize = () => setIsMobile(window.innerWidth < 1024);
-    window.addEventListener('resize', checkSize);
-    return () => window.removeEventListener('resize', checkSize);
-  }, []);
-  
-  useEffect(() => {
-    loadSchedule();
-  }, [loadSchedule]);
-
-  useEffect(() => {
-    if (printableContent) {
-      setTimeout(() => window.print(), 100);
-    }
-  }, [printableContent]);
 
   useEffect(() => {
     const { displacement, highlight } = generateGlassMaps({});
-    const dispImg = document.getElementById('displacementMapImage') as any;
-    const specImg = document.getElementById('specularHighlightImage') as any;
-    if (dispImg) dispImg.setAttribute('href', displacement);
-    if (specImg) specImg.setAttribute('href', highlight);
+    const displacementEl = document.getElementById('displacementMapImage') as unknown as SVGImageElement | null;
+    const highlightEl = document.getElementById('specularHighlightImage') as unknown as SVGImageElement | null;
+    if (displacementEl) displacementEl.setAttribute('href', displacement);
+    if (highlightEl) highlightEl.setAttribute('href', highlight);
   }, []);
 
-  // FIX: Add useEffect to open the welcome modal when a new user is detected.
   useEffect(() => {
     if (isNewUser) {
       openModal('isWelcomeModalOpen');
     }
   }, [isNewUser, openModal]);
 
-  const handleTaskToggleAndProgressUpdate = useCallback((taskId: string) => {
-    if (!studyPlan) return;
-    handleTaskToggle(taskId, selectedDate);
-  }, [studyPlan, selectedDate, handleTaskToggle]);
-
-  const handlePomodoroSessionComplete = useCallback((sessionType: 'study' | 'rest', durationMinutes: number) => {
-    new Notification(sessionType === 'study' ? 'Study session complete!' : 'Break is over!', {
-      body: sessionType === 'study' ? `Time to take a ${formatDuration(pomodoroSettings.restDuration)} break.` : "Time to get back to it!",
-    });
-    if (sessionType === 'study' && currentPomodoroTaskId && studyPlan) {
-      setStudyPlan(prevPlan => {
-        if (!prevPlan) return null;
-        const newSchedule = prevPlan.schedule.map(day => ({
-          ...day,
-          tasks: day.tasks.map(task => {
-            if (task.id === currentPomodoroTaskId) {
-              return {
-                ...task,
-                actualStudyTimeMinutes: (task.actualStudyTimeMinutes || 0) + durationMinutes,
-              };
-            }
-            return task;
-          }),
-        }));
-        return { ...prevPlan, schedule: newSchedule };
-      });
-    }
-  }, [currentPomodoroTaskId, studyPlan, pomodoroSettings.restDuration, setStudyPlan]);
-
-  const navigateDay = (direction: 'next' | 'prev') => {
-    if (!studyPlan) return;
-    const currentDateIndex = studyPlan.schedule.findIndex(d => d.date === selectedDate);
-    if (currentDateIndex === -1) return;
-
-    const newIndex = direction === 'next' ? currentDateIndex + 1 : currentDateIndex - 1;
-
-    if (newIndex >= 0 && newIndex < studyPlan.schedule.length) {
-      setSelectedDate(studyPlan.schedule[newIndex].date);
-    }
-  };
-
-  const navigatePeriod = (direction: 'next' | 'prev') => {
-    const currentDate = parseDateString(selectedDate);
-    const newDate = new Date(currentDate);
-    newDate.setUTCMonth(currentDate.getUTCMonth() + (direction === 'next' ? 1 : -1));
-    
-    if (studyPlan) {
-        const startDate = parseDateString(studyPlan.startDate);
-        const endDate = parseDateString(studyPlan.endDate);
-        if (newDate < startDate) newDate.setUTCFullYear(startDate.getUTCFullYear(), startDate.getUTCMonth());
-        if (newDate > endDate) newDate.setUTCFullYear(endDate.getUTCFullYear(), endDate.getUTCMonth());
-    }
-
-    setSelectedDate(newDate.toISOString().split('T')[0]);
-  };
+  useEffect(() => {
+    loadSchedule();
+  }, [loadSchedule]);
   
-  const handleSaveTask = (taskData: Parameters<AddTaskModalProps['onSave']>[0]) => {
-    const newResource = addResourceToGlobalPool({
-      ...taskData,
-      isPrimaryMaterial: false,
-      isSplittable: true,
-      isOptional: true,
-      sequenceOrder: 99999, // Ensure it's at the end
-    });
-    setGlobalMasterResourcePool(prev => [...prev, newResource]);
+  useEffect(() => {
+    if (studyPlan) {
+      const { startDate, endDate } = studyPlan;
+      if (selectedDate < startDate || selectedDate > endDate) {
+        if (todayInNewYork >= startDate && todayInNewYork <= endDate) {
+          setSelectedDate(todayInNewYork);
+        } else {
+          setSelectedDate(startDate);
+        }
+      }
+    }
+  }, [studyPlan?.startDate, studyPlan?.endDate, selectedDate, todayInNewYork]);
+  
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 1024);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
-    const newTask: ScheduledTask = {
-      id: `manual_${newResource.id}`,
-      resourceId: newResource.id,
-      originalResourceId: newResource.id,
-      title: taskData.title,
-      type: taskData.type,
-      originalTopic: taskData.domain,
-      durationMinutes: taskData.durationMinutes,
-      status: 'pending',
-      order: (dailySchedule?.tasks.length || 0),
-      isOptional: true,
-      isPrimaryMaterial: false,
-      pages: taskData.pages,
-      questionCount: taskData.questionCount,
-      caseCount: taskData.caseCount,
-      chapterNumber: taskData.chapterNumber,
+  useEffect(() => {
+    if (printableContent) {
+      const handleAfterPrint = () => {
+        setPrintableContent(null);
+        window.removeEventListener('afterprint', handleAfterPrint);
+      };
+      window.addEventListener('afterprint', handleAfterPrint);
+      
+      setTimeout(() => window.print(), 100);
+    }
+  }, [printableContent]);
+
+  const navigateDate = useCallback((direction: 'next' | 'prev') => {
+    if (!studyPlan) return;
+    const { startDate, endDate } = studyPlan;
+    
+    setSelectedDate(currentSelectedDate => {
+        const currentDateObj = parseDateString(currentSelectedDate);
+        currentDateObj.setUTCDate(currentDateObj.getUTCDate() + (direction === 'next' ? 1 : -1));
+        const newDateStr = currentDateObj.toISOString().split('T')[0];
+        
+        if (newDateStr >= startDate && newDateStr <= endDate) {
+          return newDateStr;
+        }
+        return currentSelectedDate; // Return original date if out of bounds
+    });
+    setHighlightedDates([]);
+  }, [studyPlan, setSelectedDate, setHighlightedDates]);
+  
+  const navigatePeriod = useCallback((direction: 'next' | 'prev') => {
+    setSelectedDate(currentSelectedDate => {
+        const currentDateObj = parseDateString(currentSelectedDate);
+        // Set date to 1 to prevent month-skipping bugs (e.g., going from Oct 31 to Dec 1)
+        currentDateObj.setUTCDate(1);
+        currentDateObj.setUTCMonth(currentDateObj.getUTCMonth() + (direction === 'next' ? 1 : -1));
+        
+        if (studyPlan) {
+            const startDate = parseDateString(studyPlan.startDate);
+            const endDate = parseDateString(studyPlan.endDate);
+            if (currentDateObj < startDate) return studyPlan.startDate;
+            if (currentDateObj > endDate) return studyPlan.endDate;
+        }
+        
+        return currentDateObj.toISOString().split('T')[0];
+    });
+    setHighlightedDates([]);
+  }, [setSelectedDate, setHighlightedDates, studyPlan]);
+
+
+  const handleUpdateTimeForDay = useCallback((newTotalMinutes: number) => {
+    const newRule: ExceptionDateRule = {
+      date: selectedDate,
+      dayType: 'exception',
+      isRestDayOverride: newTotalMinutes === 0,
+      targetMinutes: newTotalMinutes,
     };
-    
-    if (studyPlan) {
-      updatePreviousStudyPlan(studyPlan);
-      const newSchedule = studyPlan.schedule.map(d => {
-        if (d.date === selectedDate) {
-          return { ...d, tasks: [...d.tasks, newTask], isManuallyModified: true };
-        }
-        return d;
-      });
-      handleRebalance({type: 'standard'}, { ...studyPlan, schedule: newSchedule });
-    }
-    closeModal('isAddTaskModalOpen');
-  };
+    handleAddOrUpdateException(newRule);
+  }, [selectedDate, handleAddOrUpdateException]);
 
-  const handleMasterResetTasks = () => {
-    if (!studyPlan) return;
-    updatePreviousStudyPlan(studyPlan);
-    const newSchedule = studyPlan.schedule.map(day => ({
-        ...day,
-        tasks: day.tasks.map(task => ({
-            ...task,
-            // FIX: Explicitly cast status to satisfy the strict 'pending' | 'completed' type.
-            status: 'pending' as 'pending' | 'completed',
-            actualStudyTimeMinutes: 0
-        }))
-    }));
-    const newProgress = { ...studyPlan.progressPerDomain };
-    Object.keys(newProgress).forEach(domain => {
-        if (newProgress[domain as Domain]) {
-            newProgress[domain as Domain]!.completedMinutes = 0;
-        }
-    });
-    setStudyPlan({ ...studyPlan, schedule: newSchedule, progressPerDomain: newProgress });
-  };
-  
-  const handleSaveResource = (resourceData: Omit<StudyResource, 'id'> & { id?: string }) => {
-    if (resourceData.id) { // Update existing
-      setGlobalMasterResourcePool(prev => prev.map(r => r.id === resourceData.id ? { ...r, ...resourceData } as StudyResource : r));
-    } else { // Add new
-      const newResource = addResourceToGlobalPool(resourceData as Omit<StudyResource, 'id' | 'isArchived'>);
-      setGlobalMasterResourcePool(prev => [...prev, newResource]);
+  const handlePomodoroTaskSelect = useCallback((taskId: string | null) => {
+    setCurrentPomodoroTaskId(taskId);
+    if (taskId) {
+      setPomodoroSettings(prev => ({ ...prev, isActive: false, isStudySession: true, timeLeft: prev.studyDuration * 60 }));
+      setIsPomodoroCollapsed(false);
     }
-    if(studyPlan) handleRebalance({type: 'standard'});
+  }, [setPomodoroSettings, setIsPomodoroCollapsed]);
+
+  const handleSaveResource: ResourceEditorModalProps['onSave'] = useCallback((resourceData) => {
+    if (resourceData.id && modalData.editingResource) { // Update
+      const fullResource = { ...modalData.editingResource, ...resourceData };
+      setGlobalMasterResourcePool(prev => prev.map(r => r.id === fullResource.id ? fullResource : r));
+      setSystemNotification({type: 'info', message: "Resource updated. Rebalance your schedule to apply changes."});
+    } else { // Add
+      const newResource = addResourceToGlobalPool(resourceData);
+      setGlobalMasterResourcePool(prev => [...prev, newResource]);
+      setSystemNotification({type: 'info', message: "New resource added. Rebalance your schedule to include it."});
+    }
     closeResourceEditor();
-  };
+  }, [modalData.editingResource, setGlobalMasterResourcePool, setSystemNotification, closeResourceEditor]);
   
-  const handleArchiveResource = (resourceId: string) => {
-     showConfirmation({
+  const handleRequestArchive = useCallback((resourceId: string) => {
+    const resource = globalMasterResourcePool.find(r => r.id === resourceId);
+    if (!resource) return;
+    showConfirmation({
         title: "Archive Resource?",
-        message: "Archiving will remove this item from the pool for future schedule generations. It will remain in past days if already scheduled. You can restore it later.",
+        message: `Are you sure you want to archive "${resource.title}"? It will be removed from future scheduling unless restored. This won't affect past completed tasks.`,
         confirmText: "Archive",
         confirmVariant: 'danger',
         onConfirm: () => {
-          setGlobalMasterResourcePool(prev => prev.map(r => r.id === resourceId ? { ...r, isArchived: true } : r));
-          if(studyPlan) handleRebalance({type: 'standard'});
+          setGlobalMasterResourcePool(p => p.map(r => r.id === resourceId ? {...r, isArchived: true} : r));
+          setSystemNotification({ type: 'info', message: `Resource "${resource.title}" archived.` });
         }
     });
-  };
+  }, [globalMasterResourcePool, showConfirmation, setGlobalMasterResourcePool, setSystemNotification]);
+
+  const handleRestoreResource = useCallback((resourceId: string) => {
+    setGlobalMasterResourcePool(p => p.map(r => r.id === resourceId ? {...r, isArchived: false} : r));
+    setSystemNotification({ type: 'info', message: `Resource restored.` });
+  }, [setGlobalMasterResourcePool, setSystemNotification]);
   
-  const handleRestoreResource = (resourceId: string) => {
-    setGlobalMasterResourcePool(prev => prev.map(r => r.id === resourceId ? { ...r, isArchived: false } : r));
-    if(studyPlan) handleRebalance({type: 'standard'});
-  };
-  
-  const handlePermanentDeleteResource = (resourceId: string) => {
-     showConfirmation({
-        title: "Permanently Delete?",
-        message: "This action is irreversible and will remove the resource completely.",
-        confirmText: "Delete Forever",
+  const handlePermanentDelete = useCallback((resourceId: string) => {
+    const resource = globalMasterResourcePool.find(r => r.id === resourceId);
+    if (!resource) return;
+    showConfirmation({
+        title: "Delete Permanently?",
+        message: <span>Are you sure you want to permanently delete "{resource.title}"? <strong className='text-red-400'>This cannot be undone.</strong></span>,
+        confirmText: "Delete Permanently",
         confirmVariant: 'danger',
         onConfirm: () => {
-          setGlobalMasterResourcePool(prev => prev.filter(r => r.id !== resourceId));
-          if(studyPlan) handleRebalance({type: 'standard'});
+          setGlobalMasterResourcePool(p => p.filter(r => r.id !== resourceId));
+          setSystemNotification({ type: 'info', message: `Resource "${resource.title}" deleted.` });
         }
     });
-  };
+  }, [globalMasterResourcePool, showConfirmation, setGlobalMasterResourcePool, setSystemNotification]);
 
-  const handleGenerateReport = (activeTab: 'schedule' | 'progress' | 'content', options: PrintOptions) => {
-    setIsPrintModalOpen(false);
+  const handleMasterResetTasks = useCallback(() => {
     if (!studyPlan) return;
+    updatePreviousStudyPlan(studyPlan);
+    setStudyPlan(prev => prev ? ({ ...prev, schedule: prev.schedule.map(d => ({ ...d, tasks: d.tasks.map(t => ({...t, status: 'pending'})) }))}) : null);
+  }, [studyPlan, updatePreviousStudyPlan, setStudyPlan]);
+
+  const handleSaveOptionalTask: AddTaskModalProps['onSave'] = useCallback((taskData) => {
+    setStudyPlan(prevPlan => {
+        if (!prevPlan) return null;
+        updatePreviousStudyPlan(prevPlan);
+        const newSchedule = prevPlan.schedule.map(day => {
+            if (day.date === selectedDate) {
+                const newTask: ScheduledTask = {
+                    id: `optional_${Date.now()}`,
+                    resourceId: `optional_${Date.now()}`,
+                    title: taskData.title,
+                    type: taskData.type,
+                    originalTopic: taskData.domain,
+                    durationMinutes: taskData.durationMinutes,
+                    status: 'pending',
+                    order: day.tasks.length,
+                    isOptional: true,
+                    pages: taskData.pages,
+                    caseCount: taskData.caseCount,
+                    questionCount: taskData.questionCount,
+                    chapterNumber: taskData.chapterNumber,
+                };
+                return { ...day, tasks: [...day.tasks, newTask] };
+            }
+            return day;
+        });
+        return { ...prevPlan, schedule: newSchedule };
+    });
+    closeModal('isAddTaskModalOpen');
+  }, [selectedDate, setStudyPlan, updatePreviousStudyPlan, closeModal]);
+
+  const onDayTasksSave = useCallback((updatedTasks: ScheduledTask[]) => {
+    handleSaveModifiedDayTasks(updatedTasks, selectedDate);
+    closeModal('isModifyDayTasksModalOpen');
+    setTimeout(() => handleRebalance({ type: 'standard' }), 100);
+  }, [handleSaveModifiedDayTasks, selectedDate, closeModal, handleRebalance]);
   
-    if (activeTab === 'schedule') {
-        let scheduleSubset = studyPlan.schedule;
-        if (options.schedule.reportType !== 'full') {
-            const start = options.schedule.startDate!;
-            const end = options.schedule.endDate!;
-            scheduleSubset = studyPlan.schedule.filter(d => d.date >= start && d.date <= end);
-        }
-        setPrintableContent(<ScheduleReport studyPlan={studyPlan} schedule={scheduleSubset} />);
-    } else if (activeTab === 'progress') {
-        setPrintableContent(<ProgressReport studyPlan={studyPlan} />);
-    } else if (activeTab === 'content') {
-        const resourcesWithStatus = globalMasterResourcePool.map(r => ({ ...r, isScheduled: scheduledResourceIds.has(r.id), source: r.bookSource || r.videoSource || 'Custom' }));
-        let filtered = resourcesWithStatus;
-        if (options.content.filter !== 'all') {
-            if (options.content.filter === 'archived') filtered = filtered.filter(r => r.isArchived);
-            else if (options.content.filter === 'scheduled') filtered = filtered.filter(r => r.isScheduled && !r.isArchived);
-            else if (options.content.filter === 'unscheduled') filtered = filtered.filter(r => !r.isScheduled && !r.isArchived);
-        }
-        // ... sorting logic ...
-        setPrintableContent(<ContentReport resources={filtered} title={`Filtered by: ${options.content.filter}`} />);
-    }
-  };
+  const handlePomodoroSessionComplete = useCallback((sessionType: 'study' | 'rest', durationMinutes: number) => {
+      if (sessionType === 'study' && currentPomodoroTaskId) {
+          const task = studyPlan?.schedule.flatMap(d => d.tasks).find(t => t.id === currentPomodoroTaskId);
+          setStudyPlan(prevPlan => {
+              if (!prevPlan) return null;
+              updatePreviousStudyPlan(prevPlan);
+              const newSchedule = prevPlan.schedule.map(day => {
+                  const taskIndex = day.tasks.findIndex(t => t.id === currentPomodoroTaskId);
+                  if (taskIndex > -1) {
+                      const updatedTask = { ...day.tasks[taskIndex] };
+                      updatedTask.actualStudyTimeMinutes = (updatedTask.actualStudyTimeMinutes || 0) + durationMinutes;
+                      const newTasks = [...day.tasks];
+                      newTasks[taskIndex] = updatedTask;
+                      return { ...day, tasks: newTasks };
+                  }
+                  return day;
+              });
+              return { ...prevPlan, schedule: newSchedule };
+          });
+          
+          if (task) {
+              setSystemNotification({ type: 'info', message: `Logged ${formatDuration(durationMinutes)} to "${task.title}".` });
 
-
-  const dailySchedule = useMemo(() => {
-    return studyPlan?.schedule.find(d => d.date === selectedDate);
-  }, [studyPlan, selectedDate]);
-
-  const currentPomodoroTask = useMemo(() => {
-    if (!currentPomodoroTaskId || !studyPlan) return null;
-    for (const day of studyPlan.schedule) {
-      const task = day.tasks.find(t => t.id === currentPomodoroTaskId);
-      if (task) return task;
-    }
-    return null;
-  }, [currentPomodoroTaskId, studyPlan]);
+              showConfirmation({
+                  title: 'Session Complete!',
+                  message: `Your study time has been logged. Would you also like to mark "${task.title}" as complete?`,
+                  confirmText: 'Mark Complete',
+                  onConfirm: () => {
+                      if (currentPomodoroTaskId) {
+                          handleTaskToggle(currentPomodoroTaskId, selectedDate);
+                          setCurrentPomodoroTaskId(null);
+                      }
+                  }
+              });
+          }
+      } else if (sessionType === 'rest') {
+          setSystemNotification({ type: 'info', message: 'Break is over. Time to get back to it!' });
+      }
+  }, [currentPomodoroTaskId, studyPlan, setStudyPlan, updatePreviousStudyPlan, setSystemNotification, showConfirmation, handleTaskToggle, selectedDate]);
   
   const scheduledResourceIds = useMemo(() => {
     if (!studyPlan) return new Set<string>();
-    const ids = new Set<string>();
-    studyPlan.schedule.forEach(day => {
-        day.tasks.forEach(task => {
-            if (task.originalResourceId) ids.add(task.originalResourceId);
-        });
-    });
-    return ids;
+    const ids = studyPlan.schedule
+      .flatMap(day => day.tasks.map(task => task.originalResourceId || task.resourceId))
+      .filter((id): id is string => !!id);
+    return new Set(ids);
+  }, [studyPlan?.schedule]);
+
+  const handleHighlightDatesForResource = useCallback((resourceId: string) => {
+      if (!studyPlan) return;
+      const dates = studyPlan.schedule
+          .filter(day => day.tasks.some(task => (task.originalResourceId || task.resourceId) === resourceId))
+          .map(day => day.date);
+      setHighlightedDates(dates);
   }, [studyPlan]);
-  
-  const findResourceDate = (resourceId: string): string | null => {
-    if (!studyPlan) return null;
-    for(const day of studyPlan.schedule) {
-        if (day.tasks.some(t => t.originalResourceId === resourceId)) {
-            return day.date;
-        }
+
+  const handleGoToDateForResource = useCallback((resourceId: string) => {
+    if (!studyPlan) return;
+    const firstDay = studyPlan.schedule.find(day => day.tasks.some(task => (task.originalResourceId || task.resourceId) === resourceId));
+    if (firstDay) {
+        setSelectedDate(firstDay.date);
+        setActiveTab('schedule');
+        if (isMobile) setIsSidebarOpen(false);
     }
-    return null;
-  }
+  }, [studyPlan, isMobile]);
+  
+  const handleGenerateReport = useCallback((activeTab: 'schedule' | 'progress' | 'content', options: PrintOptions) => {
+    if (!studyPlan) return;
+    setIsPrintModalOpen(false);
 
-  const findResourceDates = (resourceId: string): string[] => {
-    if (!studyPlan) return [];
-    const dates: string[] = [];
-    studyPlan.schedule.forEach(day => {
-        if (day.tasks.some(t => t.originalResourceId === resourceId)) {
-            dates.push(day.date);
+    let reportComponent = null;
+
+    if (activeTab === 'schedule') {
+        let scheduleSubset: DailySchedule[] = [];
+        let title = "Full Study Schedule";
+        
+        switch(options.schedule.reportType) {
+            case 'full':
+                scheduleSubset = studyPlan.schedule;
+                break;
+            case 'range':
+                const { startDate, endDate } = options.schedule;
+                scheduleSubset = studyPlan.schedule.filter(day => day.date >= (startDate || '0') && day.date <= (endDate || 'Z'));
+                title = `Schedule from ${startDate} to ${endDate}`;
+                break;
+            case 'currentDay':
+                scheduleSubset = studyPlan.schedule.filter(day => day.date === selectedDate);
+                title = `Schedule for ${selectedDate}`;
+                break;
+            case 'currentWeek':
+                const date = parseDateString(selectedDate);
+                const dayOfWeek = date.getUTCDay();
+                const firstDayOfWeek = new Date(date);
+                firstDayOfWeek.setUTCDate(date.getUTCDate() - dayOfWeek);
+                const weekDates = Array.from({length: 7}, (_, i) => {
+                    const d = new Date(firstDayOfWeek);
+                    d.setUTCDate(firstDayOfWeek.getUTCDate() + i);
+                    return d.toISOString().split('T')[0];
+                });
+                scheduleSubset = studyPlan.schedule.filter(day => weekDates.includes(day.date));
+                title = `Schedule for Week of ${weekDates[0]}`;
+                break;
         }
-    });
-    return dates;
-  }
 
-  if (isLoading || !studyPlan || !dailySchedule) {
-    return <div className="flex justify-center items-center h-screen bg-black"><div className="text-white">Loading Study Plan...</div></div>;
+        reportComponent = <ScheduleReport studyPlan={studyPlan} schedule={scheduleSubset} />;
+
+    } else if (activeTab === 'progress') {
+        reportComponent = <ProgressReport studyPlan={studyPlan} />;
+    } else { // content
+        const { filter: statusFilter, sortBy } = options.content;
+        
+        let resourcesToPrint = globalMasterResourcePool.map(r => ({
+          ...r,
+          isScheduled: scheduledResourceIds.has(r.id),
+          source: r.bookSource || r.videoSource || 'Custom',
+        }));
+
+        let title = "All Resources";
+        
+        // FIX: Apply active UI filters (search, domain, type, source) before status filtering from print options.
+        const { searchTerm, domain, type, source } = contentUiFilters;
+        if (searchTerm.trim() || domain !== 'all' || type !== 'all' || source !== 'all') {
+            const sTerm = searchTerm.trim().toLowerCase();
+            resourcesToPrint = resourcesToPrint.filter(resource => {
+                const domainMatch = domain === 'all' || resource.domain === domain;
+                const typeMatch = type === 'all' || resource.type === type;
+                const resourceSource = resource.bookSource || resource.videoSource || 'Custom';
+                const sourceMatch = source === 'all' || resourceSource === source;
+                const searchMatch = !sTerm || (
+                    resource.title.toLowerCase().includes(sTerm) || resource.id.toLowerCase().includes(sTerm) ||
+                    resource.domain.toLowerCase().includes(sTerm) || (resourceSource && resourceSource.toLowerCase().includes(sTerm))
+                );
+                return domainMatch && typeMatch && sourceMatch && searchMatch;
+            });
+        }
+        
+        if (statusFilter === 'scheduled') { resourcesToPrint = resourcesToPrint.filter(r => r.isScheduled); title = "Scheduled Resources"; }
+        else if (statusFilter === 'unscheduled') { resourcesToPrint = resourcesToPrint.filter(r => !r.isScheduled && !r.isArchived); title = "Unscheduled Resources"; }
+        else if (statusFilter === 'archived') { resourcesToPrint = resourcesToPrint.filter(r => r.isArchived); title = "Archived Resources"; }
+        else { resourcesToPrint = resourcesToPrint.filter(r => !r.isArchived); title = "All Active Resources"; }
+
+
+        resourcesToPrint.sort((a, b) => {
+          switch (sortBy) {
+            case 'title': return a.title.localeCompare(b.title);
+            case 'domain': return a.domain.localeCompare(b.domain);
+            case 'durationMinutesAsc': return a.durationMinutes - b.durationMinutes;
+            case 'durationMinutesDesc': return b.durationMinutes - a.durationMinutes;
+            case 'sequenceOrder':
+            default: return (a.sequenceOrder ?? 9999) - (b.sequenceOrder ?? 9999);
+          }
+        });
+
+        reportComponent = <ContentReport resources={resourcesToPrint} title={title} />;
+    }
+
+    setPrintableContent(reportComponent);
+  }, [studyPlan, globalMasterResourcePool, scheduledResourceIds, selectedDate, contentUiFilters]);
+
+
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+  };
+
+  const SaveStatusIndicator: React.FC = () => {
+    switch (saveStatus) {
+      case 'saving': return <div className="text-xs text-[var(--accent-yellow)] flex items-center"><i className="fas fa-sync fa-spin mr-1.5"></i> Saving...</div>;
+      case 'saved': return <div className="text-xs text-[var(--accent-green)] flex items-center"><i className="fas fa-check-circle mr-1.5"></i> Saved</div>;
+      case 'error': return <div className="text-xs text-[var(--accent-red)] flex items-center"><i className="fas fa-exclamation-triangle mr-1.5"></i> Error</div>;
+      default: return <div className="text-xs text-[var(--text-secondary)] flex items-center"><i className="fas fa-cloud mr-1.5"></i> Synced</div>;
+    }
+  };
+
+  const selectedDaySchedule = studyPlan ? studyPlan.schedule.find(day => day.date === selectedDate) : null;
+  const currentPomodoroTask = currentPomodoroTaskId && studyPlan ? studyPlan.schedule.flatMap(d => d.tasks).find(t => t.id === currentPomodoroTaskId) : null;
+  
+
+  if (isLoading && !studyPlan) {
+    return <div className="flex flex-col items-center justify-center min-h-screen bg-black text-white p-4"><i className="fas fa-brain fa-spin fa-3x mb-6 text-[var(--accent-purple)]"></i><h1 className="text-3xl font-bold mb-3">{APP_TITLE}</h1><p className="text-lg mb-6">Connecting to the cloud...</p></div>;
   }
   
-  const availableResourceTypes = Object.values(ResourceType);
+  if (!studyPlan) {
+     return <div className="flex flex-col items-center justify-center min-h-screen bg-black text-white p-4"><i className="fas fa-exclamation-triangle fa-3x text-[var(--accent-red)] mb-4"></i><h1 className="text-2xl font-bold mb-2">Error</h1><p className="text-red-400 text-center mb-6">{systemNotification?.message || 'An unknown error occurred.'}</p><Button onClick={() => loadSchedule(true)} variant="primary">Try Again</Button></div>;
+  }
 
-  return (
-    <div className="main-app-container flex h-full">
-      <div className={`fixed inset-0 bg-black/50 z-[var(--z-sidebar-mobile-backdrop)] transition-opacity lg:hidden ${isSidebarOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`} onClick={() => setIsSidebarOpen(false)}></div>
-      <div className={`fixed top-0 left-0 h-full transition-transform duration-300 ease-in-out z-[var(--z-sidebar-mobile)] lg:relative lg:translate-x-0 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+  const MainAppContent = (
+      <div className="h-full w-full bg-transparent text-[var(--text-primary)] flex flex-col print:hidden">
+        <div className={`lg:hidden fixed inset-y-0 left-0 z-[var(--z-sidebar-mobile)] transform transition-transform duration-300 ease-in-out ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+            <SidebarContent 
+                isSidebarOpen={isSidebarOpen} setIsSidebarOpen={setIsSidebarOpen} isPomodoroCollapsed={isPomodoroCollapsed} setIsPomodoroCollapsed={setIsPomodoroCollapsed}
+                pomodoroSettings={pomodoroSettings} setPomodoroSettings={setPomodoroSettings} handlePomodoroSessionComplete={handlePomodoroSessionComplete} currentPomodoroTask={currentPomodoroTask}
+                studyPlan={studyPlan} selectedDate={selectedDate} setSelectedDate={setSelectedDate} isMobile={isMobile} navigatePeriod={navigatePeriod} highlightedDates={highlightedDates}
+                todayInNewYork={todayInNewYork} handleRebalance={handleRebalance} isLoading={isLoading} handleToggleCramMode={handleToggleCramMode} handleUpdateDeadlines={handleUpdateDeadlines}
+                isSettingsOpen={isSettingsOpen} setIsSettingsOpen={setIsSettingsOpen} handleUpdateTopicOrderAndRebalance={handleUpdateTopicOrderAndRebalance}
+                handleUpdateCramTopicOrderAndRebalance={handleUpdateCramTopicOrderAndRebalance} handleToggleSpecialTopicsInterleaving={handleToggleSpecialTopicsInterleaving}
+                handleAddOrUpdateException={handleAddOrUpdateException} handleUndo={handleUndo} previousStudyPlan={previousStudyPlan} showConfirmation={showConfirmation}
+                loadSchedule={loadSchedule} handleMasterResetTasks={handleMasterResetTasks} handleUpdatePlanDates={handleUpdatePlanDates}
+            />
+        </div>
+        <div className={`lg:hidden fixed inset-0 bg-black/60 z-[var(--z-sidebar-mobile-backdrop)] transition-opacity ${isSidebarOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`} onClick={() => setIsSidebarOpen(false)} aria-hidden="true"></div>
+        <div className="hidden lg:block fixed inset-y-0 left-0 z-30">
           <SidebarContent 
-              {...{
-                  isSidebarOpen, setIsSidebarOpen, isPomodoroCollapsed, setIsPomodoroCollapsed, pomodoroSettings, 
-                  setPomodoroSettings, handlePomodoroSessionComplete, currentPomodoroTask, studyPlan, selectedDate, 
-                  setSelectedDate, isMobile, navigatePeriod, highlightedDates, todayInNewYork, handleRebalance, 
-                  isLoading, handleToggleCramMode, handleUpdateDeadlines, isSettingsOpen, setIsSettingsOpen, 
-                  handleUpdateTopicOrderAndRebalance, handleUpdateCramTopicOrderAndRebalance, handleToggleSpecialTopicsInterleaving,
-                  handleAddOrUpdateException, handleUndo, previousStudyPlan, showConfirmation, loadSchedule,
-                  handleMasterResetTasks, handleUpdatePlanDates
-              }} 
-          />
-      </div>
+                isSidebarOpen={isSidebarOpen} setIsSidebarOpen={setIsSidebarOpen} isPomodoroCollapsed={isPomodoroCollapsed} setIsPomodoroCollapsed={setIsPomodoroCollapsed}
+                pomodoroSettings={pomodoroSettings} setPomodoroSettings={setPomodoroSettings} handlePomodoroSessionComplete={handlePomodoroSessionComplete} currentPomodoroTask={currentPomodoroTask}
+                studyPlan={studyPlan} selectedDate={selectedDate} setSelectedDate={setSelectedDate} isMobile={isMobile} navigatePeriod={navigatePeriod} highlightedDates={highlightedDates}
+                todayInNewYork={todayInNewYork} handleRebalance={handleRebalance} isLoading={isLoading} handleToggleCramMode={handleToggleCramMode} handleUpdateDeadlines={handleUpdateDeadlines}
+                isSettingsOpen={isSettingsOpen} setIsSettingsOpen={setIsSettingsOpen} handleUpdateTopicOrderAndRebalance={handleUpdateTopicOrderAndRebalance}
+                handleUpdateCramTopicOrderAndRebalance={handleUpdateCramTopicOrderAndRebalance} handleToggleSpecialTopicsInterleaving={handleToggleSpecialTopicsInterleaving}
+                handleAddOrUpdateException={handleAddOrUpdateException} handleUndo={handleUndo} previousStudyPlan={previousStudyPlan} showConfirmation={showConfirmation}
+                loadSchedule={loadSchedule} handleMasterResetTasks={handleMasterResetTasks} handleUpdatePlanDates={handleUpdatePlanDates}
+            />
+        </div>
 
-      <div className="flex-1 flex flex-col h-dvh min-w-0">
-        <header className="flex-shrink-0 flex items-center justify-between p-2.5 glass-chrome border-b border-[var(--separator-primary)] pl-[calc(0.5rem+env(safe-area-inset-left))] pr-[calc(0.5rem+env(safe-area-inset-right))] pt-[calc(0.5rem+env(safe-area-inset-top))]">
-          <Button onClick={() => setIsSidebarOpen(true)} variant="ghost" size="sm" className="lg:hidden !px-2.5">
-            <i className="fas fa-bars"></i>
-          </Button>
-          <div className="hidden lg:block">
-            <h1 className="text-lg font-semibold text-white">{APP_TITLE}</h1>
-          </div>
-          <div className="flex items-center space-x-2">
-              <span className={`text-xs font-semibold transition-opacity ${saveStatus === 'saving' ? 'opacity-100' : 'opacity-0'}`}><i className="fas fa-sync fa-spin mr-1"></i>Saving...</span>
-              <span className={`text-xs font-semibold text-[var(--accent-green)] transition-opacity ${saveStatus === 'saved' ? 'opacity-100' : 'opacity-0'}`}><i className="fas fa-check-circle mr-1"></i>Saved</span>
-              <span className={`text-xs font-semibold text-[var(--accent-red)] transition-opacity ${saveStatus === 'error' ? 'opacity-100' : 'opacity-0'}`}><i className="fas fa-exclamation-triangle mr-1"></i>Error</span>
-          </div>
-          <CountdownTimer examDate={EXAM_DATE_START} />
-        </header>
-
-        <main className="flex-grow overflow-y-auto isolated-scroll">
-            <div className="grid grid-cols-1 xl:grid-cols-3 gap-0 xl:gap-6 max-w-7xl mx-auto w-full">
-                <div className="xl:col-span-1 p-3 md:p-4 pr-[calc(0.75rem+env(safe-area-inset-right))] pl-[calc(0.75rem+env(safe-area-inset-left))]">
-                    <div className="flex items-center justify-between mb-4">
-                        <div className="flex items-center space-x-1">
-                            <Button onClick={() => setActiveTab('schedule')} variant={activeTab === 'schedule' ? 'primary' : 'secondary'} size="sm">Schedule</Button>
-                            <Button onClick={() => setActiveTab('progress')} variant={activeTab === 'progress' ? 'primary' : 'secondary'} size="sm">Progress</Button>
-                            <Button onClick={() => { setActiveTab('content'); setPrintModalInitialTab('content');}} variant={activeTab === 'content' ? 'primary' : 'secondary'} size="sm">Content</Button>
+        <div className="flex-grow lg:pl-80 flex flex-col min-h-0">
+            <header className="flex-shrink-0 text-[var(--text-primary)] px-3 md:px-4 pb-3 md:pb-4 flex justify-between items-center sticky top-0 z-[var(--z-header)] pt-[calc(0.75rem+env(safe-area-inset-top))] md:pt-[calc(1rem+env(safe-area-inset-top))] pl-[calc(0.75rem+env(safe-area-inset-left))] pr-[calc(0.75rem+env(safe-area-inset-right))] glass-chrome">
+              <div className="flex items-center">
+                  <button className="lg:hidden p-2 -ml-2 mr-2 text-[var(--text-primary)] hover:bg-[var(--background-tertiary-hover)] rounded-full" onClick={() => setIsSidebarOpen(p => !p)} aria-label="Toggle menu">
+                      <i className="fas fa-bars fa-lg"></i>
+                  </button>
+                  <h1 className="text-base sm:text-lg md:text-xl font-bold flex items-center"><i className="fas fa-brain mr-2 text-[var(--accent-purple)]"></i> {APP_TITLE}</h1>
+              </div>
+              
+              {pomodoroSettings.isActive && (
+                  <div className="absolute left-1/2 -translate-x-1/2 flex items-center flex-col pointer-events-none">
+                      <div className={`hidden sm:block text-xs uppercase tracking-wider ${pomodoroSettings.isStudySession ? 'text-[var(--accent-purple)]' : 'text-[var(--accent-green)]'}`}>{pomodoroSettings.isStudySession ? 'Study Time' : 'Break Time'}</div>
+                      <div className="text-2xl font-mono font-bold text-[var(--text-primary)] hidden sm:block">
+                          {formatTime(pomodoroSettings.timeLeft)}
+                      </div>
+                  </div>
+              )}
+              <div className="flex items-center space-x-2 md:space-x-4">
+                  <div className="hidden sm:block">
+                      <SaveStatusIndicator />
+                  </div>
+                  <Button onClick={() => setIsPrintModalOpen(true)} variant="secondary" size="sm" className="!px-2.5 !text-sm" aria-label="Print Reports">
+                    <i className="fas fa-print"></i>
+                  </Button>
+                  <div className="p-2 rounded-lg flex flex-col md:flex-row md:items-center md:space-x-4 gap-y-1">
+                    {studyPlan.firstPassEndDate && (
+                      <div className="text-right">
+                        <div className="text-xs text-slate-400">First Pass Ends</div>
+                        <div className="text-sm font-medium text-[var(--accent-purple)] interactive-glow-border">
+                          {parseDateString(studyPlan.firstPassEndDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' })}
                         </div>
-                        <Button onClick={() => setIsPrintModalOpen(true)} variant="ghost" size="sm" className="!px-2.5"><i className="fas fa-print mr-2"></i> Print</Button>
+                      </div>
+                    )}
+                    <CountdownTimer examDate={EXAM_DATE_START} />
+                  </div>
+              </div>
+            </header>
+            
+            <main className="flex-grow overflow-y-auto isolated-scroll p-3 md:p-6 pr-[calc(0.75rem+env(safe-area-inset-right))] pl-[calc(0.75rem+env(safe-area-inset-left))]">
+                <div className="max-w-4xl mx-auto w-full">
+                  <div className="mb-6">
+                        <div className="inline-flex bg-[var(--background-secondary)] p-1 rounded-lg space-x-1">
+                            <button onClick={() => setActiveTab('schedule')} className={`py-1.5 px-4 font-semibold text-sm rounded-md flex-1 transition-colors ${activeTab === 'schedule' ? 'bg-[var(--glass-bg-active)] shadow text-[var(--text-primary)]' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}>
+                                <i className="fa-regular fa-calendar-days mr-2"></i> Schedule
+                            </button>
+                            <button onClick={() => setActiveTab('progress')} className={`py-1.5 px-4 font-semibold text-sm rounded-md flex-1 transition-colors ${activeTab === 'progress' ? 'bg-[var(--glass-bg-active)] shadow text-[var(--text-primary)]' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}>
+                                <i className="fa-solid fa-chart-pie mr-2"></i> Progress
+                            </button>
+                            <button onClick={() => setActiveTab('content')} className={`py-1.5 px-4 font-semibold text-sm rounded-md flex-1 transition-colors ${activeTab === 'content' ? 'bg-[var(--glass-bg-active)] shadow text-[var(--text-primary)]' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}>
+                                <i className="fa-solid fa-book-bookmark mr-2"></i> Content
+                            </button>
+                        </div>
                     </div>
-                     <div className={activeTab !== 'schedule' ? 'hidden' : ''}>
-                        <DailyTaskList 
-                            dailySchedule={dailySchedule} 
-                            onTaskToggle={handleTaskToggleAndProgressUpdate}
-                            onOpenAddTaskModal={() => openModal('isAddTaskModalOpen')}
-                            onOpenModifyDayModal={() => openModal('isModifyDayTasksModalOpen')}
-                            currentPomodoroTaskId={currentPomodoroTaskId}
-                            onPomodoroTaskSelect={setCurrentPomodoroTaskId}
-                            onNavigateDay={navigateDay}
-                            isPomodoroActive={pomodoroSettings.isActive}
-                            onToggleRestDay={(isRest) => handleToggleRestDay(selectedDate, isRest)}
-                            // FIX: Correctly call the handler from the hook instead of trying to manipulate state directly.
-                            onUpdateTimeForDay={(newTime) => {
-                                handleAddOrUpdateException({
-                                    date: selectedDate,
-                                    dayType: 'exception',
-                                    isRestDayOverride: newTime === 0,
-                                    targetMinutes: newTime,
-                                });
-                            }}
-                            isLoading={isLoading}
-                        />
-                    </div>
-                    <div className={activeTab !== 'progress' ? 'hidden' : ''}>
-                        <ProgressDisplay studyPlan={studyPlan} />
-                    </div>
-                     <div className={activeTab !== 'content' ? 'hidden' : ''}>
-                        <MasterResourcePoolViewer 
-                            resources={globalMasterResourcePool}
-                            onOpenAddResourceModal={() => openResourceEditor(null)}
-                            onEditResource={openResourceEditor}
-                            onArchiveResource={handleArchiveResource}
-                            onRestoreResource={handleRestoreResource}
-                            onPermanentDeleteResource={handlePermanentDeleteResource}
-                            scheduledResourceIds={scheduledResourceIds}
-                            onGoToDate={(resId) => { const date = findResourceDate(resId); if (date) { setActiveTab('schedule'); setSelectedDate(date); } }}
-                            onHighlightDates={(resId) => { setHighlightedDates(findResourceDates(resId)); }}
-                            onClearHighlights={() => setHighlightedDates([])}
-                        />
+
+                    <div>
+                        {isLoading && <div className="flex flex-col items-center justify-center p-10"> <i className="fas fa-spinner fa-spin fa-2x text-[var(--accent-purple)] mb-3"></i> <span className="text-[var(--text-primary)]">Loading...</span> </div>}
+                        
+                        <div className={activeTab !== 'schedule' ? 'hidden' : ''}>
+                          {selectedDaySchedule ?
+                            <DailyTaskList 
+                                dailySchedule={selectedDaySchedule} 
+                                onTaskToggle={(taskId) => handleTaskToggle(taskId, selectedDate)} 
+                                onOpenAddTaskModal={() => openModal('isAddTaskModalOpen')} 
+                                onOpenModifyDayModal={() => openModal('isModifyDayTasksModalOpen')}
+                                currentPomodoroTaskId={currentPomodoroTaskId} 
+                                onPomodoroTaskSelect={handlePomodoroTaskSelect} 
+                                onNavigateDay={navigateDate} 
+                                isPomodoroActive={pomodoroSettings.isActive}
+                                onToggleRestDay={(isRest) => handleToggleRestDay(selectedDate, isRest)}
+                                onUpdateTimeForDay={handleUpdateTimeForDay}
+                                isLoading={isLoading}
+                            /> : <div className="text-center text-[var(--text-secondary)] py-10">No schedule for this day.</div>
+                          }
+                        </div>
+                        
+                        <div className={activeTab !== 'progress' ? 'hidden' : ''}>
+                            {studyPlan && <ProgressDisplay studyPlan={studyPlan} />}
+                        </div>
+
+                        <div className={activeTab !== 'content' ? 'hidden' : ''}>
+                            <MasterResourcePoolViewer 
+                                resources={globalMasterResourcePool}
+                                onOpenAddResourceModal={() => openResourceEditor(null)}
+                                onEditResource={openResourceEditor}
+                                onArchiveResource={handleRequestArchive}
+                                onRestoreResource={handleRestoreResource}
+                                onPermanentDeleteResource={handlePermanentDelete}
+                                scheduledResourceIds={scheduledResourceIds}
+                                onGoToDate={handleGoToDateForResource}
+                                onHighlightDates={handleHighlightDatesForResource}
+                                onClearHighlights={() => setHighlightedDates([])}
+                                filters={contentUiFilters}
+                                onFiltersChange={setContentUiFilters}
+                            />
+                        </div>
                     </div>
                 </div>
-            </div>
-        </main>
-      </div>
-      
-      {/* --- Modals --- */}
-      {/* FIX: Correctly call setIsNewUser(false) on modal close. */}
-      {isNewUser && <WelcomeModal isOpen={modalStates.isWelcomeModalOpen} onClose={() => {closeModal('isWelcomeModalOpen'); setIsNewUser(false);}}/>}
-      <AddTaskModal isOpen={modalStates.isAddTaskModalOpen} onClose={() => closeModal('isAddTaskModalOpen')} onSave={handleSaveTask} availableDomains={ALL_DOMAINS} selectedDate={selectedDate}/>
-      <ModifyDayTasksModal 
-        isOpen={modalStates.isModifyDayTasksModalOpen} 
-        onClose={() => closeModal('isModifyDayTasksModalOpen')} 
-        onSave={(tasks) => {handleSaveModifiedDayTasks(tasks, selectedDate); closeModal('isModifyDayTasksModalOpen');}}
-        tasksForDay={dailySchedule.tasks}
-        allResources={globalMasterResourcePool}
-        selectedDate={selectedDate}
-        showConfirmation={showConfirmation}
-        openAddResourceModal={() => openResourceEditor(null)}
-        onEditResource={openResourceEditor}
-        onArchiveResource={handleArchiveResource}
-        onRestoreResource={handleRestoreResource}
-        onPermanentDeleteResource={handlePermanentDeleteResource}
-        isCramModeActive={studyPlan.isCramModeActive}
-      />
-      <ResourceEditorModal 
-          isOpen={modalStates.isResourceEditorOpen} 
-          onClose={closeResourceEditor}
-          onSave={handleSaveResource}
-          onRequestArchive={handleArchiveResource}
-          initialResource={modalData.editingResource}
-          availableDomains={ALL_DOMAINS}
-          availableResourceTypes={availableResourceTypes}
-      />
-      <ConfirmationModal {...modalStates.confirmationState} />
-      <PrintModal 
-          isOpen={isPrintModalOpen} 
-          onClose={() => setIsPrintModalOpen(false)} 
-          onGenerateReport={handleGenerateReport} 
-          studyPlan={studyPlan} 
-          currentDate={selectedDate}
-          activeFilters={contentFilters}
-          initialTab={printModalInitialTab}
-      />
-      
-      {/* System Notification */}
-      {systemNotification && (
-          <div className={`fixed bottom-4 right-4 z-[var(--z-notification)] p-4 rounded-lg shadow-lg text-white max-w-sm animate-fade-in-out ${systemNotification.type === 'error' ? 'bg-red-800/80' : systemNotification.type === 'warning' ? 'bg-yellow-800/80' : 'bg-blue-800/80'}`}>
+            </main>
+        </div>
+        
+        {modalStates.isWelcomeModalOpen && <WelcomeModal isOpen={modalStates.isWelcomeModalOpen} onClose={() => { closeModal('isWelcomeModalOpen'); setIsNewUser(false); }} />}
+        {modalStates.isAddTaskModalOpen && selectedDaySchedule && <AddTaskModal isOpen={modalStates.isAddTaskModalOpen} onClose={() => closeModal('isAddTaskModalOpen')} onSave={handleSaveOptionalTask} availableDomains={ALL_DOMAINS} selectedDate={selectedDate}/>}
+        {modalStates.isModifyDayTasksModalOpen && selectedDaySchedule && <ModifyDayTasksModal isOpen={modalStates.isModifyDayTasksModalOpen} onClose={() => closeModal('isModifyDayTasksModalOpen')} onSave={onDayTasksSave} tasksForDay={selectedDaySchedule.tasks} allResources={globalMasterResourcePool} selectedDate={selectedDate} showConfirmation={showConfirmation} onEditResource={openResourceEditor} onArchiveResource={handleRequestArchive} onRestoreResource={handleRestoreResource} onPermanentDeleteResource={handlePermanentDelete} openAddResourceModal={() => openResourceEditor(null)} isCramModeActive={studyPlan.isCramModeActive ?? false} />}
+        {modalStates.isResourceEditorOpen && <ResourceEditorModal isOpen={modalStates.isResourceEditorOpen} onClose={closeResourceEditor} onSave={handleSaveResource} onRequestArchive={handleRequestArchive} initialResource={modalData.editingResource} availableDomains={ALL_DOMAINS} availableResourceTypes={Object.values(ResourceType)}/>}
+        <ConfirmationModal {...modalStates.confirmationState} onConfirm={handleConfirm} onClose={modalStates.confirmationState.onClose} />
+        {isPrintModalOpen && <PrintModal isOpen={isPrintModalOpen} onClose={() => setIsPrintModalOpen(false)} onGenerateReport={handleGenerateReport} studyPlan={studyPlan} currentDate={selectedDate} activeFilters={{ domain: contentUiFilters.domain, type: contentUiFilters.type, source: contentUiFilters.source }} initialTab={activeTab} />}
+
+        {systemNotification && (
+            <div 
+              className={`toast toast-${systemNotification.type}`}
+              role="alert"
+            >
               <div className="flex items-start">
                   <i className={`fas ${systemNotification.type === 'error' ? 'fa-exclamation-circle' : systemNotification.type === 'warning' ? 'fa-exclamation-triangle' : 'fa-info-circle'} mr-3 mt-1`}></i>
-                  <div>
+                  <div className="flex-grow">
                       <p className="font-bold capitalize">{systemNotification.type}</p>
                       <p className="text-sm">{systemNotification.message}</p>
                   </div>
                   <button onClick={() => setSystemNotification(null)} className="ml-4 -mt-1 -mr-1 p-1 rounded-full hover:bg-white/20"><i className="fas fa-times"></i></button>
               </div>
-          </div>
-      )}
-
-      {/* Print Container */}
+            </div>
+        )}
+      </div>
+  );
+  
+  return (
+    <>
+      <div className="main-app-container">{MainAppContent}</div>
       <div className="print-only-container">
         {printableContent}
       </div>
-    </div>
+    </>
   );
 };
 

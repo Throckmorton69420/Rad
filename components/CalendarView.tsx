@@ -106,10 +106,6 @@ const CalendarView: React.FC<CalendarViewProps> = ({ schedule, selectedDate, onD
                         aria-label={`${parseDateString(dateStr).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', timeZone: 'UTC' })}. ${daySchedule ? (daySchedule.isRestDay ? 'Rest Day' : `${Math.round(daySchedule.totalStudyTimeMinutes / 60)} hours assigned.`) : 'No tasks.'}`}
                     >
                         <span className={`${isSelected ? 'font-bold' : ''}`}>{dayOfMonth}</span>
-                        {domainColor && !isSelected && !daySchedule?.isRestDay && (
-                           <div className="absolute bottom-1.5 left-1/2 -translate-x-1/2 w-1.5 h-1.5 rounded-full" style={{ backgroundColor: domainColor }}></div>
-                        )}
-                        {daySchedule?.isManuallyModified && !isSelected && <i className="fas fa-hand-paper text-xxs text-[var(--accent-yellow)] absolute top-1 right-1" title="Manually Modified"></i>}
                         {daySchedule && !daySchedule.isRestDay && daySchedule.totalStudyTimeMinutes > 0 && (
                             <span className={`mt-auto text-xxs px-1 py-0.5 rounded ${isSelected ? 'bg-black/30' : 'bg-black/50'}`}>
                                 {Math.round(daySchedule.totalStudyTimeMinutes / 60)}h
@@ -126,20 +122,20 @@ const CalendarView: React.FC<CalendarViewProps> = ({ schedule, selectedDate, onD
   };
 
   const renderMonthCalendar = () => {
-    const year = displayDateObj.getFullYear();
-    const month = displayDateObj.getMonth();
-    const firstDayOfMonth = new Date(year, month, 1);
-    const lastDayOfMonth = new Date(year, month + 1, 0);
-    const daysInMonth = lastDayOfMonth.getDate();
-    const startingDayOfWeek = firstDayOfMonth.getDay();
+    const year = displayDateObj.getUTCFullYear();
+    const month = displayDateObj.getUTCMonth();
+    const firstDayOfMonth = new Date(Date.UTC(year, month, 1));
+    const lastDayOfMonth = new Date(Date.UTC(year, month + 1, 0));
+    const daysInMonth = lastDayOfMonth.getUTCDate();
+    const startingDayOfWeek = firstDayOfMonth.getUTCDay();
 
     const calendarDays: { dateStr: string; dayOfMonth: number; isCurrentMonth: boolean }[] = [];
 
     // Days from previous month
-    const prevMonthLastDay = new Date(year, month, 0);
+    const prevMonthLastDay = new Date(Date.UTC(year, month, 0));
     for (let i = startingDayOfWeek - 1; i >= 0; i--) {
-        const day = prevMonthLastDay.getDate() - i;
-        const date = new Date(year, month - 1, day);
+        const day = prevMonthLastDay.getUTCDate() - i;
+        const date = new Date(Date.UTC(year, month - 1, day));
         calendarDays.push({ dateStr: date.toISOString().split('T')[0], dayOfMonth: day, isCurrentMonth: false });
     }
 
@@ -153,7 +149,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ schedule, selectedDate, onD
     const totalCells = calendarDays.length;
     const remainingCells = (7 - (totalCells % 7)) % 7;
     for (let i = 1; i <= remainingCells; i++) {
-        const date = new Date(year, month + 1, i);
+        const date = new Date(Date.UTC(year, month + 1, i));
         calendarDays.push({ dateStr: date.toISOString().split('T')[0], dayOfMonth: i, isCurrentMonth: false });
     }
 
@@ -161,40 +157,42 @@ const CalendarView: React.FC<CalendarViewProps> = ({ schedule, selectedDate, onD
   };
   
   const renderWeekCalendar = () => {
-    const year = displayDateObj.getFullYear();
-    const month = displayDateObj.getMonth();
-    const dayInSelectedWeek = displayDateObj.getDate();
+    const year = displayDateObj.getUTCFullYear();
+    const month = displayDateObj.getUTCMonth();
+    const dayInSelectedWeek = displayDateObj.getUTCDate();
     
-    const currentDayOfWeek = displayDateObj.getDay();
-    const firstDayOfWeek = new Date(year, month, dayInSelectedWeek - currentDayOfWeek);
+    const currentDayOfWeek = displayDateObj.getUTCDay();
+    const firstDayOfWeek = new Date(Date.UTC(year, month, dayInSelectedWeek - currentDayOfWeek));
 
     const calendarDays: { dateStr: string; dayOfMonth: number; }[] = [];
 
     for(let i=0; i<7; i++) {
         const weekDay = new Date(firstDayOfWeek);
-        weekDay.setDate(firstDayOfWeek.getDate() + i);
-        calendarDays.push({ dateStr: weekDay.toISOString().split('T')[0], dayOfMonth: weekDay.getDate() });
+        weekDay.setUTCDate(firstDayOfWeek.getUTCDate() + i);
+        calendarDays.push({ dateStr: weekDay.toISOString().split('T')[0], dayOfMonth: weekDay.getUTCDate() });
     }
      return renderCalendarGrid(calendarDays);
   }
 
   return (
     <div className="p-3 md:p-4 glass-panel rounded-lg">
-      <div className="flex justify-between items-center mb-3 gap-2">
+      <div className="flex justify-between items-center mb-3">
         <Button onClick={() => onNavigatePeriod('prev')} variant="ghost" size="sm" className="!px-2" aria-label="Previous Period"><i className="fas fa-chevron-left"></i></Button>
-        <h3 className="text-sm font-semibold text-[var(--text-primary)] text-center flex-grow" aria-live="polite">
-          {viewMode === ViewMode.MONTHLY 
-            ? displayDateObj.toLocaleDateString('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' })
-            : `Week of ${displayDateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' })}`}
-        </h3>
-        <Button 
-            onClick={() => onDateSelect(today)} 
-            variant="secondary" size="sm" 
-            className="!px-2.5 !text-sm flex-shrink-0"
-            aria-label="Go to Today"
-        >
-            Today
-        </Button>
+        <div className="flex items-center gap-2">
+            <h3 className="text-sm font-semibold text-[var(--text-primary)] text-center" aria-live="polite">
+            {viewMode === ViewMode.MONTHLY 
+                ? displayDateObj.toLocaleDateString('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' })
+                : `Week of ${displayDateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' })}`}
+            </h3>
+            <Button 
+                onClick={() => onDateSelect(today)} 
+                variant="secondary" size="sm" 
+                className="!px-2.5 !text-xs"
+                aria-label="Go to Today"
+            >
+                Today
+            </Button>
+        </div>
         <Button onClick={() => onNavigatePeriod('next')} variant="ghost" size="sm" className="!px-2" aria-label="Next Period"><i className="fas fa-chevron-right"></i></Button>
       </div>
       {viewMode === ViewMode.MONTHLY ? renderMonthCalendar() : renderWeekCalendar()}

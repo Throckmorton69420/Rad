@@ -5,6 +5,9 @@ import { Button } from './Button';
 import { formatDuration, getDomainColorStyle } from '../utils/timeFormatter';
 import { ALL_DOMAINS } from '../constants';
 import CustomSelect from '../CustomSelect';
+// FIX: Import the filter type definition from App.tsx where it is now defined.
+import { ContentUiFilters } from '../App';
+
 
 interface MasterResourcePoolViewerProps {
   resources: StudyResource[];
@@ -17,6 +20,9 @@ interface MasterResourcePoolViewerProps {
   onGoToDate: (resourceId: string) => void;
   onHighlightDates: (resourceId: string) => void;
   onClearHighlights: () => void;
+  // FIX: Add props to make this a controlled component for filters.
+  filters: ContentUiFilters;
+  onFiltersChange: (filters: ContentUiFilters) => void;
 }
 
 type SortKey = 'title' | 'domain' | 'type' | 'durationMinutes' | 'sequenceOrder' | 'status' | 'source';
@@ -25,14 +31,11 @@ type SortConfig = { key: SortKey; direction: 'ascending' | 'descending'; };
 const MasterResourcePoolViewer: React.FC<MasterResourcePoolViewerProps> = ({ 
   resources, onOpenAddResourceModal, onEditResource, onArchiveResource, 
   onRestoreResource, onPermanentDeleteResource, scheduledResourceIds,
-  onGoToDate, onHighlightDates, onClearHighlights
+  onGoToDate, onHighlightDates, onClearHighlights,
+  // FIX: Destructure new filter props.
+  filters, onFiltersChange,
 }) => {
-  const [searchTerm, setSearchTerm] = useState('');
-  const [domainFilter, setDomainFilter] = useState<Domain | 'all'>('all');
-  const [typeFilter, setTypeFilter] = useState<ResourceType | 'all'>('all');
-  const [sourceFilter, setSourceFilter] = useState<string | 'all'>('all');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'scheduled' | 'unscheduled'>('all');
-  const [showArchived, setShowArchived] = useState(false);
+  // FIX: Removed local state for filters, as they are now managed by the parent component.
   const [isSummaryExpanded, setIsSummaryExpanded] = useState(true);
   
   const [sortConfig, setSortConfig] = useState<SortConfig>({ key: 'sequenceOrder', direction: 'ascending' });
@@ -72,18 +75,18 @@ const MasterResourcePoolViewer: React.FC<MasterResourcePoolViewerProps> = ({
 
   const filteredAndSortedResources = useMemo(() => {
     let filtered = resourcesWithStatus.filter(resource => {
-      const isArchivedMatch = showArchived ? resource.isArchived : !resource.isArchived;
+      const isArchivedMatch = filters.showArchived ? resource.isArchived : !resource.isArchived;
       if (!isArchivedMatch) return false;
 
-      const statusMatch = statusFilter === 'all' || 
-                          (statusFilter === 'scheduled' && resource.isScheduled) ||
-                          (statusFilter === 'unscheduled' && !resource.isScheduled);
+      const statusMatch = filters.status === 'all' || 
+                          (filters.status === 'scheduled' && resource.isScheduled) ||
+                          (filters.status === 'unscheduled' && !resource.isScheduled);
       if (!statusMatch) return false;
       
-      const searchMatch = !searchTerm || resource.title.toLowerCase().includes(searchTerm.toLowerCase()) || resource.id.toLowerCase().includes(searchTerm.toLowerCase());
-      const domainMatch = domainFilter === 'all' || resource.domain === domainFilter;
-      const typeMatch = typeFilter === 'all' || resource.type === typeFilter;
-      const sourceMatch = sourceFilter === 'all' || resource.source === sourceFilter;
+      const searchMatch = !filters.searchTerm || resource.title.toLowerCase().includes(filters.searchTerm.toLowerCase()) || resource.id.toLowerCase().includes(filters.searchTerm.toLowerCase());
+      const domainMatch = filters.domain === 'all' || resource.domain === filters.domain;
+      const typeMatch = filters.type === 'all' || resource.type === filters.type;
+      const sourceMatch = filters.source === 'all' || resource.source === filters.source;
       
       return searchMatch && domainMatch && typeMatch && sourceMatch;
     });
@@ -102,7 +105,7 @@ const MasterResourcePoolViewer: React.FC<MasterResourcePoolViewerProps> = ({
     });
 
     return filtered;
-  }, [resourcesWithStatus, showArchived, statusFilter, searchTerm, domainFilter, typeFilter, sourceFilter, sortConfig]);
+  }, [resourcesWithStatus, filters, sortConfig]);
 
   const requestSort = (key: SortKey) => {
     let direction: 'ascending' | 'descending' = 'ascending';
@@ -119,16 +122,16 @@ const MasterResourcePoolViewer: React.FC<MasterResourcePoolViewerProps> = ({
     <div className="pb-[calc(1rem+env(safe-area-inset-bottom))]">
       <div className="flex-shrink-0">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 items-end mb-3">
-          <input type="text" placeholder="Search resources..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="input-base !py-1.5 !text-sm"/>
-          <CustomSelect value={domainFilter} onChange={v => setDomainFilter(v as Domain | 'all')} options={[{value: 'all', label: 'All Topics'}, ...ALL_DOMAINS.map(d => ({ value: d, label: d }))]}/>
-          <CustomSelect value={typeFilter} onChange={v => setTypeFilter(v as ResourceType | 'all')} options={[{value: 'all', label: 'All Types'}, ...typeOptions]}/>
-          <CustomSelect value={sourceFilter} onChange={v => setSourceFilter(v)} options={[{value: 'all', label: 'All Sources'}, ...sourceOptions]}/>
+          <input type="text" placeholder="Search resources..." value={filters.searchTerm} onChange={(e) => onFiltersChange({...filters, searchTerm: e.target.value})} className="input-base !py-1.5 !text-sm"/>
+          <CustomSelect value={filters.domain} onChange={v => onFiltersChange({...filters, domain: v as Domain | 'all'})} options={[{value: 'all', label: 'All Topics'}, ...ALL_DOMAINS.map(d => ({ value: d, label: d }))]}/>
+          <CustomSelect value={filters.type} onChange={v => onFiltersChange({...filters, type: v as ResourceType | 'all'})} options={[{value: 'all', label: 'All Types'}, ...typeOptions]}/>
+          <CustomSelect value={filters.source} onChange={v => onFiltersChange({...filters, source: v})} options={[{value: 'all', label: 'All Sources'}, ...sourceOptions]}/>
         </div>
         <div className="flex justify-between items-center space-x-3 mt-2 pt-2">
             <div className="flex items-center space-x-4">
-              <CustomSelect value={statusFilter} onChange={v => setStatusFilter(v as any)} options={[ {value: 'all', label: 'All Statuses'}, {value: 'scheduled', label: 'Scheduled'}, {value: 'unscheduled', label: 'Unscheduled'} ]}/>
+              <CustomSelect value={filters.status} onChange={v => onFiltersChange({...filters, status: v as any})} options={[ {value: 'all', label: 'All Statuses'}, {value: 'scheduled', label: 'Scheduled'}, {value: 'unscheduled', label: 'Unscheduled'} ]}/>
               <label className="flex items-center text-sm text-[var(--text-secondary)] cursor-pointer">
-                <input type="checkbox" checked={showArchived} onChange={(e) => setShowArchived(e.target.checked)} className="h-4 w-4 text-[var(--accent-yellow)] border-gray-700 rounded bg-gray-800 focus:ring-[var(--accent-yellow)] mr-2"/>
+                <input type="checkbox" checked={filters.showArchived} onChange={(e) => onFiltersChange({...filters, showArchived: e.target.checked})} className="h-4 w-4 text-[var(--accent-yellow)] border-gray-700 rounded bg-gray-800 focus:ring-[var(--accent-yellow)] mr-2"/>
                 Show Archived
               </label>
             </div>
@@ -138,7 +141,7 @@ const MasterResourcePoolViewer: React.FC<MasterResourcePoolViewerProps> = ({
         </div>
       </div>
       
-      {unscheduledResources.length > 0 && !showArchived && (
+      {unscheduledResources.length > 0 && !filters.showArchived && (
         <div className="flex-shrink-0 my-4 p-3 rounded-lg glass-panel bg-red-900/20 border border-red-700/50">
           <button onClick={() => setIsSummaryExpanded(!isSummaryExpanded)} className="w-full flex justify-between items-center text-left">
             <h3 className="text-md font-semibold text-red-200">

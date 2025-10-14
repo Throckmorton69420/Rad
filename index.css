@@ -33,6 +33,8 @@
   --button-danger-bg: var(--accent-red);
   --input-bg: rgba(30, 30, 30, 0.5);
   --input-border: rgba(255, 255, 255, 0.15);
+  --toast-warning-bg: #422006; /* brown from screenshot */
+  --toast-warning-text: #FEF3C7; /* light yellow text */
 
   /* --- Z-Indexes --- */
   --z-header: 40;
@@ -62,6 +64,13 @@
   0%   { transform: translate(25%, -25%) scale(1); }
   50%  { transform: translate(-15%, 15%) scale(0.9); }
   100% { transform: translate(25%, -25%) scale(1); }
+}
+
+@keyframes fade-in-out {
+  0% { opacity: 0; transform: translateY(20px); }
+  10% { opacity: 1; transform: translateY(0); }
+  90% { opacity: 1; transform: translateY(0); }
+  100% { opacity: 0; transform: translateY(20px); }
 }
 
 body {
@@ -117,12 +126,6 @@ body {
   background: hsl(30, 90%, 60%); /* Orange */
   animation: move-blob-4 55s infinite alternate ease-in-out;
 }
-/* Hide the extra blobs to keep it clean */
-.blob:nth-child(5),
-.blob:nth-child(6) {
-  display: none;
-}
-
 
 #root {
   height: 100vh;
@@ -235,6 +238,37 @@ div.glass-chrome {
   box-shadow: 0 0 0 2px rgba(191, 90, 242, 0.3);
 }
 
+/* --- Toast Notifications --- */
+.toast {
+  position: fixed;
+  bottom: 1rem;
+  right: 1rem;
+  z-index: var(--z-notification);
+  padding: 1rem;
+  border-radius: 0.5rem;
+  box-shadow: var(--glass-shadow);
+  color: white;
+  max-width: 320px;
+  animation: fade-in-out 5s ease-in-out forwards;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.toast-warning {
+  background-color: color-mix(in srgb, var(--toast-warning-bg) 80%, transparent);
+  color: var(--toast-warning-text);
+}
+
+.toast-error {
+  background-color: color-mix(in srgb, var(--accent-red) 60%, transparent);
+}
+
+.toast-info {
+  background-color: color-mix(in srgb, var(--accent-purple) 60%, transparent);
+}
+
+
 /* --- List Items & Selections --- */
 .topic-list-item.is-dragging { background-color: color-mix(in srgb, var(--accent-purple), #000 50%); opacity: 1; }
 .resource-card.is-selected { background-color: var(--glass-bg-active); border-color: var(--accent-purple); }
@@ -286,7 +320,6 @@ div.glass-chrome {
     print-color-adjust: exact;
   }
 
-  /* Hide the main interactive app and show the print container */
   .main-app-container {
     display: none !important;
   }
