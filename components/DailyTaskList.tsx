@@ -28,6 +28,9 @@ const DailyTaskList: React.FC<DailyTaskListProps> = ({
 
   const { date, tasks, totalStudyTimeMinutes, isRestDay, dayName } = dailySchedule;
   const displayDate = parseDateString(date);
+  
+  const actualTotalMinutes = useMemo(() => tasks.reduce((sum, task) => sum + task.durationMinutes, 0), [tasks]);
+
 
   useEffect(() => {
     setEditedTime(dailySchedule.totalStudyTimeMinutes);
@@ -111,7 +114,7 @@ const DailyTaskList: React.FC<DailyTaskListProps> = ({
           <div className="flex justify-between items-center">
             <div>
               <p className="text-xs text-[var(--text-secondary)]">Total Planned Time</p>
-              <p className="text-lg font-bold text-white">{formatDuration(totalStudyTimeMinutes)}</p>
+              <p className="text-lg font-bold text-white">{formatDuration(actualTotalMinutes)}</p>
             </div>
             <Button variant="secondary" size="sm" onClick={() => setIsTimeEditorOpen(!isTimeEditorOpen)}>
               <i className="fas fa-clock mr-2"></i> Adjust
