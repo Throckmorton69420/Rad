@@ -415,7 +415,7 @@ class Scheduler {
   }
 
   private finalize(): void {
-    for (const day of this.schedule) day.tasks.sort(compareTasksByGlobalPriority);
+    for (const day of this.schedule) day.tasks.sort(sortTasksByGlobalPriority);
 
     const primariesUnscheduled = [...this.remaining].filter(id => { const r = this.allResources.get(id); return r && (isPrimaryByCategory(r) || r.isPrimaryMaterial); });
     for (const id of this.remaining) { const r = this.allResources.get(id); if (r) this.notifications.push({ type: 'warning', message: `Could not schedule: "${r.title}" (${r.durationMinutes} min)` }); }
