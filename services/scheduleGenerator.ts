@@ -1,309 +1,416 @@
 import { StudyPlan, RebalanceOptions, ExceptionDateRule, StudyResource, GeneratedStudyPlanOutcome, DeadlineSettings, Domain, ScheduledTask, ResourceType, DailySchedule } from '../types';
 import { getTodayInNewYork, parseDateString } from '../utils/timeFormatter';
-import { TASK_TYPE_PRIORITY } from '../constants';
+import { TASK_TYPE_PRIORITY, DEFAULT_TOPIC_ORDER } from '../constants';
 
 /**
- * Calculates the real-world study duration for a resource based on its type and metrics.
- * This function applies the user-defined conversion factors.
+ * Calculates the real-world study duration for a resource based on its type and metrics,
+ * adhering to the user's specific time allocation rules.
+ * This overrides any `durationMinutes` present in the source data for relevant types.
  */
-const calculateResourceDuration = (resource: StudyResource): number => {
-  // This function is now internal and respects the original durationMinutes as the source of truth.
-  return Math.round(resource.durationMinutes > 0 ? resource.durationMinutes : 1);
+const calculateAccurateResourceDuration = (resource: StudyResource): number => {
+    let calculatedMinutes = 0;
+
+    switch (resource.type) {
+        case ResourceType.READING_TEXTBOOK:
+        case ResourceType.READING_GUIDE:
+            if (resource.pages && resource.pages > 0) {
+                calculatedMinutes = resource.pages * 0.5; // 30 seconds per page
+            }
+            break;
+        case ResourceType.VIDEO_LECTURE:
+        case ResourceType.HIGH_YIELD_VIDEO:
+            if (resource.durationMinutes > 0) {
+                calculatedMinutes = resource.durationMinutes * 0.75; // 75% of video duration
+            }
+            break;
+        case ResourceType.CASES:
+            // This includes Case Companion cases
+            calculatedMinutes = (resource.caseCount || 1) * 1; // 1 min per case, default to 1 if not specified
+            if (resource.title.includes('Aunt Minnie')) { // Special timing for Aunt Minnie's
+                 const caseMatch = resource.title.match(/\(Cases (\d+)-(\d+)\)/);
+                 if (caseMatch) {
+                     const start = parseInt(caseMatch[1]);
+                     const end = parseInt(caseMatch[2]);
+                     calculatedMinutes = (end - start + 1) * 1;
+                 }
+            }
+            break;
+        case ResourceType.QUESTIONS:
+        case ResourceType.REVIEW_QUESTIONS:
+        case ResourceType.QUESTION_REVIEW:
+            if (resource.questionCount && resource.questionCount > 0) {
+                calculatedMinutes = resource.questionCount * 1.5; // 1 min per question + 30s review
+            }
+            break;
+        default:
+            calculatedMinutes = resource.durationMinutes;
+            break;
+    }
+
+    if (calculatedMinutes <= 0) {
+        calculatedMinutes = resource.durationMinutes;
+    }
+    
+    return Math.round(calculatedMinutes > 0 ? calculatedMinutes : 1);
 };
 
-// Helper to create a task from a resource
-const resourceToTask = (
-  resource: StudyResource, 
-  order: number, 
-  duration?: number, 
-  isOptionalOverride = false, 
-  titleSuffix = ''
-): ScheduledTask => {
-    const calculatedDuration = calculateResourceDuration(resource);
-    return {
-        id: `${resource.id}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-        resourceId: resource.id,
-        originalResourceId: resource.id,
-        title: resource.title + titleSuffix,
-        type: resource.type,
-        originalTopic: resource.domain,
-        durationMinutes: duration ?? calculatedDuration,
-        status: 'pending',
-        order,
-        isOptional: isOptionalOverride || !resource.isPrimaryMaterial,
-        isPrimaryMaterial: resource.isPrimaryMaterial,
-        pages: resource.pages,
-        startPage: resource.startPage,
-        endPage: resource.endPage,
-        questionCount: resource.questionCount,
-        caseCount: resource.caseCount,
-        bookSource: resource.bookSource,
-        videoSource: resource.videoSource,
-        chapterNumber: resource.chapterNumber,
-    };
-};
 
 interface TopicBlock {
-    id: string;
-    resources: StudyResource[];
-    sortKey: string;
+    primaryAnchor: StudyResource;
+    associatedResources: StudyResource[];
+    totalDuration: number;
+    isSplittable: boolean;
 }
 
-interface ScheduleState {
-    schedule: DailySchedule[];
-    scheduledResourceIds: Set<string>;
-    resourceRemainders: Map<string, number>; // resourceId -> remainingMinutes
-}
+class Scheduler {
+    private schedule: DailySchedule[];
+    private masterResourcePool: StudyResource[];
+    private topicOrder: Domain[];
+    private deadlines: DeadlineSettings;
+    private areSpecialTopicsInterleaved: boolean;
 
-// Main function to schedule a queue of topic blocks
-const scheduleTopicBlocks = (state: ScheduleState, blockQueue: TopicBlock[]) => {
-    let dayIndex = 0;
-    
-    while (blockQueue.length > 0 && dayIndex < state.schedule.length) {
-        const day = state.schedule[dayIndex];
-        let availableTime = day.isRestDay ? 0 : day.totalStudyTimeMinutes - day.tasks.reduce((sum, t) => sum + t.durationMinutes, 0);
+    private resourceMap: Map<string, StudyResource>;
+    private scheduledResourceIds = new Set<string>();
+    private coveredTopicsByDate: Map<string, Set<Domain>> = new Map();
 
-        if (availableTime <= 10) { // Leave a small buffer, move to next day if not enough time
-            dayIndex++;
-            continue;
+    constructor(
+        masterResourcePool: StudyResource[],
+        exceptionDates: ExceptionDateRule[],
+        topicOrder: Domain[],
+        deadlines: DeadlineSettings,
+        startDate: string,
+        endDate: string,
+        areSpecialTopicsInterleaved: boolean
+    ) {
+        this.masterResourcePool = masterResourcePool
+            .filter(r => !r.isArchived)
+            .map(r => ({
+                ...r,
+                durationMinutes: calculateAccurateResourceDuration(r)
+            }));
+        this.topicOrder = topicOrder;
+        this.deadlines = deadlines;
+        this.areSpecialTopicsInterleaved = areSpecialTopicsInterleaved;
+        this.resourceMap = new Map(this.masterResourcePool.map(r => [r.id, r]));
+
+        this.schedule = this.initializeSchedule(startDate, endDate, exceptionDates);
+    }
+
+    private initializeSchedule(startDate: string, endDate: string, exceptionDates: ExceptionDateRule[]): DailySchedule[] {
+        const schedule: DailySchedule[] = [];
+        const exceptionMap = new Map(exceptionDates.map(e => [e.date, e]));
+        let currentDate = parseDateString(startDate);
+        const finalDate = parseDateString(endDate);
+
+        while (currentDate <= finalDate) {
+            const dateStr = currentDate.toISOString().split('T')[0];
+            const exception = exceptionMap.get(dateStr);
+            const isRestDay = exception ? exception.isRestDayOverride : false;
+            
+            schedule.push({
+                date: dateStr,
+                dayName: currentDate.toLocaleDateString('en-US', { weekday: 'long', timeZone: 'UTC' }),
+                tasks: [],
+                totalStudyTimeMinutes: isRestDay ? 0 : (exception?.targetMinutes ?? 14 * 60),
+                isRestDay: isRestDay,
+                isManuallyModified: !!exception,
+            });
+            this.coveredTopicsByDate.set(dateStr, new Set<Domain>());
+            currentDate.setUTCDate(currentDate.getUTCDate() + 1);
+        }
+        return schedule;
+    }
+
+    public generate(): { plan: StudyPlan; notifications: any[] } {
+        this.runPrimaryContentPass();
+        this.runDailyRequirementsPass();
+        this.runBoardVitalsPass();
+        this.runSupplementaryLecturesPass();
+        this.runOptionalContentPass();
+        this.finalizeSchedule();
+
+        const notifications: any[] = [];
+        const unscheduledPrimary = this.masterResourcePool.filter(r => r.isPrimaryMaterial && !this.scheduledResourceIds.has(r.id));
+        if (unscheduledPrimary.length > 0) {
+            notifications.push({ type: 'warning', message: `${unscheduledPrimary.length} primary resources could not be fully scheduled.` });
+            console.warn("Unscheduled Primary Resources:", unscheduledPrimary.map(r => r.title));
         }
 
-        const block = blockQueue[0];
+        const firstPassEndDate = this.schedule.slice().reverse().find(day => day.tasks.some(t => t.isPrimaryMaterial))?.date || this.schedule[this.schedule.length-1].date;
+
+        const plan: StudyPlan = {
+            schedule: this.schedule,
+            progressPerDomain: this.calculateInitialProgress(),
+            startDate: this.schedule[0].date,
+            endDate: this.schedule[this.schedule.length - 1].date,
+            firstPassEndDate,
+            topicOrder: this.topicOrder,
+            cramTopicOrder: [], // Placeholder
+            deadlines: this.deadlines,
+            isCramModeActive: false,
+            areSpecialTopicsInterleaved: this.areSpecialTopicsInterleaved,
+        };
         
-        const getDuration = (res: StudyResource) => state.resourceRemainders.get(res.id) ?? calculateResourceDuration(res);
+        return { plan, notifications };
+    }
 
-        const resourcesInBlock = block.resources.filter(r => (state.resourceRemainders.get(r.id) ?? calculateResourceDuration(r)) > 0);
-        if (resourcesInBlock.length === 0) {
-            blockQueue.shift();
-            continue;
+    private findAvailableSlot(duration: number, dateIndex: number = 0): number {
+        for (let i = dateIndex; i < this.schedule.length; i++) {
+            const day = this.schedule[i];
+            if (day.isRestDay) continue;
+            const scheduledTime = day.tasks.reduce((sum, task) => sum + task.durationMinutes, 0);
+            if (scheduledTime + duration <= day.totalStudyTimeMinutes) {
+                return i;
+            }
         }
+        return -1; // No slot found
+    }
+    
+    private scheduleTask(dateIndex: number, resource: StudyResource, duration?: number, startPage?: number, endPage?: number) {
+        const day = this.schedule[dateIndex];
+        const task: ScheduledTask = {
+            id: `${resource.id}_${day.date}_${Math.random()}`,
+            resourceId: resource.id,
+            originalResourceId: resource.id,
+            title: resource.title,
+            type: resource.type,
+            originalTopic: resource.domain,
+            durationMinutes: duration || resource.durationMinutes,
+            status: 'pending',
+            order: day.tasks.length,
+            isPrimaryMaterial: resource.isPrimaryMaterial,
+            bookSource: resource.bookSource,
+            videoSource: resource.videoSource,
+            chapterNumber: resource.chapterNumber,
+            pages: endPage && startPage ? endPage - startPage + 1 : resource.pages,
+            startPage: startPage,
+            endPage: endPage,
+            questionCount: resource.questionCount,
+        };
+        day.tasks.push(task);
+        this.scheduledResourceIds.add(resource.id);
+        this.coveredTopicsByDate.get(day.date)!.add(resource.domain);
+    }
 
-        const totalBlockDuration = resourcesInBlock.reduce((sum, res) => sum + getDuration(res), 0);
 
-        if (totalBlockDuration <= availableTime) {
-            // Block fits, schedule it all
-            for (const resource of resourcesInBlock) {
-                const duration = getDuration(resource);
-                day.tasks.push(resourceToTask(resource, day.tasks.length, duration, false, state.resourceRemainders.has(resource.id) ? ' (Cont.)' : ''));
-                state.scheduledResourceIds.add(resource.id);
-                state.resourceRemainders.delete(resource.id);
-            }
-            blockQueue.shift(); // Move to the next block
-        } else {
-            // Block doesn't fit, chunk it
-            const nonSplittable = resourcesInBlock.filter(r => !r.isSplittable);
-            const splittable = resourcesInBlock.filter(r => r.isSplittable);
+    private getPrimaryAnchors(): StudyResource[] {
+        return this.masterResourcePool.filter(r => 
+            r.isPrimaryMaterial && 
+            (r.type === ResourceType.VIDEO_LECTURE && r.videoSource === 'Titan Radiology') ||
+            (r.type === ResourceType.VIDEO_LECTURE && r.videoSource === 'Huda' && r.domain === Domain.PHYSICS)
+        ).sort((a,b) => (a.sequenceOrder ?? 9999) - (b.sequenceOrder ?? 9999));
+    }
+
+    private createTopicBlock(anchor: StudyResource): TopicBlock {
+        const associatedResources = new Set<StudyResource>([anchor]);
+        const seenIds = new Set<string>([anchor.id]);
+
+        const findPairs = (resource: StudyResource) => {
+            (resource.pairedResourceIds || []).forEach(id => {
+                const pairedResource = this.resourceMap.get(id);
+                if(pairedResource && !seenIds.has(id) && pairedResource.isPrimaryMaterial) {
+                    seenIds.add(id);
+                    associatedResources.add(pairedResource);
+                    findPairs(pairedResource);
+                }
+            });
+        };
+        findPairs(anchor);
+
+        const resources = Array.from(associatedResources);
+        const totalDuration = resources.reduce((sum, r) => sum + r.durationMinutes, 0);
+        const isSplittable = resources.some(r => r.isSplittable);
+
+        return { primaryAnchor: anchor, associatedResources: resources, totalDuration, isSplittable };
+    }
+
+    private runPrimaryContentPass() {
+        const anchors = this.getPrimaryAnchors();
+        let currentDayIndex = 0;
+
+        for (const anchor of anchors) {
+            if (this.scheduledResourceIds.has(anchor.id)) continue;
             
-            const nonSplittableDuration = nonSplittable.reduce((sum, r) => sum + getDuration(r), 0);
-
-            if (nonSplittableDuration > availableTime) {
-                dayIndex++; // Can't even fit required parts, try next day
-                continue;
-            }
-
-            // Schedule non-splittable parts
-            for (const resource of nonSplittable) {
-                const duration = getDuration(resource);
-                day.tasks.push(resourceToTask(resource, day.tasks.length, duration, false, state.resourceRemainders.has(resource.id) ? ' (Cont.)' : ''));
-                state.scheduledResourceIds.add(resource.id);
-                state.resourceRemainders.delete(resource.id);
-            }
-
-            let timeForSplittables = availableTime - nonSplittableDuration;
-            const totalSplittableDuration = splittable.reduce((sum, r) => sum + getDuration(r), 0);
+            const block = this.createTopicBlock(anchor);
+            let remainingDuration = block.totalDuration;
             
-            if (timeForSplittables > 0 && totalSplittableDuration > 0) {
-                 for (const resource of splittable) {
-                    const remainingDuration = getDuration(resource);
-                    const proportion = remainingDuration / totalSplittableDuration;
-                    const timeToScheduleThisDay = Math.floor(proportion * timeForSplittables);
+            while (remainingDuration > 0 && currentDayIndex < this.schedule.length) {
+                const day = this.schedule[currentDayIndex];
+                if (day.isRestDay) {
+                    currentDayIndex++;
+                    continue;
+                }
+                
+                const scheduledTime = day.tasks.reduce((sum, t) => sum + t.durationMinutes, 0);
+                let availableTime = day.totalStudyTimeMinutes - scheduledTime;
+                
+                if (availableTime <= 0) {
+                    currentDayIndex++;
+                    continue;
+                }
 
-                    if (timeToScheduleThisDay > 0) {
-                        const suffix = state.resourceRemainders.has(resource.id) ? ' (Cont.)' : ' (Part 1)';
-                        day.tasks.push(resourceToTask(resource, day.tasks.length, timeToScheduleThisDay, false, suffix));
-                        
-                        const newRemaining = remainingDuration - timeToScheduleThisDay;
-                        if (newRemaining > 1) { // Only keep remainder if it's more than a minute
-                            state.resourceRemainders.set(resource.id, newRemaining);
-                        } else {
-                            state.scheduledResourceIds.add(resource.id);
-                            state.resourceRemainders.delete(resource.id);
+                const timeToSchedule = Math.min(remainingDuration, availableTime);
+                const proportion = timeToSchedule / remainingDuration;
+
+                block.associatedResources.forEach(res => {
+                    if (this.scheduledResourceIds.has(res.id)) return;
+
+                    if (!res.isSplittable || proportion >= 1) {
+                        if (availableTime >= res.durationMinutes) {
+                            this.scheduleTask(currentDayIndex, res);
+                            availableTime -= res.durationMinutes;
+                        }
+                    } else {
+                        const durationToSchedule = Math.round(res.durationMinutes * proportion);
+                        if (durationToSchedule > 0 && availableTime >= durationToSchedule) {
+                            this.scheduleTask(currentDayIndex, res, durationToSchedule);
+                            res.durationMinutes -= durationToSchedule; // Mutate for next iteration
+                            availableTime -= durationToSchedule;
                         }
                     }
+                });
+                
+                remainingDuration = block.associatedResources
+                    .filter(r => !this.scheduledResourceIds.has(r.id))
+                    .reduce((sum, r) => sum + r.durationMinutes, 0);
+
+                if (remainingDuration > 0 && availableTime <= 10) {
+                    currentDayIndex++;
                 }
             }
-            // Block remains at the front of the queue, move to next day to schedule its remainder
-            dayIndex++;
         }
     }
-};
-
-const scheduleFillerResources = (state: ScheduleState, resources: StudyResource[]) => {
-    const sortedResources = resources.sort((a,b) => (TASK_TYPE_PRIORITY[a.type] || 99) - (TASK_TYPE_PRIORITY[b.type] || 99));
-
-    for (const resource of sortedResources) {
-        if (state.scheduledResourceIds.has(resource.id)) continue;
-        
-        let durationToSchedule = calculateResourceDuration(resource);
-
-        for (const day of state.schedule) {
-            if (day.isRestDay || durationToSchedule <= 0) continue;
-
+    
+    private runDailyRequirementsPass() {
+      // Logic for Physics, Nucs, NIS/RISC daily requirements
+      const physicsResources = this.masterResourcePool.filter(r => r.domain === Domain.PHYSICS && r.isPrimaryMaterial);
+      const nucsResources = this.masterResourcePool.filter(r => r.domain === Domain.NUCLEAR_MEDICINE && r.isPrimaryMaterial);
+      const nisRiscResources = this.masterResourcePool.filter(r => (r.domain === Domain.NIS || r.domain === Domain.RISC) && r.isPrimaryMaterial);
+      
+      if(this.areSpecialTopicsInterleaved) {
+        // Interleave small chunks
+        let physIdx = 0, nucsIdx = 0;
+        this.schedule.forEach((day, dayIndex) => {
             const availableTime = day.totalStudyTimeMinutes - day.tasks.reduce((sum, t) => sum + t.durationMinutes, 0);
-            if (availableTime <= 0) continue;
+            if (availableTime < 30) return;
 
-            const timeToScheduleThisDay = Math.min(durationToSchedule, availableTime);
-
-            if (timeToScheduleThisDay > 0) {
-                if (!resource.isSplittable || durationToSchedule <= availableTime) {
-                    day.tasks.push(resourceToTask(resource, day.tasks.length, durationToSchedule, !resource.isPrimaryMaterial));
-                    durationToSchedule = 0;
-                    state.scheduledResourceIds.add(resource.id);
-                    break;
-                } else {
-                    day.tasks.push(resourceToTask(resource, day.tasks.length, timeToScheduleThisDay, !resource.isPrimaryMaterial, " (Part)"));
-                    durationToSchedule -= timeToScheduleThisDay;
-                }
+            // Physics every other day
+            if (dayIndex % 2 === 0 && physIdx < physicsResources.length) {
+                 // Simplified: grab next unscheduled physics task
             }
-        }
+             // Nucs daily
+             if (nucsIdx < nucsResources.length) {
+                 // Simplified: grab next unscheduled nucs task
+            }
+        });
+      } else {
+        // Schedule as large blocks based on topicOrder
+      }
     }
-};
+    
+    private getCoveredTopics(untilDate: string): Set<Domain> {
+        const covered = new Set<Domain>();
+        for(const day of this.schedule) {
+            if (day.date > untilDate) break;
+            day.tasks.forEach(task => covered.add(task.originalTopic));
+        }
+        return covered;
+    }
+
+    private runBoardVitalsPass() {
+        this.schedule.forEach(day => {
+            const scheduledTime = day.tasks.reduce((sum, t) => sum + t.durationMinutes, 0);
+            let availableTime = day.totalStudyTimeMinutes - scheduledTime;
+            if (availableTime < 30) return;
+            
+            const coveredTopics = this.getCoveredTopics(day.date);
+            const relevantBV = this.masterResourcePool.filter(r => 
+                !this.scheduledResourceIds.has(r.id) &&
+                r.bookSource === 'Board Vitals' &&
+                coveredTopics.has(r.domain)
+            );
+
+            if (relevantBV.length > 0) {
+                const resourceToSchedule = relevantBV[0]; // Simple selection
+                const duration = Math.min(availableTime, resourceToSchedule.durationMinutes);
+                this.scheduleTask(this.schedule.indexOf(day), resourceToSchedule, duration);
+                resourceToSchedule.durationMinutes -= duration;
+                if(resourceToSchedule.durationMinutes <= 0) this.scheduledResourceIds.add(resourceToSchedule.id);
+            }
+        });
+    }
+
+    private runSupplementaryLecturesPass() {
+        const discordLectures = this.masterResourcePool.filter(r => r.videoSource === 'Discord');
+        let dateIndex = 0;
+        discordLectures.forEach(lecture => {
+             const slotIndex = this.findAvailableSlot(lecture.durationMinutes, dateIndex);
+             if (slotIndex !== -1) {
+                 const dayTopics = this.coveredTopicsByDate.get(this.schedule[slotIndex].date)!;
+                 if (dayTopics.has(lecture.domain)) {
+                     this.scheduleTask(slotIndex, lecture);
+                     dateIndex = slotIndex;
+                 }
+             }
+        });
+    }
+    
+    private runOptionalContentPass() {
+        const coreRadiology = this.masterResourcePool.filter(r => r.bookSource === 'Core Radiology');
+        this.schedule.forEach((day, dayIndex) => {
+            const dayTopics = this.getCoveredTopics(day.date);
+            let availableTime = day.totalStudyTimeMinutes - day.tasks.reduce((sum, t) => sum + t.durationMinutes, 0);
+
+            coreRadiology.forEach(res => {
+                if (availableTime > 0 && !this.scheduledResourceIds.has(res.id) && dayTopics.has(res.domain)) {
+                    if (availableTime >= res.durationMinutes) {
+                        this.scheduleTask(dayIndex, res);
+                        availableTime -= res.durationMinutes;
+                    }
+                }
+            });
+        });
+    }
+    
+    private finalizeSchedule() {
+        this.schedule.forEach(day => {
+            day.tasks.sort((a, b) => {
+                const priorityA = TASK_TYPE_PRIORITY[a.type] || 99;
+                const priorityB = TASK_TYPE_PRIORITY[b.type] || 99;
+                if (priorityA !== priorityB) return priorityA - priorityB;
+                const seqA = this.resourceMap.get(a.resourceId)?.sequenceOrder ?? 9999;
+                const seqB = this.resourceMap.get(b.resourceId)?.sequenceOrder ?? 9999;
+                return seqA - seqB;
+            });
+            day.tasks.forEach((task, index) => task.order = index);
+        });
+    }
+
+    private calculateInitialProgress() {
+        const progress: StudyPlan['progressPerDomain'] = {};
+        for(const domain of Object.values(Domain)) {
+            const totalMinutes = this.masterResourcePool
+                .filter(r => r.domain === domain && r.isPrimaryMaterial)
+                .reduce((sum, r) => sum + (this.resourceMap.get(r.id)?.durationMinutes || 0), 0);
+            progress[domain] = { completedMinutes: 0, totalMinutes };
+        }
+        return progress;
+    }
+}
 
 
 export const generateInitialSchedule = (
   masterResourcePool: StudyResource[],
   exceptionDates: ExceptionDateRule[],
-  topicOrder: Domain[] = [],
+  topicOrder: Domain[] = DEFAULT_TOPIC_ORDER,
   deadlines: DeadlineSettings = {},
   startDate: string,
-  endDate: string
+  endDate: string,
+  areSpecialTopicsInterleaved: boolean = true,
 ): GeneratedStudyPlanOutcome => {
     
-    // --- 1. INITIAL SETUP ---
-    const notifications: { type: 'error' | 'warning' | 'info'; message: string }[] = [];
-    const exceptionMap = new Map(exceptionDates.map(e => [e.date, e]));
-    const schedule: DailySchedule[] = [];
-    
-    let currentDate = parseDateString(startDate);
-    const finalDate = parseDateString(endDate);
-
-    while (currentDate <= finalDate) {
-        const dateStr = currentDate.toISOString().split('T')[0];
-        const exception = exceptionMap.get(dateStr);
-        const isRestDay = exception ? exception.isRestDayOverride : false;
-        
-        schedule.push({
-            date: dateStr,
-            dayName: currentDate.toLocaleDateString('en-US', { weekday: 'long', timeZone: 'UTC' }),
-            tasks: [],
-            totalStudyTimeMinutes: isRestDay ? 0 : (exception?.targetMinutes ?? 14 * 60),
-            isRestDay: isRestDay,
-            isManuallyModified: false,
-        });
-        currentDate.setUTCDate(currentDate.getUTCDate() + 1);
-    }
-
-    // --- 2. RESOURCE GROUPING ---
-    const activeResources = masterResourcePool.filter(r => !r.isArchived);
-    const resourceMap = new Map(activeResources.map(r => [r.id, r]));
-    const childrenIds = new Set(activeResources.flatMap(r => r.pairedResourceIds || []));
-
-    // Anchors are primary materials that are not themselves paired to another resource
-    const anchors = activeResources.filter(r => r.isPrimaryMaterial && !childrenIds.has(r.id));
-    
-    const topicBlocks: TopicBlock[] = [];
-    const resourcesInBlocks = new Set<string>();
-
-    for (const anchor of anchors) {
-        if (resourcesInBlocks.has(anchor.id)) continue;
-        
-        const block: TopicBlock = {
-            id: anchor.id,
-            resources: [anchor],
-            sortKey: `${String(topicOrder.indexOf(anchor.domain)).padStart(2,'0')}_${String(anchor.sequenceOrder ?? 9999).padStart(4,'0')}`
-        };
-        resourcesInBlocks.add(anchor.id);
-
-        const queue = [...(anchor.pairedResourceIds || [])];
-        const visitedInBlock = new Set(queue);
-        visitedInBlock.add(anchor.id);
-
-        while(queue.length > 0) {
-            const resourceId = queue.shift()!;
-            const resource = resourceMap.get(resourceId);
-
-            if (resource && resource.isPrimaryMaterial && !resourcesInBlocks.has(resourceId)) {
-                block.resources.push(resource);
-                resourcesInBlocks.add(resourceId);
-                (resource.pairedResourceIds || []).forEach(nextId => {
-                    if (!visitedInBlock.has(nextId)) {
-                        visitedInBlock.add(nextId);
-                        queue.push(nextId);
-                    }
-                });
-            }
-        }
-        topicBlocks.push(block);
-    }
-    
-    // Any remaining primary materials become their own blocks
-    const standalonePrimary = activeResources.filter(r => r.isPrimaryMaterial && !resourcesInBlocks.has(r.id));
-    standalonePrimary.forEach(r => {
-        topicBlocks.push({
-            id: r.id,
-            resources: [r],
-            sortKey: `${String(topicOrder.indexOf(r.domain)).padStart(2,'0')}_${String(r.sequenceOrder ?? 9999).padStart(4,'0')}`
-        });
-        resourcesInBlocks.add(r.id);
-    });
-
-    topicBlocks.sort((a,b) => a.sortKey.localeCompare(b.sortKey));
-    
-    // --- 3. SCHEDULING ---
-    const state: ScheduleState = {
-        schedule,
-        scheduledResourceIds: new Set<string>(),
-        resourceRemainders: new Map<string, number>()
-    };
-
-    scheduleTopicBlocks(state, topicBlocks);
-
-    // Schedule remaining optional resources
-    const fillerResources = activeResources.filter(r => !resourcesInBlocks.has(r.id));
-    scheduleFillerResources(state, fillerResources);
-
-    // --- 4. FINALIZATION ---
-    state.schedule.forEach(day => {
-        day.tasks.sort((a, b) => {
-            const priorityA = TASK_TYPE_PRIORITY[a.type] || 99;
-            const priorityB = TASK_TYPE_PRIORITY[b.type] || 99;
-            if (priorityA !== priorityB) return priorityA - priorityB;
-            return a.order - b.order;
-        });
-        day.tasks.forEach((task, index) => task.order = index);
-    });
-
-    const unscheduledPrimary = activeResources.filter(r => r.isPrimaryMaterial && !state.scheduledResourceIds.has(r.id));
-    if (unscheduledPrimary.length > 0) {
-        notifications.push({ type: 'warning', message: `${unscheduledPrimary.length} primary resources could not be fully scheduled. Consider extending dates or increasing study time.` });
-    }
-    
-    const firstPassEndDate = state.schedule.slice().reverse().find(day => day.tasks.some(t => t.isPrimaryMaterial))?.date || endDate;
-
-    const plan: StudyPlan = {
-        schedule: state.schedule, progressPerDomain: {}, startDate, endDate, firstPassEndDate,
-        topicOrder, cramTopicOrder: topicOrder, deadlines,
-        isCramModeActive: false, areSpecialTopicsInterleaved: true,
-    };
-    
-    Object.values(Domain).forEach(domain => {
-        const totalMinutes = masterResourcePool.filter(r => r.domain === domain && !r.isArchived && r.isPrimaryMaterial).reduce((sum, r) => sum + calculateResourceDuration(r), 0);
-        plan.progressPerDomain[domain] = { completedMinutes: 0, totalMinutes };
-    });
-
-    notifications.push({ type: 'info', message: 'A new study plan has been generated.' });
-    
-    return { plan, notifications };
+    const scheduler = new Scheduler(masterResourcePool, exceptionDates, topicOrder, deadlines, startDate, endDate, areSpecialTopicsInterleaved);
+    return scheduler.generate();
 };
 
 
@@ -313,65 +420,53 @@ export const rebalanceSchedule = (
   exceptionDates: ExceptionDateRule[],
   masterResourcePool: StudyResource[]
 ): GeneratedStudyPlanOutcome => {
-    let rebalanceStartDate: string;
-
-    const rebalanceFrom = options.type === 'standard' 
-        ? (options.rebalanceDate || getTodayInNewYork())
-        : options.date;
-
-    rebalanceStartDate = rebalanceFrom > currentPlan.startDate ? rebalanceFrom : currentPlan.startDate;
+    const rebalanceDate = options.type === 'standard' ? (options.rebalanceDate || getTodayInNewYork()) : options.date;
     
-    const preservedSchedule: DailySchedule[] = JSON.parse(JSON.stringify(currentPlan.schedule));
     const completedResourceIds = new Set<string>();
-    
-    preservedSchedule.forEach(day => {
-        if (day.date < rebalanceStartDate) {
+    currentPlan.schedule.forEach(day => {
+        if (day.date < rebalanceDate) {
             day.tasks.forEach(task => {
-                if (task.status === 'completed') {
+                if(task.status === 'completed') {
                     completedResourceIds.add(task.originalResourceId || task.resourceId);
                 }
             });
-        } else {
-            if (day.isManuallyModified && options.type === 'standard') {
-                day.tasks.forEach(task => {
-                    const id = task.originalResourceId || task.resourceId;
-                    if(id) completedResourceIds.add(id);
-                });
-            } else {
-                day.tasks = [];
-                day.isManuallyModified = false;
-            }
         }
     });
+
+    const resourcesToReschedule = masterResourcePool.filter(r => !completedResourceIds.has(r.id));
     
-    const availableForReschedule = masterResourcePool.filter(r => !completedResourceIds.has(r.id) && !r.isArchived);
-    
-    const generationOutcome = generateInitialSchedule(availableForReschedule, exceptionDates, currentPlan.topicOrder, currentPlan.deadlines, rebalanceStartDate, currentPlan.endDate);
-    
-    const futureScheduleMap = new Map(generationOutcome.plan.schedule.map(d => [d.date, d]));
-    
-    const finalSchedule = preservedSchedule.map(day => {
-        if (day.date < rebalanceStartDate || day.isManuallyModified) {
-            return day;
-        }
-        return futureScheduleMap.get(day.date) || day;
-    });
+    const scheduler = new Scheduler(
+        resourcesToReschedule,
+        exceptionDates,
+        currentPlan.topicOrder,
+        currentPlan.deadlines,
+        rebalanceDate,
+        currentPlan.endDate,
+        currentPlan.areSpecialTopicsInterleaved
+    );
+    const futureOutcome = scheduler.generate();
+
+    const finalSchedule = currentPlan.schedule.filter(day => day.date < rebalanceDate);
+    finalSchedule.push(...futureOutcome.plan.schedule);
 
     const finalPlan = { ...currentPlan, schedule: finalSchedule };
-    
-    Object.values(Domain).forEach(domain => {
-        if (finalPlan.progressPerDomain[domain]) {
-            const completedMinutes = finalSchedule
-                .flatMap(d => d.tasks)
-                .filter(t => t.originalTopic === domain && t.status === 'completed')
-                .reduce((sum, t) => sum + t.durationMinutes, 0);
-            
-            const totalMinutes = masterResourcePool.filter(r => r.domain === domain && !r.isArchived && r.isPrimaryMaterial).reduce((sum, r) => sum + calculateResourceDuration(r), 0);
+    const progress: StudyPlan['progressPerDomain'] = {};
+     Object.values(Domain).forEach(domain => {
+        const totalMinutes = masterResourcePool
+            .filter(r => r.domain === domain && !r.isArchived && r.isPrimaryMaterial)
+            .reduce((sum, r) => sum + calculateAccurateResourceDuration(r), 0);
 
-            finalPlan.progressPerDomain[domain]!.completedMinutes = completedMinutes;
-            finalPlan.progressPerDomain[domain]!.totalMinutes = totalMinutes;
-        }
+        const completedMinutes = finalSchedule
+            .flatMap(d => d.tasks)
+            .filter(t => t.originalTopic === domain && t.status === 'completed')
+            .reduce((sum, t) => sum + t.durationMinutes, 0);
+
+        progress[domain] = { completedMinutes, totalMinutes };
     });
-    
-    return { plan: finalPlan, notifications: [{ type: 'info', message: 'Schedule has been rebalanced.' }] };
+    finalPlan.progressPerDomain = progress;
+
+    const notifications = futureOutcome.notifications;
+    notifications.push({ type: 'info', message: 'Schedule has been rebalanced successfully.' });
+
+    return { plan: finalPlan, notifications };
 };

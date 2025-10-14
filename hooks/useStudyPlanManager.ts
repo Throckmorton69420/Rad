@@ -42,11 +42,8 @@ export const useStudyPlanManager = (showConfirmation: (options: ShowConfirmation
                     throw new Error(error.message);
                 }
                 
-                // FIX: The type of `data` is inferred as `never` due to a broken Supabase type environment.
-                // Casting to `any` bypasses the type error to allow property access.
                 const loadedData = data ? (data as any).plan_data as PlanDataBlob | null : null;
                 
-                // FIX: Add robust validation to prevent crashes from malformed data from the DB.
                 if (loadedData && loadedData.plan && Array.isArray(loadedData.plan.schedule)) {
                     const freshCodePool = initialMasterResourcePool;
                     const dbResources = loadedData.resources || [];
@@ -71,7 +68,6 @@ export const useStudyPlanManager = (showConfirmation: (options: ShowConfirmation
                     reconciledPool.push(...customResources);
 
                     const loadedPlan = loadedData.plan;
-                    // Backwards compatibility checks
                     if (!loadedPlan.topicOrder) loadedPlan.topicOrder = DEFAULT_TOPIC_ORDER;
                     if (!loadedPlan.cramTopicOrder) loadedPlan.cramTopicOrder = DEFAULT_TOPIC_ORDER;
                     if (!loadedPlan.deadlines) loadedPlan.deadlines = {};
@@ -96,22 +92,20 @@ export const useStudyPlanManager = (showConfirmation: (options: ShowConfirmation
                 }
             }
 
-            // Fallback to generating a new schedule if no valid data was found or if regeneration is requested.
-            const poolForGeneration = regenerate ? initialMasterResourcePool : planStateRef.current.globalMasterResourcePool;
+            const poolForGeneration = regenerate ? initialMasterResourcePool.map(r => ({...r})) : planStateRef.current.globalMasterResourcePool.map(r => ({...r}));
             const exceptionsForGeneration = regenerate ? [] : planStateRef.current.userExceptions;
             if (regenerate) {
                 setUserExceptions([]);
                 setGlobalMasterResourcePool(initialMasterResourcePool); 
             }
             
-            // FIX: A regeneration should start from today, not the fixed study start date.
             const generationStartDate = regenerate ? getTodayInNewYork() : STUDY_START_DATE;
-
             const currentTopicOrder = planStateRef.current.studyPlan?.topicOrder || DEFAULT_TOPIC_ORDER;
+            const areTopicsInterleaved = planStateRef.current.studyPlan?.areSpecialTopicsInterleaved ?? true;
             const defaultDeadlines: DeadlineSettings = {
                 allContent: '2025-11-05',
             };
-            const outcome: GeneratedStudyPlanOutcome = generateInitialSchedule(poolForGeneration, exceptionsForGeneration, currentTopicOrder, defaultDeadlines, generationStartDate, STUDY_END_DATE);
+            const outcome: GeneratedStudyPlanOutcome = generateInitialSchedule(poolForGeneration, exceptionsForGeneration, currentTopicOrder, defaultDeadlines, generationStartDate, STUDY_END_DATE, areTopicsInterleaved);
 
             setStudyPlan(outcome.plan);
             setPreviousStudyPlan(null);
@@ -147,9 +141,6 @@ export const useStudyPlanManager = (showConfirmation: (options: ShowConfirmation
                 resources: globalMasterResourcePool,
                 exceptions: userExceptions,
             };
-            // FIX: The Supabase client's type inference is failing, causing `upsert` to expect a `never` type.
-            // Casting the entire argument array to `any` bypasses the problematic type check, which is consistent
-            // with how the `select` return value is handled elsewhere in this file.
             const { error } = await supabase.from('study_plans').upsert([{ id: 1, plan_data: stateToSave }] as any);
             if (error) {
                 console.error("Supabase save error:", error);
@@ -175,7 +166,9 @@ export const useStudyPlanManager = (showConfirmation: (options: ShowConfirmation
         
         setTimeout(() => {
             try {
-                const outcome = rebalanceSchedule(plan, options, userExceptions, globalMasterResourcePool);
+                // Use a deep copy of the pool to prevent mutations from affecting the global state
+                const poolForRebalance = globalMasterResourcePool.map(r => ({...r}));
+                const outcome = rebalanceSchedule(plan, options, userExceptions, poolForRebalance);
                 setStudyPlan(outcome.plan);
 
                 if (outcome.notifications && outcome.notifications.length > 0) {
@@ -213,7 +206,8 @@ export const useStudyPlanManager = (showConfirmation: (options: ShowConfirmation
         
         setTimeout(() => {
             try {
-                const outcome = rebalanceSchedule(studyPlan, { type: 'standard' }, newExceptions, globalMasterResourcePool);
+                const poolForRebalance = globalMasterResourcePool.map(r => ({...r}));
+                const outcome = rebalanceSchedule(studyPlan, { type: 'standard' }, newExceptions, poolForRebalance);
                 setStudyPlan(outcome.plan);
                 setSystemNotification({ type: 'info', message: 'Schedule updated with exception!' });
                 setTimeout(() => setSystemNotification(null), 3000);
@@ -260,7 +254,8 @@ export const useStudyPlanManager = (showConfirmation: (options: ShowConfirmation
         
         setTimeout(() => {
             try {
-                const outcome = rebalanceSchedule(studyPlan, { type: 'standard' }, newExceptions, globalMasterResourcePool);
+                const poolForRebalance = globalMasterResourcePool.map(r => ({...r}));
+                const outcome = rebalanceSchedule(studyPlan, { type: 'standard' }, newExceptions, poolForRebalance);
                 setStudyPlan(outcome.plan);
                 setSystemNotification({ type: 'info', message: 'Schedule updated successfully!' });
                 setTimeout(() => setSystemNotification(null), 3000);
@@ -284,12 +279,13 @@ export const useStudyPlanManager = (showConfirmation: (options: ShowConfirmation
                 setSystemNotification({ type: 'info', message: 'Regenerating schedule with new dates...' });
                 setTimeout(() => {
                     const outcome = generateInitialSchedule(
-                        globalMasterResourcePool,
+                        globalMasterResourcePool.map(r => ({...r})),
                         userExceptions,
                         studyPlan?.topicOrder,
                         studyPlan?.deadlines,
                         newStartDate,
-                        newEndDate
+                        newEndDate,
+                        studyPlan?.areSpecialTopicsInterleaved
                     );
                     setStudyPlan(outcome.plan);
                     setPreviousStudyPlan(null);
@@ -325,8 +321,8 @@ export const useStudyPlanManager = (showConfirmation: (options: ShowConfirmation
         if (!studyPlan || isLoading) return;
         updatePreviousStudyPlan(studyPlan);
         const updatedPlan = { ...studyPlan, isCramModeActive: isActive };
-        setStudyPlan(updatedPlan); // Set the state immediately so the UI updates
-        triggerRebalance(updatedPlan, { type: 'standard' }); // Then trigger the rebalance with the new state
+        setStudyPlan(updatedPlan); 
+        triggerRebalance(updatedPlan, { type: 'standard' });
         setSystemNotification({ type: 'info', message: `Cram mode ${isActive ? 'activated' : 'deactivated'}. Rebalancing schedule.` });
     };
 
