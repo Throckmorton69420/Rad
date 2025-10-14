@@ -29,7 +29,7 @@ import ContentReport from './components/ContentReport';
 import { formatDuration, getTodayInNewYork, parseDateString } from './utils/timeFormatter';
 import { addResourceToGlobalPool } from './services/studyResources';
 
-// Add this inside App component (before render)
+// Add this inside App component, before render
 const handleReorderTasks = React.useCallback((date: string, tasks: ScheduledTask[]) => {
   setStudyPlan(prev => {
     if (!prev) return prev;
@@ -40,6 +40,8 @@ const handleReorderTasks = React.useCallback((date: string, tasks: ScheduledTask
   });
 }, [setStudyPlan]);
 
+// FIX: Define the shape of the content UI filters to be shared between components.
+export interface ContentUiFilters {
   searchTerm: string;
   domain: Domain | 'all';
   type: ResourceType | 'all';
