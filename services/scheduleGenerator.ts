@@ -38,7 +38,16 @@ const calculateResourceDuration = (resource: StudyResource): number => {
   return Math.round(duration);
 };
 
-const resourceToTask = (resource: StudyResource, order: number, isOptionalOverride = false): ScheduledTask => {
+// Represents a resource or a group of paired resources that must be scheduled together.
+interface SchedulingBlock {
+  id: string;
+  resources: StudyResource[];
+  totalDuration: number;
+  remainingDuration: number;
+  isSplittable: boolean;
+}
+
+const resourceToTask = (resource: StudyResource, order: number, duration?: number, isOptionalOverride = false): ScheduledTask => {
     const calculatedDuration = calculateResourceDuration(resource);
     return {
         id: `${resource.id}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
@@ -47,7 +56,7 @@ const resourceToTask = (resource: StudyResource, order: number, isOptionalOverri
         title: resource.title,
         type: resource.type,
         originalTopic: resource.domain,
-        durationMinutes: calculatedDuration,
+        durationMinutes: duration ?? calculatedDuration,
         status: 'pending',
         order,
         isOptional: isOptionalOverride || !resource.isPrimaryMaterial,
@@ -98,65 +107,113 @@ export const generateInitialSchedule = (
     const availableResources = masterResourcePool.filter(r => !r.isArchived);
     const scheduledResourceIds = new Set<string>();
     
-    let coveredDomains = new Set<Domain>();
+    // --- Phase 1: Pre-computation & "Blockification" (The Homework) ---
+    const resourceMap = new Map(availableResources.map(r => [r.id, r]));
+    const processedForBlocking = new Set<string>();
+    const schedulingBlocks: SchedulingBlock[] = [];
 
-    // --- GLOBAL PASS 1: Primary Content (Balanced Distribution) ---
-    // This pass now uses a global queue and fills each day to a minimum target to ensure better distribution.
-    const primaryResources = availableResources
-      .filter(r => r.isPrimaryMaterial)
-      .sort((a, b) => {
-          const topicA_Index = topicOrder.indexOf(a.domain);
-          const topicB_Index = topicOrder.indexOf(b.domain);
-          if (topicA_Index !== topicB_Index) return topicA_Index - topicB_Index;
-          return (a.sequenceOrder ?? 999) - (b.sequenceOrder ?? 999);
-      });
-      
-    const primaryResourceQueue = [...primaryResources];
-    const totalPrimaryDuration = primaryResourceQueue.reduce((sum, r) => sum + calculateResourceDuration(r), 0);
-    const studyDays = schedule.filter(d => !d.isRestDay);
-    const dailyPrimaryTarget = studyDays.length > 0 ? totalPrimaryDuration / studyDays.length : 0;
-    
-    for (const day of studyDays) {
-        let timeScheduledForPrimary = 0;
+    for (const resource of availableResources) {
+        if (processedForBlocking.has(resource.id) || !resource.isPrimaryMaterial) continue;
+
+        const blockResources = new Set<StudyResource>([resource]);
+        const idsToProcess = [...(resource.pairedResourceIds || [])];
+        
+        while (idsToProcess.length > 0) {
+            const id = idsToProcess.shift();
+            if (id && !processedForBlocking.has(id)) {
+                const pairedResource = resourceMap.get(id);
+                if (pairedResource && pairedResource.isPrimaryMaterial) {
+                    blockResources.add(pairedResource);
+                    processedForBlocking.add(id);
+                    (pairedResource.pairedResourceIds || []).forEach(nextId => {
+                        if (!blockResources.has(resourceMap.get(nextId)!) && !processedForBlocking.has(nextId)) {
+                            idsToProcess.push(nextId);
+                        }
+                    });
+                }
+            }
+        }
+
+        const resourcesInBlock = Array.from(blockResources);
+        resourcesInBlock.forEach(r => processedForBlocking.add(r.id));
+        
+        const totalDuration = resourcesInBlock.reduce((sum, r) => sum + calculateResourceDuration(r), 0);
+        
+        schedulingBlocks.push({
+            id: resource.id,
+            resources: resourcesInBlock,
+            totalDuration,
+            remainingDuration: totalDuration,
+            isSplittable: resourcesInBlock.some(r => r.isSplittable),
+        });
+    }
+
+    // Sort blocks based on the main topic order
+    schedulingBlocks.sort((a, b) => {
+        const topicA_Index = topicOrder.indexOf(a.resources[0].domain);
+        const topicB_Index = topicOrder.indexOf(b.resources[0].domain);
+        if (topicA_Index !== topicB_Index) return topicA_Index - topicB_Index;
+        return (a.resources[0].sequenceOrder ?? 999) - (b.resources[0].sequenceOrder ?? 999);
+    });
+
+    const blockQueue = [...schedulingBlocks];
+
+    // --- Phase 2: Intelligent Primary Content Placement ---
+    for (const day of schedule) {
+        if (day.isRestDay) continue;
+
+        let remainingTimeOnDay = day.totalStudyTimeMinutes - day.tasks.reduce((sum, t) => sum + t.durationMinutes, 0);
         let taskOrder = day.tasks.length;
         
-        while(timeScheduledForPrimary < dailyPrimaryTarget && primaryResourceQueue.length > 0) {
-            const nextResource = primaryResourceQueue[0]; // Peek at the next resource
-            if (!nextResource) break;
-
-            const resourceSet = [nextResource];
-            (nextResource.pairedResourceIds || []).forEach(id => {
-                const pairedIndex = primaryResourceQueue.findIndex(r => r.id === id);
-                if (pairedIndex > -1) {
-                    resourceSet.push(primaryResourceQueue[pairedIndex]);
-                }
-            });
-
-            const totalSetDuration = resourceSet.reduce((sum, r) => sum + calculateResourceDuration(r), 0);
+        while (remainingTimeOnDay > 0 && blockQueue.length > 0) {
+            const block = blockQueue[0];
             
-            // If the set fits within the day's total limit, schedule it.
-            if ((day.tasks.reduce((s,t) => s + t.durationMinutes, 0) + totalSetDuration) <= day.totalStudyTimeMinutes) {
-                 resourceSet
+            if (block.remainingDuration <= remainingTimeOnDay) {
+                // The whole (remaining) block fits, schedule it
+                blockQueue.shift(); // Consume the block
+                
+                const splittableResource = block.isSplittable ? block.resources.find(r => r.isSplittable) : null;
+
+                block.resources
                     .sort((a, b) => (TASK_TYPE_PRIORITY[a.type] || 99) - (TASK_TYPE_PRIORITY[b.type] || 99))
                     .forEach(res => {
-                        const task = resourceToTask(res, taskOrder++);
-                        day.tasks.push(task);
-                        timeScheduledForPrimary += task.durationMinutes;
-                        scheduledResourceIds.add(res.id);
-                        coveredDomains.add(res.domain);
-
-                        // Remove from queue
-                        const queueIndex = primaryResourceQueue.findIndex(r => r.id === res.id);
-                        if (queueIndex > -1) primaryResourceQueue.splice(queueIndex, 1);
+                        let taskDuration = calculateResourceDuration(res);
+                        // If this is part of a split block, use remaining duration for the splittable part
+                        if (splittableResource && res.id === splittableResource.id && block.totalDuration !== block.remainingDuration) {
+                            taskDuration = block.remainingDuration - (block.totalDuration - calculateResourceDuration(splittableResource));
+                        }
+                        
+                        if(taskDuration > 0) {
+                            day.tasks.push(resourceToTask(res, taskOrder++, taskDuration));
+                            scheduledResourceIds.add(res.id);
+                        }
                     });
+                remainingTimeOnDay -= block.remainingDuration;
+            } else if (block.isSplittable) {
+                // Block is too big, but we can split it
+                const splittableResource = block.resources.find(r => r.isSplittable);
+                if (splittableResource) {
+                     const durationToSchedule = remainingTimeOnDay;
+                     const originalDuration = calculateResourceDuration(splittableResource);
+
+                     const task = resourceToTask(splittableResource, taskOrder++, durationToSchedule);
+                     task.title += ` (Part ${Math.round(((originalDuration - block.remainingDuration) / originalDuration) * 10) + 1})`;
+                     day.tasks.push(task);
+                     
+                     block.remainingDuration -= durationToSchedule;
+                     scheduledResourceIds.add(splittableResource.id);
+                     remainingTimeOnDay = 0; // Day is full
+                } else {
+                     break; // Can't split, day is effectively full for primary
+                }
             } else {
-                // If the set doesn't fit, we stop adding primary content for this day to avoid breaking up logical sets.
+                // Block is too big and not splittable, move to next day
                 break;
             }
         }
     }
-
-    // --- GLOBAL PASS 2: Supplementary Lectures (Discord) ---
+    
+    // --- Pass 3: Supplementary Lectures (Discord) ---
     for (const day of schedule) {
         if (day.isRestDay) continue;
         let remainingTime = day.totalStudyTimeMinutes - day.tasks.reduce((sum, t) => sum + t.durationMinutes, 0);
@@ -170,14 +227,14 @@ export const generateInitialSchedule = (
         for (const lecture of discordLectures) {
             const duration = calculateResourceDuration(lecture);
             if (remainingTime >= duration) {
-                day.tasks.push(resourceToTask(lecture, day.tasks.length, true));
+                day.tasks.push(resourceToTask(lecture, day.tasks.length, duration, true));
                 scheduledResourceIds.add(lecture.id);
                 remainingTime -= duration;
             }
         }
     }
 
-    // --- GLOBAL PASS 3: Optional Textbook (Core Radiology) ---
+    // --- Pass 4: Optional Textbook (Core Radiology) ---
     let allCoveredTopicsCumulative = new Set<Domain>();
     for (const day of schedule) {
         day.tasks.forEach(t => allCoveredTopicsCumulative.add(t.originalTopic));
@@ -192,7 +249,7 @@ export const generateInitialSchedule = (
         for (const reading of coreReadings) {
             const duration = calculateResourceDuration(reading);
             if (remainingTime >= duration) {
-                day.tasks.push(resourceToTask(reading, day.tasks.length, true));
+                day.tasks.push(resourceToTask(reading, day.tasks.length, duration, true));
                 scheduledResourceIds.add(reading.id);
                 remainingTime -= duration;
             }
@@ -203,10 +260,11 @@ export const generateInitialSchedule = (
         day.tasks.sort((a, b) => a.order - b.order);
         day.tasks.forEach((task, index) => task.order = index);
     });
-
+    
     const unscheduledPrimary = availableResources.filter(r => r.isPrimaryMaterial && !scheduledResourceIds.has(r.id));
-    if (unscheduledPrimary.length > 0) {
-        notifications.push({ type: 'warning', message: `${unscheduledPrimary.length} primary resources could not be scheduled. Consider extending dates or increasing study time.` });
+    if (unscheduledPrimary.length > 0 || blockQueue.some(b => b.remainingDuration > 0)) {
+        const unscheduledCount = unscheduledPrimary.length + blockQueue.length;
+        notifications.push({ type: 'warning', message: `${unscheduledCount} primary resources/blocks could not be fully scheduled. Consider extending dates or increasing study time.` });
     }
     
     const firstPassEndDate = schedule.slice().reverse().find(day => day.tasks.some(t => t.isPrimaryMaterial))?.date || endDate;
@@ -287,7 +345,7 @@ export const rebalanceSchedule = (
             for(const res of resourcesForTopic) {
                 const duration = calculateResourceDuration(res);
                 if(remainingTime >= duration) {
-                    dayToModify.tasks.push(resourceToTask(res, taskOrder++));
+                    dayToModify.tasks.push(resourceToTask(res, taskOrder++, duration));
                     completedResourceIds.add(res.id);
                     remainingTime -= duration;
                 }

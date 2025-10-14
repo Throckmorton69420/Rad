@@ -144,9 +144,9 @@ export const useStudyPlanManager = (showConfirmation: (options: ShowConfirmation
                 exceptions: userExceptions,
             };
             // FIX: The Supabase client's type inference is failing, causing `upsert` to expect a `never` type.
-            // Casting the complex `plan_data` object to `any` breaks the problematic type inference chain,
-            // allowing the call to match the `Insert` type defined with `any` in the database interface.
-            const { error } = await supabase.from('study_plans').upsert([{ id: 1, plan_data: stateToSave as any }]);
+            // Casting the entire argument array to `any` bypasses the problematic type check, which is consistent
+            // with how the `select` return value is handled elsewhere in this file.
+            const { error } = await supabase.from('study_plans').upsert([{ id: 1, plan_data: stateToSave }] as any);
             if (error) {
                 console.error("Supabase save error:", error);
                 setSystemNotification({ type: 'error', message: "Failed to save progress to the cloud." });
