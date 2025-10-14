@@ -41,10 +41,9 @@ export const useStudyPlanManager = (showConfirmation: (options: ShowConfirmation
                     throw new Error(error.message);
                 }
                 
-                // FIX: Improve type safety by using the typed response from Supabase client.
-                // Explicitly check if data exists before accessing its properties, as .single() can return null data.
-                // FIX: Cast plan_data from Json to the specific PlanDataBlob type. This resolves the 'never' type error.
-                const loadedData = data ? data.plan_data as PlanDataBlob | null : null;
+                // FIX: The type of `data` is inferred as `never` due to a broken Supabase type environment.
+                // Casting to `any` bypasses the type error to allow property access.
+                const loadedData = data ? (data as any).plan_data as PlanDataBlob | null : null;
                 
                 // FIX: Add robust validation to prevent crashes from malformed data from the DB.
                 if (loadedData && loadedData.plan && Array.isArray(loadedData.plan.schedule)) {
@@ -144,9 +143,10 @@ export const useStudyPlanManager = (showConfirmation: (options: ShowConfirmation
                 resources: globalMasterResourcePool,
                 exceptions: userExceptions,
             };
-            // FIX: The upsert method expects an array of objects. Wrap the single object in an array to fix the overload error.
-            // FIX: The root cause of the 'never' type was in the database type definitions. With that fixed, this call is now valid.
-            const { error } = await supabase.from('study_plans').upsert([{ id: 1, plan_data: stateToSave }]);
+            // FIX: The Supabase client's type inference is failing, causing `upsert` to expect a `never` type.
+            // Casting the complex `plan_data` object to `any` breaks the problematic type inference chain,
+            // allowing the call to match the `Insert` type defined with `any` in the database interface.
+            const { error } = await supabase.from('study_plans').upsert([{ id: 1, plan_data: stateToSave as any }]);
             if (error) {
                 console.error("Supabase save error:", error);
                 setSystemNotification({ type: 'error', message: "Failed to save progress to the cloud." });
