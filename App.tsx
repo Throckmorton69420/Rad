@@ -242,6 +242,16 @@ const App: React.FC = () => {
   const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
   const [printableContent, setPrintableContent] = useState<React.ReactNode | null>(null);
 
+  const handleReorderTasks = React.useCallback((date: string, tasks: ScheduledTask[]) => {
+    setStudyPlan(prev => {
+      if (!prev) return prev;
+      const updatedSchedule = prev.schedule.map(d =>
+        d.date === date ? { ...d, tasks } : d
+      );
+      return { ...prev, schedule: updatedSchedule };
+    });
+  }, [setStudyPlan]);
+
   useEffect(() => {
     const { displacement, highlight } = generateGlassMaps({});
     const displacementEl = document.getElementById('displacementMapImage') as unknown as SVGImageElement | null;
@@ -709,21 +719,20 @@ const App: React.FC = () => {
                         {isLoading && <div className="flex flex-col items-center justify-center p-10"> <i className="fas fa-spinner fa-spin fa-2x text-[var(--accent-purple)] mb-3"></i> <span className="text-[var(--text-primary)]">Loading...</span> </div>}
                         
                         <div className={activeTab !== 'schedule' ? 'hidden' : ''}>
-                          {selectedDaySchedule ?
-                            <DailyTaskList 
-                                dailySchedule={selectedDaySchedule} 
-                                onTaskToggle={(taskId) => handleTaskToggle(taskId, selectedDate)} 
-                                onOpenAddTaskModal={() => openModal('isAddTaskModalOpen')} 
-                                onOpenModifyDayModal={() => openModal('isModifyDayTasksModalOpen')}
-                                currentPomodoroTaskId={currentPomodoroTaskId} 
-                                onPomodoroTaskSelect={handlePomodoroTaskSelect} 
-                                onNavigateDay={navigateDate} 
-                                isPomodoroActive={pomodoroSettings.isActive}
-                                onToggleRestDay={(isRest) => handleToggleRestDay(selectedDate, isRest)}
-                                onUpdateTimeForDay={handleUpdateTimeForDay}
-                                isLoading={isLoading}
-                            /> : <div className="text-center text-[var(--text-secondary)] py-10">No schedule for this day.</div>
-                          }
+                          {(() => {
+                            const dayObj = studyPlan?.schedule?.find(d => d.date === selectedDate) ?? null;
+                            if (!dayObj) {
+                              return <div className="text-center text-[var(--text-secondary)] py-10">No schedule for this day.</div>;
+                            }
+                            return (
+                              <DailyTaskList
+                                day={dayObj}
+                                onToggleTask={(taskId) => handleTaskToggle(dayObj.date, taskId)}
+                                onOpenModify={(date) => openModal('isModifyDayTasksModalOpen', { date })}
+                                onReorderTasks={handleReorderTasks}
+                              />
+                            );
+                          })()}
                         </div>
                         
                         <div className={activeTab !== 'progress' ? 'hidden' : ''}>
