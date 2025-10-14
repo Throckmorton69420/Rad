@@ -4,6 +4,7 @@ import { generateInitialSchedule, rebalanceSchedule } from '../services/schedule
 import { masterResourcePool as initialMasterResourcePool } from '../services/studyResources';
 import { supabase } from '../services/supabaseClient';
 import { DEFAULT_TOPIC_ORDER, STUDY_END_DATE, STUDY_START_DATE } from '../constants';
+import { getTodayInNewYork } from '../utils/timeFormatter';
 
 
 export const useStudyPlanManager = (showConfirmation: (options: ShowConfirmationOptions) => void) => {
@@ -102,12 +103,15 @@ export const useStudyPlanManager = (showConfirmation: (options: ShowConfirmation
                 setUserExceptions([]);
                 setGlobalMasterResourcePool(initialMasterResourcePool); 
             }
+            
+            // FIX: A regeneration should start from today, not the fixed study start date.
+            const generationStartDate = regenerate ? getTodayInNewYork() : STUDY_START_DATE;
 
             const currentTopicOrder = planStateRef.current.studyPlan?.topicOrder || DEFAULT_TOPIC_ORDER;
             const defaultDeadlines: DeadlineSettings = {
                 allContent: '2025-11-05',
             };
-            const outcome: GeneratedStudyPlanOutcome = generateInitialSchedule(poolForGeneration, exceptionsForGeneration, currentTopicOrder, defaultDeadlines, STUDY_START_DATE, STUDY_END_DATE);
+            const outcome: GeneratedStudyPlanOutcome = generateInitialSchedule(poolForGeneration, exceptionsForGeneration, currentTopicOrder, defaultDeadlines, generationStartDate, STUDY_END_DATE);
 
             setStudyPlan(outcome.plan);
             setPreviousStudyPlan(null);
