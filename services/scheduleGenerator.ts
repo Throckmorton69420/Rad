@@ -40,7 +40,8 @@ import { getTodayInNewYork, parseDateString } from '../utils/timeFormatter';
  * 12) Core Radiology
  */
 
-const isoDate = (d: Date) => d.toISOString().split('T')[0];
+import { sortTasksByGlobalPriority } from '../utils/taskPriority';
+
 
 const chunkLargeResources = (resources: StudyResource[]): StudyResource[] => {
   const out: StudyResource[] = [];

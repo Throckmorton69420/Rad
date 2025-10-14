@@ -1,212 +1,192 @@
-import React, { useState, useEffect, useMemo } from 'react';
-// FIX: Corrected import path for types.
-import { DailyTaskListProps, ScheduledTask } from '../types';
+import React, { useMemo, useState, useEffect } from 'react';
+import { DailySchedule, ScheduledTask } from '../types';
+import { formatDuration, parseDateString } from '../utils/timeFormatter';
 import { Button } from './Button';
-import TaskItem from './TaskItem';
-import TaskGroupItem from './TaskGroupItem';
-import { formatDuration } from '../utils/timeFormatter';
-import TimeInputScroller from './TimeInputScroller';
-import { parseDateString } from '../utils/timeFormatter';
+import { getCategoryRankFromTask, sortTasksByGlobalPriority, CATEGORY_LABEL } from '../utils/taskPriority';
 
-const DailyTaskList: React.FC<DailyTaskListProps> = ({
-  dailySchedule,
-  onTaskToggle,
-  onOpenAddTaskModal,
-  onOpenModifyDayModal,
-  currentPomodoroTaskId,
-  onPomodoroTaskSelect,
-  onNavigateDay,
-  isPomodoroActive,
-  onToggleRestDay,
-  onUpdateTimeForDay,
-  isLoading
-}) => {
-  const [pulsingTaskId, setPulsingTaskId] = useState<string | null>(null);
-  const [isTimeEditorOpen, setIsTimeEditorOpen] = useState(false);
-  const [editedTime, setEditedTime] = useState(dailySchedule.totalStudyTimeMinutes);
-  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
+interface DailyTaskListProps {
+  day: DailySchedule;
+  onToggleTask: (taskId: string) => void;
+  onOpenModify: (date: string) => void;
+  onReorderTasks?: (date: string, tasks: ScheduledTask[]) => void;
+}
 
-  const { date, tasks, totalStudyTimeMinutes, isRestDay, dayName } = dailySchedule;
-  const displayDate = parseDateString(date);
-  
-  const actualTotalMinutes = useMemo(() => tasks.reduce((sum, task) => sum + task.durationMinutes, 0), [tasks]);
+// Build grouped tabs from tasks in canonical (global) order
+const useGroupedTabs = (tasks: ScheduledTask[]) => {
+  const canonical = useMemo(() => [...tasks].sort(sortTasksByGlobalPriority), [tasks]);
 
+  const grouped = useMemo(() => {
+    const map = new Map<number, ScheduledTask[]>();
+    canonical.forEach(t => {
+      const c = getCategoryRankFromTask(t);
+      if (!map.has(c)) map.set(c, []);
+      map.get(c)!.push(t);
+    });
+    return map;
+  }, [canonical]);
 
+  const defaultTabOrder = useMemo(() => Array.from(grouped.keys()).sort((a, b) => a - b), [grouped]);
+
+  return { canonical, grouped, defaultTabOrder };
+};
+
+const DailyTaskList: React.FC<DailyTaskListProps> = ({ day, onToggleTask, onOpenModify, onReorderTasks }) => {
+  // Group by category rank
+  const { canonical, grouped, defaultTabOrder } = useGroupedTabs(day.tasks);
+
+  // Local state for tab order + per-tab item orders
+  const [tabOrder, setTabOrder] = useState<number[]>(defaultTabOrder);
+  const [itemsByTab, setItemsByTab] = useState<Record<number, ScheduledTask[]>>(() => {
+    const rec: Record<number, ScheduledTask[]> = {};
+    defaultTabOrder.forEach(k => (rec[k] = grouped.get(k)!));
+    return rec;
+  });
+
+  // Track what’s being dragged (tab or task)
+  const [dragTab, setDragTab] = useState<number | null>(null);
+  const [dragTask, setDragTask] = useState<{ cat: number; id: string } | null>(null);
+
+  // Active tab
+  const [activeTab, setActiveTab] = useState<number>(defaultTabOrder[0] ?? 1);
+
+  // Sync when external tasks change
   useEffect(() => {
-    setEditedTime(dailySchedule.totalStudyTimeMinutes);
-    setIsTimeEditorOpen(false);
-  }, [date, dailySchedule.totalStudyTimeMinutes]);
+    setTabOrder(defaultTabOrder);
+    const rec: Record<number, ScheduledTask[]> = {};
+    defaultTabOrder.forEach(k => (rec[k] = grouped.get(k)!));
+    setItemsByTab(rec);
+    setActiveTab(defaultTabOrder[0] ?? 1);
+  }, [canonical, grouped, defaultTabOrder]);
 
-  const handleSetPomodoro = (task: ScheduledTask) => {
-    onPomodoroTaskSelect(task.id);
-    setPulsingTaskId(task.id);
-    setTimeout(() => setPulsingTaskId(null), 1000);
+  // Helpers
+  const totalTime = useMemo(
+    () => Object.values(itemsByTab).flat().reduce((s, t) => s + t.durationMinutes, 0),
+    [itemsByTab]
+  );
+
+  const flattenedCurrentOrder = useMemo(() => {
+    // Flatten respecting current tab order then each tab’s item order
+    const list: ScheduledTask[] = [];
+    tabOrder.forEach(cat => {
+      const arr = itemsByTab[cat] ?? [];
+      arr.forEach(item => list.push(item));
+    });
+    return list;
+  }, [tabOrder, itemsByTab]);
+
+  // Drag handlers for tabs
+  const onTabDragStart = (cat: number) => setDragTab(cat);
+  const onTabDragOver = (e: React.DragEvent) => e.preventDefault();
+  const onTabDrop = (targetCat: number) => {
+    if (dragTab == null || dragTab === targetCat) return;
+    setTabOrder(prev => {
+      const next = [...prev];
+      const from = next.indexOf(dragTab);
+      const to = next.indexOf(targetCat);
+      if (from < 0 || to < 0) return prev;
+      const [m] = next.splice(from, 1);
+      next.splice(to, 0, m);
+      return next;
+    });
+    setDragTab(null);
   };
 
-  const handleSaveTime = () => {
-    onUpdateTimeForDay(editedTime);
-    setIsTimeEditorOpen(false);
+  // Drag handlers for items inside a tab (no cross-tab moves)
+  const onItemDragStart = (cat: number, id: string) => setDragTask({ cat, id });
+  const onItemDragOver = (e: React.DragEvent) => e.preventDefault();
+  const onItemDrop = (cat: number, targetId: string) => {
+    if (!dragTask || dragTask.cat !== cat) return;
+    setItemsByTab(prev => {
+      const arr = prev[cat] ? [...prev[cat]] : [];
+      const from = arr.findIndex(t => t.id === dragTask.id);
+      const to = arr.findIndex(t => t.id === targetId);
+      if (from < 0 || to < 0) return prev;
+      const next = { ...prev };
+      const [m] = arr.splice(from, 1);
+      arr.splice(to, 0, m);
+      next[cat] = arr;
+      return next;
+    });
+    setDragTask(null);
   };
-  
-  const toggleGroup = (groupKey: string) => {
-    setExpandedGroups(prev => ({ ...prev, [groupKey]: !prev[groupKey] }));
+
+  // Persist: renumber order and send up
+  const persist = () => {
+    const reindexed = flattenedCurrentOrder.map((t, i) => ({ ...t, order: i }));
+    onReorderTasks?.(day.date, reindexed);
   };
-
-  const groupedAndSortedTasks = useMemo(() => {
-    if (!tasks) return [];
-    
-    const sortedTasks = [...tasks].sort((a, b) => a.order - b.order);
-    const groups: { isGroup: true; id: string; source: string; tasks: ScheduledTask[] }[] = [];
-    const singles: ScheduledTask[] = [];
-    const groupMap: Map<string, ScheduledTask[]> = new Map();
-
-    sortedTasks.forEach(task => {
-        const source = task.bookSource || task.videoSource;
-        if (source) {
-            if (!groupMap.has(source)) {
-                groupMap.set(source, []);
-            }
-            groupMap.get(source)!.push(task);
-        } else {
-            singles.push(task);
-        }
-    });
-
-    groupMap.forEach((groupTasks, source) => {
-        if (groupTasks.length >= 2) {
-            groups.push({
-                isGroup: true,
-                id: `${date}-${source}`,
-                source: source,
-                tasks: groupTasks,
-            });
-        } else {
-            singles.push(...groupTasks);
-        }
-    });
-
-    const result = [...groups, ...singles];
-
-    result.sort((a, b) => {
-        const orderA = 'isGroup' in a ? a.tasks[0].order : a.order;
-        const orderB = 'isGroup' in b ? b.tasks[0].order : b.order;
-        return orderA - orderB;
-    });
-
-    return result;
-  }, [tasks, date]);
-
 
   return (
-    // This root div no longer has any flex or height constraints, allowing it to grow.
-    <div className="relative"> 
-      <div className="flex-shrink-0">
-        <div className="flex justify-between items-center mb-1">
-          <Button onClick={() => onNavigateDay('prev')} variant="ghost" size="sm" className="!px-2.5" aria-label="Previous Day"><i className="fas fa-chevron-left"></i></Button>
-          <div className="text-center">
-            <h2 className="text-xl font-bold text-white">{dayName ? displayDate.toLocaleDateString('en-US', { weekday: 'long', timeZone: 'UTC' }) : '...'}</h2>
-            <p className="text-sm text-[var(--text-secondary)]">{displayDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric', timeZone: 'UTC' })}</p>
-          </div>
-          <Button onClick={() => onNavigateDay('next')} variant="ghost" size="sm" className="!px-2.5" aria-label="Next Day"><i className="fas fa-chevron-right"></i></Button>
-        </div>
-        
-        <div className="mt-4 mb-4 p-3 glass-panel rounded-lg">
-          <div className="flex justify-between items-center">
-            <div>
-              <p className="text-xs text-[var(--text-secondary)]">Total Planned Time</p>
-              <p className="text-lg font-bold text-white">{formatDuration(actualTotalMinutes)}</p>
-            </div>
-            <Button variant="secondary" size="sm" onClick={() => setIsTimeEditorOpen(!isTimeEditorOpen)}>
-              <i className="fas fa-clock mr-2"></i> Adjust
+    <div className="space-y-3">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <h3 className="text-lg font-semibold">
+          {parseDateString(day.date).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', timeZone: 'UTC' })}
+        </h3>
+        <div className="flex items-center gap-2">
+          <span className="text-sm opacity-80">{formatDuration(totalTime)}</span>
+          <Button size="sm" variant="secondary" onClick={() => onOpenModify(day.date)}>
+            <i className="fas fa-edit mr-2" /> Modify
+          </Button>
+          {onReorderTasks && (
+            <Button size="sm" variant="primary" onClick={persist}>
+              <i className="fas fa-save mr-2" /> Save Order
             </Button>
-          </div>
-          {isTimeEditorOpen && (
-            <div className="mt-3 pt-3 border-t border-[var(--separator-secondary)] space-y-3">
-              <TimeInputScroller valueInMinutes={editedTime} onChange={setEditedTime} maxHours={14} disabled={isLoading} />
-              <div className="flex justify-end space-x-2">
-                <Button variant="secondary" size="sm" onClick={() => { setIsTimeEditorOpen(false); setEditedTime(totalStudyTimeMinutes); }}>Cancel</Button>
-                <Button variant="primary" size="sm" onClick={handleSaveTime} disabled={isLoading || editedTime === totalStudyTimeMinutes}>
-                  Save & Rebalance
-                </Button>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-      
-      {/* This container also has no height constraints. */}
-      <div>
-        <div className="transition-colors p-1 rounded-lg pb-32">
-          {isRestDay ? (
-            <div className="h-full flex flex-col justify-center items-center text-center p-6 glass-panel rounded-lg">
-              <i className="fas fa-coffee fa-2x text-[var(--text-secondary)] mb-3"></i>
-              <p className="text-lg font-semibold">Rest Day</p>
-              <p className="text-sm text-[var(--text-secondary)] mb-4">Take a well-deserved break!</p>
-              <Button onClick={() => onToggleRestDay(true)} variant="secondary" size="sm">Make it a Study Day</Button>
-            </div>
-          ) : tasks.length === 0 ? (
-            <div className="h-full flex flex-col justify-center items-center text-center p-6 glass-panel rounded-lg">
-              <i className="fas fa-calendar-check fa-2x text-[var(--text-secondary)] mb-3"></i>
-              <p className="text-lg font-semibold">No Tasks Scheduled</p>
-              <p className="text-sm text-[var(--text-secondary)] mb-4">You can add optional tasks or rebalance your schedule.</p>
-               <Button onClick={onOpenAddTaskModal} variant="secondary" size="sm" className="mb-2"><i className="fas fa-plus mr-2"></i> Add Optional Task</Button>
-              <Button onClick={() => onToggleRestDay(false)} variant="secondary" size="sm">Make it a Rest Day</Button>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {groupedAndSortedTasks.map((item, index) => {
-                if ('isGroup' in item) {
-                  const isExpanded = !!expandedGroups[item.id];
-                  return (
-                    <div key={item.id}>
-                      <TaskGroupItem 
-                        groupKey={item.id}
-                        sourceName={item.source} 
-                        tasks={item.tasks}
-                        isExpanded={isExpanded}
-                        onToggle={() => toggleGroup(item.id)}
-                      />
-                      {isExpanded && (
-                        <div className="pl-4 border-l-2 border-[var(--separator-primary)] ml-3 space-y-2 pt-2">
-                          {item.tasks.map(task => (
-                            <TaskItem
-                              key={task.id}
-                              task={task}
-                              onToggle={onTaskToggle}
-                              isCurrentPomodoroTask={currentPomodoroTaskId === task.id}
-                              isPulsing={pulsingTaskId === task.id && !isPomodoroActive}
-                              onSetPomodoro={() => handleSetPomodoro(task)}
-                            />
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  );
-                }
-                return (
-                  <TaskItem
-                    key={item.id}
-                    task={item}
-                    onToggle={onTaskToggle}
-                    isCurrentPomodoroTask={currentPomodoroTaskId === item.id}
-                    isPulsing={pulsingTaskId === item.id && !isPomodoroActive}
-                    onSetPomodoro={() => handleSetPomodoro(item)}
-                  />
-                );
-              })}
-            </div>
           )}
         </div>
       </div>
 
-      <div className="sticky bottom-0 pt-3 glass-chrome pb-[calc(1rem+env(safe-area-inset-bottom))]">
-        <div className="flex space-x-2">
-          <Button onClick={onOpenModifyDayModal} variant="primary" className="flex-grow">
-            <i className="fas fa-edit mr-2"></i> Modify Schedule
-          </Button>
-          <Button onClick={onOpenAddTaskModal} variant="secondary" title="Add a quick custom task"><i className="fas fa-plus"></i></Button>
-          <Button onClick={() => onToggleRestDay(false)} variant="secondary" title="Convert to Rest Day"><i className="fas fa-coffee"></i></Button>
-        </div>
+      {/* Tab bar with drag handles */}
+      <div className="flex flex-wrap gap-1">
+        {tabOrder.map(cat => {
+          const count = (itemsByTab[cat] ?? []).length;
+          const isActive = cat === activeTab;
+          return (
+            <button
+              key={cat}
+              draggable
+              onDragStart={() => onTabDragStart(cat)}
+              onDragOver={onTabDragOver}
+              onDrop={() => onTabDrop(cat)}
+              onClick={() => setActiveTab(cat)}
+              className={`px-2.5 py-1 rounded-md text-xs transition ${
+                isActive ? 'bg-[var(--accent-purple)] text-white' : 'glass-panel glass-panel-interactive'
+              }`}
+              aria-pressed={isActive}
+              title="Drag to reorder tabs; click to activate"
+            >
+              <i className="fas fa-grip-lines mr-1 opacity-70" />
+              {CATEGORY_LABEL[cat] || `Cat ${cat}`} • {count}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Tab content */}
+      <div className="rounded-lg glass-panel p-2">
+        {(itemsByTab[activeTab] ?? []).map(task => (
+          <div
+            key={task.id}
+            className={`flex items-center p-2 rounded-lg glass-panel glass-panel-interactive mb-2 ${
+              dragTask?.id === task.id ? 'opacity-50' : ''
+            }`}
+            draggable
+            onDragStart={() => onItemDragStart(activeTab, task.id)}
+            onDragOver={onItemDragOver}
+            onDrop={() => onItemDrop(activeTab, task.id)}
+            onDragEnd={() => setDragTask(null)}
+          >
+            <i className="fas fa-grip-vertical mr-3 cursor-grab text-[var(--text-secondary)]" />
+            <div className="flex-grow min-w-0">
+              <div className="text-sm font-medium truncate" title={task.title}>{task.title}</div>
+              <div className="text-xs opacity-70">{task.originalTopic}</div>
+            </div>
+            <div className="ml-3 text-sm font-semibold">{formatDuration(task.durationMinutes)}</div>
+            <Button size="sm" variant="ghost" className="ml-2" onClick={() => onToggleTask(task.id)}>
+              <i className={`fas ${task.status === 'completed' ? 'fa-check-circle text-green-400' : 'fa-circle text-[var(--text-secondary)]'}`} />
+            </Button>
+          </div>
+        ))}
       </div>
     </div>
   );
