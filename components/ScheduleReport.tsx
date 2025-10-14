@@ -33,12 +33,8 @@ const ScheduleReport: React.FC<ScheduleReportProps> = ({ studyPlan, schedule }) 
       </header>
       
       <main className="space-y-8">
-        {scheduleToRender.map((day, index) => {
-            const dayOfWeek = parseDateString(day.date).getUTCDay(); // Sunday = 0
-            const isFirstDayOfWeek = dayOfWeek === 0;
-
-            return (
-              <div key={day.date} className={`print-no-break ${isFirstDayOfWeek && index > 0 ? 'print-page-break' : ''}`}>
+        {scheduleToRender.map((day) => (
+              <div key={day.date} className="print-no-break">
                 <h2 className="text-lg font-bold mb-3 border-b-2 border-gray-400 pb-2 text-gray-800">
                   {parseDateString(day.date).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' })}
                 </h2>
@@ -74,8 +70,8 @@ const ScheduleReport: React.FC<ScheduleReportProps> = ({ studyPlan, schedule }) 
                   </table>
                 )}
               </div>
-            );
-        })}
+            )
+        )}
       </main>
       <footer className="mt-8 pt-4 border-t border-gray-300 text-center text-xs text-gray-500 print-header-footer">
         End of Report
