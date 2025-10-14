@@ -239,15 +239,7 @@ const App: React.FC = () => {
     showArchived: false,
   });
 
-  const handleReorderTasks = React.useCallback((date: string, tasks: ScheduledTask[]) => {
-    setStudyPlan(prev => {
-      if (!prev) return prev;
-      const updatedSchedule = prev.schedule.map(day =>
-        day.date === date ? { ...day, tasks } : day
-      );
-      return { ...prev, schedule: updatedSchedule };
-    });
-  }, [setStudyPlan]);
+  const [printableContent, setPrintableContent] = useState<React.ReactNode | null>(null);
 
   useEffect(() => {
     const { displacement, highlight } = generateGlassMaps({});
