@@ -29,8 +29,17 @@ import ContentReport from './components/ContentReport';
 import { formatDuration, getTodayInNewYork, parseDateString } from './utils/timeFormatter';
 import { addResourceToGlobalPool } from './services/studyResources';
 
-// FIX: Define the shape of the content UI filters to be shared between components.
-export interface ContentUiFilters {
+// Add this inside App component (before render)
+const handleReorderTasks = React.useCallback((date: string, tasks: ScheduledTask[]) => {
+  setStudyPlan(prev => {
+    if (!prev) return prev;
+    const updatedSchedule = prev.schedule.map(day =>
+      day.date === date ? { ...day, tasks } : day
+    );
+    return { ...prev, schedule: updatedSchedule };
+  });
+}, [setStudyPlan]);
+
   searchTerm: string;
   domain: Domain | 'all';
   type: ResourceType | 'all';
