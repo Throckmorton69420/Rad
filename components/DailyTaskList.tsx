@@ -17,17 +17,36 @@ type DragState = { fromId: string | null };
 const normalizeSource = (t: ScheduledTask) =>
   (t.bookSource || t.videoSource || 'Custom Task').trim();
 
+// Define your preferred source order (groups appear in this order by default)
+const SOURCE_RANK: Record<string, number> = {
+  'Titan Radiology': 1,
+  'Crack the Core': 2,
+  'Core Radiology': 3,
+  'Board Vitals': 4,
+  'Huda Text': 5,
+  'Huda Gbank': 6,
+  'Qevlar': 7,
+  'Nuclear Medicine': 8,
+  'Case Companion': 9,
+  'Discord': 10,
+  'NIS / RISC': 11,
+  'RadPrimer': 12,
+  'Other': 999,
+  'Custom Task': 1000,
+};
+
+const getSourceRank = (sourceName: string) => SOURCE_RANK[sourceName] ?? 998;
+
 const DailyTaskList: React.FC<DailyTaskListProps> = ({
   day,
   onToggleTask,
   onOpenModify,
   onReorderTasks,
 }) => {
-  // Maintain on-screen order for DnD; reset when day changes
   const [ordered, setOrdered] = React.useState<ScheduledTask[]>(day.tasks);
   React.useEffect(() => setOrdered(day.tasks), [day.tasks]);
 
-  // Build grouped view by source, preserving current order
+  // Build groups, then sort by your preferred source rank
   const groups = React.useMemo(() => {
     const m = new Map<string, ScheduledTask[]>();
     for (const t of ordered) {
@@ -35,10 +54,15 @@ const DailyTaskList: React.FC<DailyTaskListProps> = ({
       if (!m.has(key)) m.set(key, []);
       m.get(key)!.push(t);
     }
-    return m;
+    // Sort groups by rank
+    const sortedEntries = Array.from(m.entries()).sort((a, b) => {
+      const rankA = getSourceRank(a[0]);
+      const rankB = getSourceRank(b[0]);
+      return rankA - rankB;
+    });
+    return new Map(sortedEntries);
   }, [ordered]);
 
-  // Expanded state per source; default expand sources that have tasks
   const initialExpanded = React.useMemo(() => {
     const s = new Set<string>();
     for (const k of groups.keys()) s.add(k);
@@ -56,13 +80,11 @@ const DailyTaskList: React.FC<DailyTaskListProps> = ({
       return next;
     });
 
-  // Total time for header
   const totalMinutes = React.useMemo(
     () => ordered.reduce((s, t) => s + t.durationMinutes, 0),
     [ordered]
   );
 
-  // Native drag-and-drop across entire day, no style changes
   const dragRef = React.useRef<DragState>({ fromId: null });
   const onTaskDragStart = (id: string) => (dragRef.current.fromId = id);
   const onTaskDragOver = (e: React.DragEvent) => e.preventDefault();
@@ -86,10 +108,10 @@ const DailyTaskList: React.FC<DailyTaskListProps> = ({
     onReorderTasks?.(day.date, reindexed);
   };
 
-  // Render a single grouped section (source name, color, tasks)
   const renderGroup = (sourceName: string, tasks: ScheduledTask[]) => {
     const key = sourceName || 'Custom Task';
     const isExpanded = expanded.has(key);
+
     return (
       <div key={key} className="mb-3">
         <TaskGroupItem
@@ -126,7 +148,6 @@ const DailyTaskList: React.FC<DailyTaskListProps> = ({
 
   return (
     <div className="space-y-3">
-      {/* Header (unchanged) */}
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-semibold">
           {parseDateString(day.date).toLocaleDateString('en-US', {
@@ -151,7 +172,6 @@ const DailyTaskList: React.FC<DailyTaskListProps> = ({
         </div>
       </div>
 
-      {/* Grouped by source (original look) */}
       <div>
         {Array.from(groups.entries()).map(([sourceName, tasks]) =>
           renderGroup(sourceName, tasks)
