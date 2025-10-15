@@ -62,8 +62,47 @@ interface ORToolsScheduleResponse {
     };
 }
 
-async function generateORToolsSchedule(request: ORToolsScheduleRequest): Promise<ORToolsScheduleResponse> {
+// Progress tracking interface
+interface ProgressInfo {
+    progress: number;  // 0-1
+    step: number;
+    total_steps: number;
+    current_task: string;
+    elapsed_seconds: number;
+    estimated_remaining_seconds: number;
+}
+
+async function generateORToolsSchedule(
+    request: ORToolsScheduleRequest, 
+    onProgress?: (progress: ProgressInfo) => void
+): Promise<ORToolsScheduleResponse> {
     try {
+        // Start progress tracking
+        let startTime = Date.now();
+        let progressInterval: NodeJS.Timeout | null = null;
+        
+        if (onProgress) {
+            // Simulate progress updates during the request
+            progressInterval = setInterval(() => {
+                const elapsed = (Date.now() - startTime) / 1000;
+                const progress = Math.min(elapsed / 45, 0.95); // Estimate 45 seconds max
+                const remaining = Math.max(45 - elapsed, 2);
+                
+                onProgress({
+                    progress,
+                    step: Math.floor(progress * 6) + 1,
+                    total_steps: 6,
+                    current_task: progress < 0.2 ? 'Fetching resources from database' :
+                                 progress < 0.4 ? 'Analyzing and categorizing resources' :
+                                 progress < 0.6 ? 'Building optimization model' :
+                                 progress < 0.8 ? 'Solving with CP-SAT algorithm' :
+                                 'Generating final schedule',
+                    elapsed_seconds: elapsed,
+                    estimated_remaining_seconds: remaining
+                });
+            }, 1000);
+        }
+        
         const response = await fetch(`${OR_TOOLS_SERVICE_URL}/generate-schedule`, {
             method: 'POST',
             headers: {
@@ -71,6 +110,24 @@ async function generateORToolsSchedule(request: ORToolsScheduleRequest): Promise
             },
             body: JSON.stringify(request)
         });
+        
+        // Clear progress interval
+        if (progressInterval) {
+            clearInterval(progressInterval);
+        }
+        
+        // Final progress update
+        if (onProgress) {
+            const totalElapsed = (Date.now() - startTime) / 1000;
+            onProgress({
+                progress: 1.0,
+                step: 6,
+                total_steps: 6,
+                current_task: 'Schedule optimization complete!',
+                elapsed_seconds: totalElapsed,
+                estimated_remaining_seconds: 0
+            });
+        }
 
         if (!response.ok) {
             const errorData = await response.json().catch(() => null);
@@ -171,6 +228,7 @@ export const useStudyPlanManager = (showConfirmation: (options: ShowConfirmation
     const [systemNotification, setSystemNotification] = useState<{ type: 'error' | 'warning' | 'info', message: string } | null>(null);
     const [isNewUser, setIsNewUser] = useState(false);
     const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+    const [optimizationProgress, setOptimizationProgress] = useState<ProgressInfo | null>(null);
     
     // Enable OR-Tools for all environments now that it's deployed
     const [useORTools, setUseORTools] = useState<boolean>(true);
@@ -186,6 +244,7 @@ export const useStudyPlanManager = (showConfirmation: (options: ShowConfirmation
     const loadSchedule = useCallback(async (regenerate = false) => {
         setIsLoading(true);
         setSystemNotification(null);
+        setOptimizationProgress(null);
         isInitialLoadRef.current = true;
 
         try {
@@ -270,7 +329,7 @@ export const useStudyPlanManager = (showConfirmation: (options: ShowConfirmation
             // Try OR-Tools only if available and enabled
             if (useORTools) {
                 try {
-                    setSystemNotification({ type: 'info', message: 'Generating optimized schedule using OR-Tools...' });
+                    setSystemNotification({ type: 'info', message: '🚀 Initializing advanced optimization engine...' });
                     
                     const orToolsRequest: ORToolsScheduleRequest = {
                         startDate: generationStartDate,
@@ -279,14 +338,25 @@ export const useStudyPlanManager = (showConfirmation: (options: ShowConfirmation
                         includeOptional: true
                     };
 
-                    const orToolsResponse = await generateORToolsSchedule(orToolsRequest);
+                    const orToolsResponse = await generateORToolsSchedule(
+                        orToolsRequest, 
+                        (progress) => {
+                            setOptimizationProgress(progress);
+                            setSystemNotification({
+                                type: 'info',
+                                message: `🔄 ${progress.current_task} (${Math.round(progress.progress * 100)}% - ${Math.round(progress.elapsed_seconds)}s elapsed)`
+                            });
+                        }
+                    );
+                    
                     const optimizedPlan = convertORToolsToStudyPlan(orToolsResponse, poolForGeneration);
                     
                     setStudyPlan(optimizedPlan);
                     setPreviousStudyPlan(null);
+                    setOptimizationProgress(null);
                     setSystemNotification({ 
                         type: 'info', 
-                        message: `✨ Optimized schedule generated! ${orToolsResponse.summary.total_resources} resources across ${orToolsResponse.summary.total_days} days using advanced constraint solving.` 
+                        message: `✨ Optimization complete! ${orToolsResponse.summary.total_resources} resources perfectly scheduled across ${orToolsResponse.summary.total_days} days using constraint solving.` 
                     });
                     setIsNewUser(!regenerate);
                     setIsLoading(false);
@@ -295,6 +365,7 @@ export const useStudyPlanManager = (showConfirmation: (options: ShowConfirmation
                     
                 } catch (orToolsError) {
                     console.warn('OR-Tools failed, falling back to original algorithm:', orToolsError);
+                    setOptimizationProgress(null);
                     setSystemNotification({ 
                         type: 'warning', 
                         message: 'Advanced optimizer unavailable, using standard algorithm...' 
@@ -319,6 +390,7 @@ export const useStudyPlanManager = (showConfirmation: (options: ShowConfirmation
 
         } catch (err: any) {
             console.error("Error loading/generating data:", err);
+            setOptimizationProgress(null);
             setSystemNotification({ type: 'error', message: err.message || "Failed to load or generate data." });
             setStudyPlan(null);
         } finally {
@@ -407,10 +479,11 @@ export const useStudyPlanManager = (showConfirmation: (options: ShowConfirmation
             confirmVariant: 'primary',
             onConfirm: async () => {
                 setIsLoading(true);
+                setOptimizationProgress(null);
                 updatePreviousStudyPlan(studyPlan);
                 
                 try {
-                    setSystemNotification({ type: 'info', message: 'Generating optimized schedule with OR-Tools...' });
+                    setSystemNotification({ type: 'info', message: '🚀 Initializing advanced optimization engine...' });
                     
                     const orToolsRequest: ORToolsScheduleRequest = {
                         startDate: studyPlan.startDate,
@@ -419,7 +492,17 @@ export const useStudyPlanManager = (showConfirmation: (options: ShowConfirmation
                         includeOptional: true
                     };
 
-                    const orToolsResponse = await generateORToolsSchedule(orToolsRequest);
+                    const orToolsResponse = await generateORToolsSchedule(
+                        orToolsRequest,
+                        (progress) => {
+                            setOptimizationProgress(progress);
+                            setSystemNotification({
+                                type: 'info',
+                                message: `🔄 ${progress.current_task} (${Math.round(progress.progress * 100)}% - ${Math.round(progress.elapsed_seconds)}s elapsed)`
+                            });
+                        }
+                    );
+                    
                     const optimizedPlan = convertORToolsToStudyPlan(orToolsResponse, globalMasterResourcePool);
                     
                     // Preserve completed task status from current plan
@@ -443,14 +526,16 @@ export const useStudyPlanManager = (showConfirmation: (options: ShowConfirmation
                     
                     const finalPlan = { ...optimizedPlan, schedule: preservedSchedule };
                     setStudyPlan(finalPlan);
+                    setOptimizationProgress(null);
                     
                     setSystemNotification({ 
                         type: 'info', 
-                        message: `✨ Schedule optimized! ${orToolsResponse.summary.total_resources} resources scheduled across ${orToolsResponse.summary.total_days} days with perfect constraint satisfaction.` 
+                        message: `✨ Optimization complete! ${orToolsResponse.summary.total_resources} resources perfectly scheduled across ${orToolsResponse.summary.total_days} days with constraint satisfaction.` 
                     });
                     
                 } catch (error: any) {
                     console.error('OR-Tools optimization failed:', error);
+                    setOptimizationProgress(null);
                     setSystemNotification({ 
                         type: 'error', 
                         message: `Optimization failed: ${error.message}. Using standard algorithm instead.` 
@@ -703,5 +788,6 @@ export const useStudyPlanManager = (showConfirmation: (options: ShowConfirmation
         handleGenerateORToolsSchedule,
         useORTools,
         setUseORTools,
+        optimizationProgress,  // Export progress info
     };
 };
