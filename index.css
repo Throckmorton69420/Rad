@@ -308,7 +308,7 @@ div.glass-chrome {
 @media print {
   @page {
     size: letter;
-    margin: 12mm;
+    margin: 0.7in;
   }
 
   body, html, #root {
@@ -317,8 +317,6 @@ div.glass-chrome {
     background: white !important;
     color: black !important;
     font-size: 9pt;
-    margin: 0 !important;
-    padding: 0 !important;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
@@ -341,16 +339,6 @@ div.glass-chrome {
     font-family: 'Times New Roman', Times, serif;
     margin: 0;
     padding: 0;
-  }
-  
-  .printable-report > *:first-child {
-    break-before: avoid !important;
-    page-break-before: avoid !important;
-    margin-top: 0 !important;
-  }
-  
-  .print-only-cover {
-    display: none !important;
   }
   
   .printable-report header, .printable-report footer {

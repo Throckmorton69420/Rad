@@ -533,36 +533,6 @@ class Scheduler {
     const blocks = anchors.map(a => this.buildBlockFromAnchor(a));
     return this.placeBlockStrictRoundRobin(blocks, cursorStart);
   }
-// Phase 1d: Distribute remaining non-Nuclear, non-Physics resources in Titan domain order
-private phase1d_distributeByTitanDomainOrder(cursorStart: number): number {
-    // Titan-inspired domain sequence excluding Nuclear and Physics (handled elsewhere)
-    const DOMAIN_ORDER: Domain[] = [
-      Domain.GASTROINTESTINAL_IMAGING,
-      Domain.GENITOURINARY_IMAGING,
-      Domain.THORACIC_IMAGING,
-      Domain.MUSCULOSKELETAL_IMAGING,
-      Domain.NEURORADIOLOGY,
-      Domain.PEDIATRIC_RADIOLOGY,
-      Domain.CARDIOVASCULAR_IMAGING,
-      Domain.BREAST_IMAGING,
-      Domain.INTERVENTIONAL_RADIOLOGY,
-    ];
-
-    // Build one block per domain in preferred order
-    const domainBlocks = DOMAIN_ORDER.map(dom => {
-      const items = [...this.remaining]
-        .map(id => this.allResources.get(id)!)
-        .filter(r => r && r.domain === dom && r.domain !== Domain.NUCLEAR_MEDICINE && r.domain !== Domain.PHYSICS)
-        .filter(r => (isPrimaryByCategory(r) || r.isPrimaryMaterial));
-      const sortedItems = sortResourcesByTaskPriority(items);
-      const totalMinutes = sortedItems.reduce((s, r) => s + r.durationMinutes, 0);
-      const anchorId = sortedItems[0]?.id || `${dom}_anchor`;
-      return { anchorId, domain: dom, items: sortedItems, totalMinutes } as Block;
-    }).filter(b => b.items.length > 0);
-
-    if (domainBlocks.length === 0) return cursorStart;
-    return this.placeBlockStrictRoundRobin(domainBlocks, cursorStart);
-  }
 
   private phase2_dailyFirstFit(): void {
     // Pre-pass: distribute block families with round-robin before daily fill
@@ -665,10 +635,15 @@ private phase1d_distributeByTitanDomainOrder(cursorStart: number): number {
     cursor = this.phase1a_distributeTitan(cursor);
     cursor = this.phase1b_distributeHuda(cursor);
     cursor = this.phase1c_distributeOtherPrimaries(cursor);
+    cursor = this.phase1d_distributeByTitanDomainOrder(cursor);
 
     this.phase2_dailyFirstFit();
     this.phase2b_fillPrimariesToCapacity();
     this.phase3_supplementaryFill();
+    
+    // CRITICAL FIX: Place leftovers with domain alignment before finalization
+    this.placeLeftoversWithDomainAlignment();
+    
     this.finalize();
 
     const progressPerDomain: StudyPlan['progressPerDomain'] = {};

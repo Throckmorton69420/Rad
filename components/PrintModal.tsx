@@ -1,134 +1,252 @@
 import React, { useState } from 'react';
-import { PrintModalProps, PrintOptions, StudyPlan } from '../types';
+import { StudyPlan } from '../types';
+import ScheduleReport from './ScheduleReport';
+import ProgressReport from './ProgressReport';
+import ContentReport from './ContentReport';
+import { createPortal } from 'react-dom';
+import { parseDateString } from '../utils/timeFormatter';
 import { Button } from './Button';
-import FocusTrap from 'focus-trap-react';
-import CustomSelect from '../CustomSelect';
 
-const PrintModal: React.FC<PrintModalProps> = ({ isOpen, onClose, onGenerateReport, studyPlan, currentDate, activeFilters, initialTab }) => {
-  const [activeTab, setActiveTab] = useState<'schedule' | 'progress' | 'content'>(initialTab);
-  const [printOptions, setPrintOptions] = useState<PrintOptions>({
-    schedule: { reportType: 'full', pageBreakPerWeek: true, startDate: studyPlan.startDate, endDate: studyPlan.endDate },
-    progress: { includeSummary: true, includeDeadlines: true, includeTopic: true, includeType: true, includeSource: true },
-    content: { filter: 'all', sortBy: 'sequenceOrder' },
-  });
+interface PrintModalProps {
+  studyPlan: StudyPlan;
+  onClose: () => void;
+}
 
-  const handleGenerate = () => {
-    onGenerateReport(activeTab, printOptions);
+type ReportType = 'schedule' | 'progress' | 'content';
+type PrintOption = 'full' | 'range' | 'day' | 'week';
+
+const PrintModal: React.FC<PrintModalProps> = ({ studyPlan, onClose }) => {
+  const [reportType, setReportType] = useState<ReportType>('schedule');
+  const [printOption, setPrintOption] = useState<PrintOption>('full');
+  const [customStartDate, setCustomStartDate] = useState('');
+  const [customEndDate, setCustomEndDate] = useState('');
+  const [singleDayDate, setSingleDayDate] = useState('');
+  const [weekStartDate, setWeekStartDate] = useState('');
+  const [includeCompleted, setIncludeCompleted] = useState(true);
+  const [includePending, setIncludePending] = useState(true);
+
+  const handlePrint = () => {
+    let filteredSchedule = studyPlan.schedule;
+
+    if (reportType === 'schedule') {
+      if (printOption === 'range' && customStartDate && customEndDate) {
+        filteredSchedule = studyPlan.schedule.filter((day) => {
+          const dayDate = parseDateString(day.date);
+          const start = parseDateString(customStartDate);
+          const end = parseDateString(customEndDate);
+          return dayDate >= start && dayDate <= end;
+        });
+      } else if (printOption === 'day' && singleDayDate) {
+        filteredSchedule = studyPlan.schedule.filter((day) => day.date === singleDayDate);
+      } else if (printOption === 'week' && weekStartDate) {
+        const start = parseDateString(weekStartDate);
+        const end = new Date(start);
+        end.setDate(end.getDate() + 6);
+        filteredSchedule = studyPlan.schedule.filter((day) => {
+          const dayDate = parseDateString(day.date);
+          return dayDate >= start && dayDate <= end;
+        });
+      }
+
+      if (!includeCompleted || !includePending) {
+        filteredSchedule = filteredSchedule.map((day) => ({
+          ...day,
+          tasks: day.tasks.filter((task) => {
+            if (!includeCompleted && task.status === 'completed') return false;
+            if (!includePending && task.status === 'pending') return false;
+            return true;
+          }),
+        }));
+      }
+    }
+
+    const printContainer = document.createElement('div');
+    printContainer.className = 'print-only-container';
+    document.body.appendChild(printContainer);
+
+    const root = createRoot(printContainer);
+
+    if (reportType === 'schedule') {
+      root.render(<ScheduleReport studyPlan={studyPlan} schedule={filteredSchedule} />);
+    } else if (reportType === 'progress') {
+      root.render(<ProgressReport studyPlan={studyPlan} />);
+    } else if (reportType === 'content') {
+      root.render(<ContentReport studyPlan={studyPlan} />);
+    }
+
+    // CRITICAL FIX: Defer print to next frame to allow layout to complete
+    requestAnimationFrame(() => {
+      window.print();
+      
+      setTimeout(() => {
+        root.unmount();
+        document.body.removeChild(printContainer);
+      }, 100);
+    });
   };
-  
-  const getWeekStartEnd = (dateStr: string) => {
-    const date = new Date(dateStr + 'T00:00:00Z');
-    const day = date.getUTCDay();
-    const diffStart = date.getUTCDate() - day;
-    const diffEnd = diffStart + 6;
-    const weekStart = new Date(date.setUTCDate(diffStart));
-    const weekEnd = new Date(date.setUTCDate(diffEnd));
-    return {
-      start: weekStart.toISOString().split('T')[0],
-      end: weekEnd.toISOString().split('T')[0],
-    };
-  };
-
-  if (!isOpen) return null;
 
   return (
-    <FocusTrap active={isOpen}>
-      <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-[var(--z-modal)]" role="dialog" aria-modal="true" aria-labelledby="print-modal-title">
-        <div className="modal-panel p-0 w-full max-w-lg text-[var(--text-primary)] flex flex-col">
-          <header className="flex justify-between items-center p-4 border-b border-[var(--separator-primary)]">
-            <h2 id="print-modal-title" className="text-xl font-semibold">Print Options</h2>
-            <Button onClick={onClose} variant="ghost" size="sm" className="!p-1" aria-label="Close">
-              <i className="fas fa-times fa-lg"></i>
-            </Button>
-          </header>
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm">
+      <div className="modal-panel w-full max-w-2xl max-h-[90vh] overflow-y-auto p-6">
+        <h2 className="text-2xl font-bold mb-4">Print Options</h2>
 
-          <div className="p-2 bg-black/20 border-b border-[var(--separator-primary)]">
-            <div className="inline-flex bg-[var(--background-secondary)] p-1 rounded-lg space-x-1 w-full">
-              <button onClick={() => setActiveTab('schedule')} className={`py-1.5 px-4 font-semibold text-sm rounded-md flex-1 transition-colors ${activeTab === 'schedule' ? 'bg-[var(--glass-bg-active)] shadow' : 'hover:bg-white/10'}`}>Schedule</button>
-              <button onClick={() => setActiveTab('progress')} className={`py-1.5 px-4 font-semibold text-sm rounded-md flex-1 transition-colors ${activeTab === 'progress' ? 'bg-[var(--glass-bg-active)] shadow' : 'hover:bg-white/10'}`}>Progress</button>
-              <button onClick={() => setActiveTab('content')} className={`py-1.5 px-4 font-semibold text-sm rounded-md flex-1 transition-colors ${activeTab === 'content' ? 'bg-[var(--glass-bg-active)] shadow' : 'hover:bg-white/10'}`}>Content</button>
+        <div className="space-y-6">
+          {/* Report Type Selection */}
+          <div>
+            <label className="block text-sm font-medium mb-2">Report Type</label>
+            <div className="flex gap-2">
+              <Button
+                variant={reportType === 'schedule' ? 'primary' : 'secondary'}
+                onClick={() => setReportType('schedule')}
+              >
+                Schedule
+              </Button>
+              <Button
+                variant={reportType === 'progress' ? 'primary' : 'secondary'}
+                onClick={() => setReportType('progress')}
+              >
+                Progress
+              </Button>
+              <Button
+                variant={reportType === 'content' ? 'primary' : 'secondary'}
+                onClick={() => setReportType('content')}
+              >
+                Content
+              </Button>
             </div>
           </div>
-          
-          <main className="p-4 space-y-4">
-            {activeTab === 'schedule' && (
-              <div className="space-y-4">
-                <h3 className="font-semibold">Schedule Report Options</h3>
-                <CustomSelect
-                  value={printOptions.schedule.reportType}
-                  onChange={(val) => {
-                    const type = val as PrintOptions['schedule']['reportType'];
-                    const { start, end } = getWeekStartEnd(currentDate);
-                    setPrintOptions(p => ({...p, schedule: {...p.schedule, reportType: type,
-                        startDate: type === 'full' || type === 'range' ? studyPlan.startDate : type === 'currentDay' ? currentDate : start,
-                        endDate: type === 'full' || type === 'range' ? studyPlan.endDate : type === 'currentDay' ? currentDate : end,
-                    }}));
-                  }}
-                  options={[
-                    { value: 'full', label: 'Full Schedule' },
-                    { value: 'range', label: 'Custom Date Range' },
-                    { value: 'currentDay', label: 'Current Day Only' },
-                    { value: 'currentWeek', label: 'Current Week Only' },
-                  ]}
-                />
-                {printOptions.schedule.reportType === 'range' && (
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <label className="text-xs text-[var(--text-secondary)]">Start Date</label>
-                      <input type="date" value={printOptions.schedule.startDate} onChange={e => setPrintOptions(p => ({...p, schedule: {...p.schedule, startDate: e.target.value}}))} className="input-base text-sm"/>
-                    </div>
-                    <div>
-                      <label className="text-xs text-[var(--text-secondary)]">End Date</label>
-                      <input type="date" value={printOptions.schedule.endDate} onChange={e => setPrintOptions(p => ({...p, schedule: {...p.schedule, endDate: e.target.value}}))} className="input-base text-sm"/>
-                    </div>
+
+          {reportType === 'schedule' && (
+            <>
+              <div>
+                <label className="block text-sm font-medium mb-2">Print Range</label>
+                <div className="flex flex-col gap-2">
+                  <Button
+                    variant={printOption === 'full' ? 'primary' : 'secondary'}
+                    onClick={() => setPrintOption('full')}
+                  >
+                    Full Schedule
+                  </Button>
+                  <Button
+                    variant={printOption === 'range' ? 'primary' : 'secondary'}
+                    onClick={() => setPrintOption('range')}
+                  >
+                    Date Range
+                  </Button>
+                  <Button
+                    variant={printOption === 'day' ? 'primary' : 'secondary'}
+                    onClick={() => setPrintOption('day')}
+                  >
+                    Single Day
+                  </Button>
+                  <Button
+                    variant={printOption === 'week' ? 'primary' : 'secondary'}
+                    onClick={() => setPrintOption('week')}
+                  >
+                    Week
+                  </Button>
+                </div>
+              </div>
+
+              {printOption === 'range' && (
+                <div className="flex gap-4">
+                  <div className="flex-1">
+                    <label className="block text-sm font-medium mb-2">Start Date</label>
+                    <input
+                      type="date"
+                      value={customStartDate}
+                      onChange={(e) => setCustomStartDate(e.target.value)}
+                      className="input-base"
+                    />
                   </div>
-                )}
-              </div>
-            )}
-            {activeTab === 'progress' && (
-              <div className="space-y-2">
-                 <h3 className="font-semibold">Progress Report Options</h3>
-                 <p className="text-xs text-[var(--text-secondary)]">This report provides a high-level summary of your completed study time versus the total scheduled time, broken down by topic.</p>
-              </div>
-            )}
-            {activeTab === 'content' && (
-              <div className="space-y-4">
-                <h3 className="font-semibold">Content Report Options</h3>
+                  <div className="flex-1">
+                    <label className="block text-sm font-medium mb-2">End Date</label>
+                    <input
+                      type="date"
+                      value={customEndDate}
+                      onChange={(e) => setCustomEndDate(e.target.value)}
+                      className="input-base"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {printOption === 'day' && (
                 <div>
-                  <label className="text-xs text-[var(--text-secondary)]">Filter by Status</label>
-                  <CustomSelect value={printOptions.content.filter} onChange={v => setPrintOptions(p => ({...p, content: {...p.content, filter: v as any}}))}
-                    options={[
-                      {value: 'all', label: 'All Resources'},
-                      {value: 'scheduled', label: 'Scheduled Only'},
-                      {value: 'unscheduled', label: 'Unscheduled Only'},
-                      {value: 'archived', label: 'Archived Only'},
-                    ]}
+                  <label className="block text-sm font-medium mb-2">Select Date</label>
+                  <input
+                    type="date"
+                    value={singleDayDate}
+                    onChange={(e) => setSingleDayDate(e.target.value)}
+                    className="input-base"
                   />
                 </div>
+              )}
+
+              {printOption === 'week' && (
                 <div>
-                  <label className="text-xs text-[var(--text-secondary)]">Sort By</label>
-                  <CustomSelect value={printOptions.content.sortBy} onChange={v => setPrintOptions(p => ({...p, content: {...p.content, sortBy: v as any}}))}
-                    options={[
-                      {value: 'sequenceOrder', label: 'Default Order'},
-                      {value: 'title', label: 'Title (A-Z)'},
-                      {value: 'domain', label: 'Domain'},
-                      {value: 'durationMinutesAsc', label: 'Duration (Shortest First)'},
-                      {value: 'durationMinutesDesc', label: 'Duration (Longest First)'},
-                    ]}
+                  <label className="block text-sm font-medium mb-2">Week Starting</label>
+                  <input
+                    type="date"
+                    value={weekStartDate}
+                    onChange={(e) => setWeekStartDate(e.target.value)}
+                    className="input-base"
                   />
                 </div>
+              )}
+
+              <div>
+                <label className="block text-sm font-medium mb-2">Include Tasks</label>
+                <div className="flex gap-4">
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={includeCompleted}
+                      onChange={(e) => setIncludeCompleted(e.target.checked)}
+                    />
+                    <span>Completed</span>
+                  </label>
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={includePending}
+                      onChange={(e) => setIncludePending(e.target.checked)}
+                    />
+                    <span>Pending</span>
+                  </label>
+                </div>
               </div>
-            )}
-          </main>
-          
-          <footer className="flex justify-end space-x-3 p-4 border-t border-[var(--separator-primary)]">
-            <Button type="button" onClick={onClose} variant="secondary">Cancel</Button>
-            <Button type="button" onClick={handleGenerate} variant="primary">Generate & Print</Button>
-          </footer>
+            </>
+          )}
+
+          {reportType === 'progress' && (
+            <p className="text-sm text-[var(--text-secondary)]">
+              This report provides a high-level summary of your completed study time versus the total
+              scheduled time, broken down by topic.
+            </p>
+          )}
+
+          {reportType === 'content' && (
+            <p className="text-sm text-[var(--text-secondary)]">
+              This report lists all study materials organized by topic, showing their status and duration.
+            </p>
+          )}
+        </div>
+
+        <div className="flex gap-3 mt-6">
+          <Button variant="primary" onClick={handlePrint}>
+            Print
+          </Button>
+          <Button variant="secondary" onClick={onClose}>
+            Cancel
+          </Button>
         </div>
       </div>
-    </FocusTrap>
+    </div>
   );
 };
+
+// Missing import - add this at the top with other imports
+import { createRoot } from 'react-dom/client';
 
 export default PrintModal;
