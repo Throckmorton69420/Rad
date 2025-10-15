@@ -1,37 +1,51 @@
 import { createClient } from '@supabase/supabase-js';
 
-// FIXED: Safe environment variable access with proper fallbacks
+// Safe env getter (works in Vite prod and local)
 const getEnvVar = (key: string): string | undefined => {
   try {
-    return (import.meta as any)?.env?.[key];
+    const v = (import.meta as any)?.env?.[key];
+    return typeof v === 'string' && v.length ? v : undefined;
   } catch {
-    return undefined;
+    // Non-Vite contexts (SSR/build) won’t have import.meta
+    return (process as any)?.env?.[key];
   }
 };
 
-const supabaseUrl = getEnvVar('VITE_SUPABASE_URL') || process.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = getEnvVar('VITE_SUPABASE_ANON_KEY') || process.env.VITE_SUPABASE_ANON_KEY;
+const SUPABASE_URL = getEnvVar('VITE_SUPABASE_URL');
+const SUPABASE_ANON_KEY = getEnvVar('VITE_SUPABASE_ANON_KEY');
 
-if (!supabaseUrl || !supabaseAnonKey) {
-  console.warn('Supabase configuration missing - app will work in offline mode');
-  
-  // Create a minimal client that doesn't crash the app
-  const mockClient = {
-    from: () => ({
-      select: () => ({ single: () => Promise.resolve({ data: null, error: { code: 'PGRST116' } }) }),
-      upsert: () => Promise.resolve({ error: null })
-    })
+// Single export at top-level so esbuild doesn’t see conditional exports
+export type SupabaseClientLike = {
+  from: (table: string) => {
+    select: (columns?: string) => { single: () => Promise<{ data: any; error: any }> };
+    upsert: (rows: any[]) => Promise<{ error: any }>;
   };
-  
-  export const supabase = mockClient as any;
-} else {
-  export interface Database {
+};
+
+// Minimal mock client used when env vars are missing (prevents crashes)
+const makeMockClient = (): SupabaseClientLike => ({
+  from: () => ({
+    select: () => ({
+      // Simulate “no rows” so app proceeds to generate a plan
+      single: async () => ({ data: null, error: { code: 'PGRST116' } }),
+    }),
+    upsert: async () => ({ error: null }),
+  }),
+});
+
+// Build a real client when env is present
+const buildRealClient = () => {
+  // Local runtime guard: if either is missing, fall back to mock
+  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) return makeMockClient();
+
+  // Define DB types only in the real path (but not via “export” here)
+  interface Database {
     public: {
       Tables: {
         study_plans: {
           Row: {
             id: number;
-            created_at: string;
+            created_at?: string;
             plan_data: any | null;
           };
           Insert: {
@@ -43,20 +57,18 @@ if (!supabaseUrl || !supabaseAnonKey) {
           };
         };
       };
-      Views: {
-        [_ in never]: never;
-      };
-      Functions: {
-        [_ in never]: never;
-      };
-      Enums: {
-        [_ in never]: never;
-      };
-      CompositeTypes: {
-        [_ in never]: never;
-      };
+      Views: { [_ in never]: never };
+      Functions: { [_ in never]: never };
+      Enums: { [_ in never]: never };
+      CompositeTypes: { [_ in never]: never };
     };
   }
 
-  export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey);
-}
+  return createClient<Database>(SUPABASE_URL, SUPABASE_ANON_KEY) as unknown as SupabaseClientLike;
+};
+
+// Decide once at module init; do not use conditional “export”
+const internalClient: SupabaseClientLike =
+  SUPABASE_URL && SUPABASE_ANON_KEY ? buildRealClient() : makeMockClient();
+
+export const supabase = internalClient;
