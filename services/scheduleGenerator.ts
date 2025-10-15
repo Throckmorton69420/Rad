@@ -331,6 +331,75 @@ class Scheduler {
     return kws.some(kw => topic1.includes(kw) && topic2.includes(kw));
   }
 
+  // Place remaining items on days that match their topic; if not possible, only after topic introduced
+  private placeLeftoversWithDomainAlignment(): void {
+    const seenDomains = new Set<Domain>();
+    const firstDayForDomain = new Map<Domain, number>();
+
+    for (let i = 0; i < this.studyDays.length; i++) {
+      const day = this.studyDays[i];
+      for (const t of day.tasks) {
+        if (!seenDomains.has(t.originalTopic)) {
+          seenDomains.add(t.originalTopic);
+          firstDayForDomain.set(t.originalTopic, i);
+        }
+      }
+    }
+
+    const leftovers = [...this.remaining]
+      .map(id => this.allResources.get(id)!)
+      .filter(Boolean);
+
+    for (const res of leftovers) {
+      let placed = false;
+
+      // Attempt 1: place on day that already covers this topic (by domain or title alignment)
+      for (const day of this.studyDays) {
+        const dayDomains = new Set(day.tasks.map(t => t.originalTopic));
+        const aligns = dayDomains.has(res.domain) || this.dayTitleAligns(day, res);
+        if (aligns && this.remainingTime(day) >= res.durationMinutes) {
+          day.tasks.push(this.toTask(res, day.tasks.length));
+          this.remaining.delete(res.id);
+          placed = true;
+          break;
+        }
+      }
+      if (placed) continue;
+
+      // Attempt 2: place only after the topic has been introduced
+      const firstIdx = firstDayForDomain.get(res.domain);
+      if (typeof firstIdx === 'number') {
+        for (let i = firstIdx + 1; i < this.studyDays.length; i++) {
+          const day = this.studyDays[i];
+          if (this.remainingTime(day) >= res.durationMinutes) {
+            day.tasks.push(this.toTask(res, day.tasks.length));
+            this.remaining.delete(res.id);
+            placed = true;
+            break;
+          }
+        }
+      }
+
+      if (!placed) {
+        this.notifications.push({
+          type: 'warning',
+          message: `No aligned slot for "${res.title}" (${res.durationMinutes} min) respecting topic/day rules`
+        });
+      }
+    }
+  }
+
+  // Allow matching by day content titles to align Discord/Core Radiology
+  private dayTitleAligns(day: DailySchedule, res: StudyResource): boolean {
+    if (!day.tasks.length) return false;
+    const rTopic = ((res.title || '') + ' ' + String(res.domain || '')).toLowerCase();
+    for (const t of day.tasks) {
+      const s = ((t.title || '') + ' ' + String(t.originalTopic || '')).toLowerCase();
+      if (this.topicsMatch(s, rTopic)) return true;
+    }
+    return false;
+  }
+
   private tryPlaceWholeBlockOnDay(block: Block, dayIndexStart: number): number | null {
     for (let i = 0; i < this.studyDays.length; i++) {
       const idx = (dayIndexStart + i) % this.studyDays.length;
