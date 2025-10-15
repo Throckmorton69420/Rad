@@ -29,15 +29,14 @@ import ContentReport from './components/ContentReport';
 import { formatDuration, getTodayInNewYork, parseDateString } from './utils/timeFormatter';
 import { addResourceToGlobalPool } from './services/studyResources';
 
-
 // FIX: Define the shape of the content UI filters to be shared between components.
 export interface ContentUiFilters {
-  searchTerm: string;
-  domain: Domain | 'all';
-  type: ResourceType | 'all';
-  source: string | 'all';
-  status: 'all' | 'scheduled' | 'unscheduled';
-  showArchived: boolean;
+    searchTerm: string;
+    domain: Domain | 'all';
+    type: ResourceType | 'all';
+    source: string | 'all';
+    status: 'all' | 'scheduled' | 'unscheduled';
+    showArchived: boolean;
 }
 
 interface SidebarContentProps {
@@ -72,6 +71,7 @@ interface SidebarContentProps {
     loadSchedule: (regenerate?: boolean) => Promise<void>;
     handleMasterResetTasks: () => void;
     handleUpdatePlanDates: (startDate: string, endDate: string) => void;
+    handleGenerateORToolsSchedule: () => void;
 }
 
 // Memoized Sidebar to prevent re-renders from the Pomodoro timer
@@ -82,7 +82,7 @@ const SidebarContent = React.memo(({
     todayInNewYork, handleRebalance, isLoading, handleToggleCramMode, handleUpdateDeadlines,
     isSettingsOpen, setIsSettingsOpen, handleUpdateTopicOrderAndRebalance, handleUpdateCramTopicOrderAndRebalance,
     handleToggleSpecialTopicsInterleaving, handleAddOrUpdateException, handleUndo, previousStudyPlan,
-    showConfirmation, loadSchedule, handleMasterResetTasks, handleUpdatePlanDates
+    showConfirmation, loadSchedule, handleMasterResetTasks, handleUpdatePlanDates, handleGenerateORToolsSchedule
 }: SidebarContentProps) => (
     <aside className={`w-80 text-[var(--text-secondary)] flex flex-col h-dvh isolated-scroll glass-chrome`}>
         <div className="flex-grow flex flex-col min-h-0">
@@ -160,7 +160,14 @@ const SidebarContent = React.memo(({
                     <div>
                         <h2 className="text-lg font-semibold mb-3 border-b border-[var(--separator-primary)] pb-2 text-[var(--text-primary)]">Actions</h2>
                         <div className="space-y-2">
-                            <Button onClick={handleUndo} variant="secondary" className="w-full" disabled={!previousStudyPlan || isLoading}><i className="fas fa-undo mr-2"></i> Undo Last Plan Change</Button>
+                            <Button onClick={handleUndo} variant="secondary" className="w-full" disabled={!previousStudyPlan || isLoading}>
+                                <i className="fas fa-undo mr-2"></i> Undo Last Plan Change
+                            </Button>
+                            
+                            <Button onClick={handleGenerateORToolsSchedule} variant="primary" className="w-full" disabled={isLoading}>
+                                <i className="fas fa-robot mr-2"></i> Generate Optimized Schedule
+                            </Button>
+                            
                             <Button onClick={() => showConfirmation({
                                 title: "Regenerate Full Schedule?",
                                 message: "This will erase your entire schedule and all progress, creating a new plan from scratch using the current resource pool. This action cannot be undone.",
@@ -186,7 +193,6 @@ const SidebarContent = React.memo(({
         </div>
     </aside>
 ));
-
 
 const App: React.FC = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -215,6 +221,7 @@ const App: React.FC = () => {
     handleToggleRestDay,
     handleAddOrUpdateException,
     handleUpdateDeadlines,
+    handleGenerateORToolsSchedule,
   } = useStudyPlanManager(showConfirmation);
 
   const todayInNewYork = useMemo(() => getTodayInNewYork(), []);
@@ -336,7 +343,6 @@ const App: React.FC = () => {
     });
     setHighlightedDates([]);
   }, [setSelectedDate, setHighlightedDates, studyPlan]);
-
 
   const handleUpdateTimeForDay = useCallback((newTotalMinutes: number) => {
     const newRule: ExceptionDateRule = {
@@ -587,7 +593,6 @@ const App: React.FC = () => {
         else if (statusFilter === 'archived') { resourcesToPrint = resourcesToPrint.filter(r => r.isArchived); title = "Archived Resources"; }
         else { resourcesToPrint = resourcesToPrint.filter(r => !r.isArchived); title = "All Active Resources"; }
 
-
         resourcesToPrint.sort((a, b) => {
           switch (sortBy) {
             case 'title': return a.title.localeCompare(b.title);
@@ -604,7 +609,6 @@ const App: React.FC = () => {
 
     setPrintableContent(reportComponent);
   }, [studyPlan, globalMasterResourcePool, scheduledResourceIds, selectedDate, contentUiFilters]);
-
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -624,7 +628,6 @@ const App: React.FC = () => {
   const selectedDaySchedule = studyPlan ? studyPlan.schedule.find(day => day.date === selectedDate) : null;
   const currentPomodoroTask = currentPomodoroTaskId && studyPlan ? studyPlan.schedule.flatMap(d => d.tasks).find(t => t.id === currentPomodoroTaskId) : null;
   
-
   if (isLoading && !studyPlan) {
     return <div className="flex flex-col items-center justify-center min-h-screen bg-black text-white p-4"><i className="fas fa-brain fa-spin fa-3x mb-6 text-[var(--accent-purple)]"></i><h1 className="text-3xl font-bold mb-3">{APP_TITLE}</h1><p className="text-lg mb-6">Connecting to the cloud...</p></div>;
   }
@@ -645,6 +648,7 @@ const App: React.FC = () => {
                 handleUpdateCramTopicOrderAndRebalance={handleUpdateCramTopicOrderAndRebalance} handleToggleSpecialTopicsInterleaving={handleToggleSpecialTopicsInterleaving}
                 handleAddOrUpdateException={handleAddOrUpdateException} handleUndo={handleUndo} previousStudyPlan={previousStudyPlan} showConfirmation={showConfirmation}
                 loadSchedule={loadSchedule} handleMasterResetTasks={handleMasterResetTasks} handleUpdatePlanDates={handleUpdatePlanDates}
+                handleGenerateORToolsSchedule={handleGenerateORToolsSchedule}
             />
         </div>
         <div className={`lg:hidden fixed inset-0 bg-black/60 z-[var(--z-sidebar-mobile-backdrop)] transition-opacity ${isSidebarOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`} onClick={() => setIsSidebarOpen(false)} aria-hidden="true"></div>
@@ -658,6 +662,7 @@ const App: React.FC = () => {
                 handleUpdateCramTopicOrderAndRebalance={handleUpdateCramTopicOrderAndRebalance} handleToggleSpecialTopicsInterleaving={handleToggleSpecialTopicsInterleaving}
                 handleAddOrUpdateException={handleAddOrUpdateException} handleUndo={handleUndo} previousStudyPlan={previousStudyPlan} showConfirmation={showConfirmation}
                 loadSchedule={loadSchedule} handleMasterResetTasks={handleMasterResetTasks} handleUpdatePlanDates={handleUpdatePlanDates}
+                handleGenerateORToolsSchedule={handleGenerateORToolsSchedule}
             />
         </div>
 
