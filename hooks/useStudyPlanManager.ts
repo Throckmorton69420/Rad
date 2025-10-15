@@ -6,8 +6,17 @@ import { supabase } from '../services/supabaseClient';
 import { DEFAULT_TOPIC_ORDER, STUDY_END_DATE, STUDY_START_DATE } from '../constants';
 import { getTodayInNewYork } from '../utils/timeFormatter';
 
-// OR-Tools Service Integration - FIXED environment variable access
+// OR-Tools Service Integration
 const OR_TOOLS_SERVICE_URL = 'http://localhost:8001';
+
+// Check if running in development (localhost) vs production (vercel)
+const isLocalDevelopment = () => {
+  try {
+    return window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+  } catch {
+    return false;
+  }
+};
 
 interface ORToolsScheduleRequest {
     startDate: string;
@@ -163,8 +172,8 @@ export const useStudyPlanManager = (showConfirmation: (options: ShowConfirmation
     const [isNewUser, setIsNewUser] = useState(false);
     const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
     
-    // FIXED: Safe environment variable access - defaults to false on production
-    const [useORTools, setUseORTools] = useState<boolean>(false);
+    // Enable OR-Tools by default for local development, disabled for production
+    const [useORTools, setUseORTools] = useState<boolean>(isLocalDevelopment());
     
     const isInitialLoadRef = useRef(true);
     const debounceTimerRef = useRef<number | null>(null);
@@ -391,6 +400,17 @@ export const useStudyPlanManager = (showConfirmation: (options: ShowConfirmation
     const handleGenerateORToolsSchedule = useCallback(async () => {
         if (!studyPlan) return;
         
+        // If not in local development, show a message that OR-Tools is not available
+        if (!useORTools) {
+            setSystemNotification({
+                type: 'info',
+                message: 'OR-Tools optimization is only available in local development. Using standard algorithm instead.'
+            });
+            // Fall back to regenerating with standard algorithm
+            setTimeout(() => loadSchedule(true), 1000);
+            return;
+        }
+        
         showConfirmation({
             title: "Generate Optimized Schedule?",
             message: "This will create a new schedule using advanced OR-Tools constraint solving. Your progress will be preserved but the schedule structure will be optimized for your exact requirements.",
@@ -444,14 +464,16 @@ export const useStudyPlanManager = (showConfirmation: (options: ShowConfirmation
                     console.error('OR-Tools optimization failed:', error);
                     setSystemNotification({ 
                         type: 'error', 
-                        message: `Optimization failed: ${error.message}. Please try again or use standard scheduling.` 
+                        message: `Optimization failed: ${error.message}. Using standard algorithm instead.` 
                     });
+                    // Fall back to standard regeneration
+                    setTimeout(() => loadSchedule(true), 1000);
                 } finally {
                     setIsLoading(false);
                 }
             }
         });
-    }, [studyPlan, globalMasterResourcePool, showConfirmation]);
+    }, [studyPlan, globalMasterResourcePool, showConfirmation, useORTools, loadSchedule]);
 
     const handleAddOrUpdateException = useCallback((newRule: ExceptionDateRule) => {
         if (!studyPlan) return;
