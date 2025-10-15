@@ -1,3 +1,13 @@
+
+/**
+ * Formats a Date object as 'YYYY-MM-DD' in UTC (no timezone shifts).
+ */
+export const isoDate = (d: Date): string => {
+  const y = d.getUTCFullYear();
+  const m = String(d.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(d.getUTCDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+};
 // utils/timeFormatter.ts
 // FIX: Corrected import path for types.
 import { Domain } from '../types';

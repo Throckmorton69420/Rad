@@ -17,25 +17,46 @@ type DragState = { fromId: string | null };
 const normalizeSource = (t: ScheduledTask) =>
   (t.bookSource || t.videoSource || 'Custom Task').trim();
 
-// Your preferred source order
+// Map various source labels to canonical keys (case-insensitive)
+const canonicalKey = (label: string): string => {
+  const s = (label || '').trim();
+  const lower = s.toLowerCase();
+  if (lower.includes('titan')) return 'Titan Radiology';
+  if (lower.includes('crack the core')) return 'Crack the Core';
+  if (lower.includes('case companion')) return 'Case Companion';
+  if (lower.includes('qevlar')) return 'QEVLAR';
+  // Huda cluster
+  if (lower.includes('huda physics qb') || lower.includes('gbank')) return 'Huda Physics QB';
+  if (lower.includes('review of physics') || lower === 'huda text' || lower.includes('huda')) return 'Huda';
+  // Nuclear cluster sources
+  if (lower.includes('nuc') || lower.includes('war machine') || lower.includes('nuclear')) return 'Nuclear';
+  if (lower.includes('nis') || lower.includes('risc')) return 'NIS / RISC';
+  if (lower.includes('board vitals')) return 'Board Vitals';
+  if (lower.includes('radprimer')) return 'RadPrimer';
+  if (lower.includes('discord')) return 'Discord';
+  if (lower.includes('core radiology')) return 'Core Radiology';
+  return s; // fallback to original label
+};
+
+// Preferred group order (lower rank = earlier)
 const SOURCE_RANK: Record<string, number> = {
   'Titan Radiology': 1,
   'Crack the Core': 2,
   'Case Companion': 3,
-  'Core Radiology': 4,
-  'Board Vitals': 5,
-  'Huda Text': 6,
-  'Huda Gbank': 7,
-  'Qevlar': 8,
-  'Nuclear Medicine': 9,
-  'Discord': 10,
-  'NIS / RISC': 11,
-  'RadPrimer': 12,
-  'Other': 999,
-  'Custom Task': 1000,
+  'QEVLAR': 4,
+  'Huda': 5,               // lectures/general Huda material
+  'Huda Physics QB': 6,     // QBank & textbooks
+  'Nuclear': 7,             // Nucs content + Nucs App + War Machine
+  'NIS / RISC': 8,
+  'Board Vitals': 9,
+  'RadPrimer': 10,
+  'Discord': 11,
+  'Core Radiology': 12,
+  'Other': 998,
+  'Custom Task': 999,
 };
 
-const getSourceRank = (sourceName: string) => SOURCE_RANK[sourceName] ?? 998;
+const getSourceRank = (sourceName: string) => SOURCE_RANK[canonicalKey(sourceName)] ?? 997;
 
 const DailyTaskList: React.FC<DailyTaskListProps> = ({
   day,
