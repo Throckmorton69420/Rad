@@ -15,7 +15,7 @@ const ScheduleReport: React.FC<ScheduleReportProps> = ({ studyPlan, schedule }) 
   return (
     <div className="p-4 md:p-8 font-sans text-black bg-white printable-report">
       <header className="mb-8 text-center border-b border-gray-300 pb-4">
-        <div className="flex justify-between items-end print-header-footer">
+        <div className="flex justify-between items-end">
           <span className="text-xs text-gray-500">Radiology Core Exam Study Planner</span>
           <span className="text-xs text-gray-500">{new Date().toLocaleString()}</span>
         </div>
@@ -73,7 +73,7 @@ const ScheduleReport: React.FC<ScheduleReportProps> = ({ studyPlan, schedule }) 
             )
         )}
       </main>
-      <footer className="mt-8 pt-4 border-t border-gray-300 text-center text-xs text-gray-500 print-header-footer">
+      <footer className="mt-8 pt-4 border-t border-gray-300 text-center text-xs text-gray-500">
         End of Report
       </footer>
     </div>
