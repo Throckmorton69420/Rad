@@ -1,440 +1,189 @@
-import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
-import { StudyPlan, RebalanceOptions, ExceptionDateRule, StudyResource, ScheduledTask, GeneratedStudyPlanOutcome, Domain, ResourceType, PlanDataBlob, DeadlineSettings, ShowConfirmationOptions } from '../types';
-import { generateInitialSchedule, rebalanceSchedule } from '../services/scheduleGenerator';
-import { masterResourcePool as initialMasterResourcePool } from '../services/studyResources';
-import { supabase } from '../services/supabaseClient';
-import { DEFAULT_TOPIC_ORDER, STUDY_END_DATE, STUDY_START_DATE } from '../constants';
-import { getTodayInNewYork } from '../utils/timeFormatter';
+// In your Vercel app - update the schedule generation function
 
+async function generateSchedule() {
+    try {
+        showLoading();
+        
+        // Get form data
+        const startDate = document.getElementById('startDate').value;
+        const endDate = document.getElementById('endDate').value;
+        const includeOptional = document.getElementById('includeOptional')?.checked ?? true;
+        
+        // Call your local OR-Tools service
+        const response = await fetch('http://localhost:8001/generate-schedule', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                startDate: startDate,
+                endDate: endDate,
+                includeOptional: includeOptional,
+                dailyStudyMinutes: 840 // 14 hours
+            })
+        });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const scheduleData = await response.json();
+        displaySchedule(scheduleData);
+        hideLoading();
+        
+    } catch (error) {
+        console.error('Error generating schedule:', error);
+        hideLoading();
+        alert('Error generating schedule: ' + error.message);
+    }
+}
 
-export const useStudyPlanManager = (showConfirmation: (options: ShowConfirmationOptions) => void) => {
-    const [studyPlan, setStudyPlan] = useState<StudyPlan | null>(null);
-    const [previousStudyPlan, setPreviousStudyPlan] = useState<StudyPlan | null>(null);
-    const [globalMasterResourcePool, setGlobalMasterResourcePool] = useState<StudyResource[]>(initialMasterResourcePool);
-    const [userExceptions, setUserExceptions] = useState<ExceptionDateRule[]>([]);
-    const [isLoading, setIsLoading] = useState<boolean>(true);
-    const [systemNotification, setSystemNotification] = useState<{ type: 'error' | 'warning' | 'info', message: string } | null>(null);
-    const [isNewUser, setIsNewUser] = useState(false);
-    const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+function displaySchedule(data) {
+    const { schedule, summary } = data;
     
-    const isInitialLoadRef = useRef(true);
-    const debounceTimerRef = useRef<number | null>(null);
-
-    const planStateRef = useRef({ studyPlan, userExceptions, globalMasterResourcePool });
-    useEffect(() => {
-        planStateRef.current = { studyPlan, userExceptions, globalMasterResourcePool };
-    }, [studyPlan, userExceptions, globalMasterResourcePool]);
-
-    const loadSchedule = useCallback(async (regenerate = false) => {
-        setIsLoading(true);
-        setSystemNotification(null);
-        isInitialLoadRef.current = true;
-
-        try {
-            if (!regenerate) {
-                const { data, error } = await supabase
-                    .from('study_plans')
-                    .select('plan_data')
-                    .eq('id', 1)
-                    .single();
-
-                if (error && error.code !== 'PGRST116') { // PGRST116 is "No rows found"
-                    throw new Error(error.message);
-                }
+    // Clear previous results
+    const resultsContainer = document.getElementById('results');
+    resultsContainer.innerHTML = '';
+    
+    // Display summary
+    const summaryDiv = document.createElement('div');
+    summaryDiv.className = 'summary';
+    summaryDiv.innerHTML = `
+        <h2>Study Schedule Summary</h2>
+        <div class="summary-stats">
+            <div class="stat">
+                <span class="stat-number">${summary.total_days}</span>
+                <span class="stat-label">Total Days</span>
+            </div>
+            <div class="stat">
+                <span class="stat-number">${summary.total_resources}</span>
+                <span class="stat-label">Total Resources</span>
+            </div>
+            <div class="stat">
+                <span class="stat-number">${summary.total_study_hours}h</span>
+                <span class="stat-label">Total Study Hours</span>
+            </div>
+            <div class="stat">
+                <span class="stat-number">${summary.average_daily_hours}h</span>
+                <span class="stat-label">Avg Daily Hours</span>
+            </div>
+        </div>
+    `;
+    resultsContainer.appendChild(summaryDiv);
+    
+    // Display daily schedule
+    const scheduleDiv = document.createElement('div');
+    scheduleDiv.className = 'daily-schedule';
+    
+    schedule.forEach(day => {
+        const dayDiv = document.createElement('div');
+        dayDiv.className = 'day-card';
+        
+        const dayHeader = document.createElement('div');
+        dayHeader.className = 'day-header';
+        dayHeader.innerHTML = `
+            <h3>${formatDate(day.date)}</h3>
+            <div class="day-stats">
+                <span class="total-time">${day.total_hours}h</span>
+                <span class="resource-count">${day.resources.length} resources</span>
+            </div>
+        `;
+        dayDiv.appendChild(dayHeader);
+        
+        // Group resources by category
+        const resourcesByCategory = {};
+        day.resources.forEach(resource => {
+            const category = resource.category || 'OTHER';
+            if (!resourcesByCategory[category]) {
+                resourcesByCategory[category] = [];
+            }
+            resourcesByCategory[category].push(resource);
+        });
+        
+        // Display resources by priority category
+        const categoryOrder = [
+            'TITAN_VIDEO_GROUP', 'HUDA_PHYSICS_GROUP', 'TITAN_NUCS_GROUP',
+            'NIS_RISC_GROUP', 'BOARD_VITALS_GROUP', 'TITAN_PHYSICS_GROUP',
+            'RAD_DISCORD_GROUP', 'CORE_RADIOLOGY_GROUP'
+        ];
+        
+        categoryOrder.forEach(category => {
+            if (resourcesByCategory[category]) {
+                const categoryDiv = document.createElement('div');
+                categoryDiv.className = `category-section ${category.toLowerCase()}`;
+                categoryDiv.innerHTML = `<h4>${getCategoryDisplayName(category)}</h4>`;
                 
-                const loadedData = data ? (data as any).plan_data as PlanDataBlob | null : null;
+                const resourcesList = document.createElement('ul');
+                resourcesList.className = 'resources-list';
                 
-                if (loadedData && loadedData.plan && Array.isArray(loadedData.plan.schedule)) {
-                    const freshCodePool = initialMasterResourcePool;
-                    const dbResources = loadedData.resources || [];
-                    
-                    const archivedIds = new Set<string>();
-                    const customResources: StudyResource[] = [];
-
-                    dbResources.forEach((res: StudyResource) => {
-                        if (res.isArchived) {
-                            archivedIds.add(res.id);
-                        }
-                        if (res.id.startsWith('custom_')) {
-                            customResources.push(res);
-                        }
-                    });
-
-                    let reconciledPool = freshCodePool.map(codeRes => ({
-                        ...codeRes,
-                        isArchived: archivedIds.has(codeRes.id),
-                    }));
-                    
-                    reconciledPool.push(...customResources);
-
-                    const loadedPlan = loadedData.plan;
-                    if (!loadedPlan.topicOrder) loadedPlan.topicOrder = DEFAULT_TOPIC_ORDER;
-                    if (!loadedPlan.cramTopicOrder) loadedPlan.cramTopicOrder = DEFAULT_TOPIC_ORDER;
-                    if (!loadedPlan.deadlines) loadedPlan.deadlines = {};
-                    if (loadedPlan.areSpecialTopicsInterleaved === undefined) {
-                        loadedPlan.areSpecialTopicsInterleaved = true;
-                    }
-                     if (!loadedPlan.startDate) loadedPlan.startDate = STUDY_START_DATE;
-                    if (!loadedPlan.endDate) loadedPlan.endDate = STUDY_END_DATE;
-                    
-                    setStudyPlan(loadedPlan);
-                    setGlobalMasterResourcePool(reconciledPool);
-                    setUserExceptions(loadedData.exceptions || []);
-                    
-                    setIsNewUser(false);
-                    setSystemNotification({ type: 'info', message: 'Welcome back! Your plan has been restored.' });
-                    setTimeout(() => setSystemNotification(null), 3000);
-                    setSaveStatus('saved');
-                    setTimeout(() => setSaveStatus('idle'), 2000);
-                    setIsLoading(false);
-                    isInitialLoadRef.current = false;
-                    return;
-                }
-            }
-
-            const poolForGeneration = regenerate ? initialMasterResourcePool.map(r => ({...r})) : planStateRef.current.globalMasterResourcePool.map(r => ({...r}));
-            const exceptionsForGeneration = regenerate ? [] : planStateRef.current.userExceptions;
-            if (regenerate) {
-                setUserExceptions([]);
-                setGlobalMasterResourcePool(initialMasterResourcePool); 
-            }
-            
-            const generationStartDate = regenerate ? getTodayInNewYork() : STUDY_START_DATE;
-            const currentTopicOrder = planStateRef.current.studyPlan?.topicOrder || DEFAULT_TOPIC_ORDER;
-            const areTopicsInterleaved = planStateRef.current.studyPlan?.areSpecialTopicsInterleaved ?? true;
-            const defaultDeadlines: DeadlineSettings = {
-                allContent: '2025-11-05',
-            };
-            const outcome: GeneratedStudyPlanOutcome = generateInitialSchedule(poolForGeneration, exceptionsForGeneration, currentTopicOrder, defaultDeadlines, generationStartDate, STUDY_END_DATE, areTopicsInterleaved);
-
-            setStudyPlan(outcome.plan);
-            setPreviousStudyPlan(null);
-
-            if (outcome.notifications && outcome.notifications.length > 0) {
-                setSystemNotification(outcome.notifications[0]);
-            } else {
-                setSystemNotification({ type: 'info', message: regenerate ? 'The study plan has been regenerated!' : 'A new study plan has been generated for you!' });
-            }
-            
-            setIsNewUser(!regenerate);
-
-        } catch (err: any) {
-            console.error("Error loading/generating data:", err);
-            setSystemNotification({ type: 'error', message: err.message || "Failed to load or generate data." });
-            setStudyPlan(null);
-        } finally {
-            setIsLoading(false);
-            isInitialLoadRef.current = false;
-        }
-    }, []);
-
-    useEffect(() => {
-        if (isInitialLoadRef.current || isLoading) return;
-        
-        if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
-        setSaveStatus('saving');
-
-        debounceTimerRef.current = window.setTimeout(async () => {
-            if (!studyPlan) return;
-            const stateToSave: PlanDataBlob = {
-                plan: studyPlan,
-                resources: globalMasterResourcePool,
-                exceptions: userExceptions,
-            };
-            const { error } = await supabase.from('study_plans').upsert([{ id: 1, plan_data: stateToSave }] as any);
-            if (error) {
-                console.error("Supabase save error:", error);
-                setSystemNotification({ type: 'error', message: "Failed to save progress to the cloud." });
-                setSaveStatus('error');
-            } else {
-                setSaveStatus('saved');
-                setTimeout(() => setSaveStatus('idle'), 2000);
-            }
-        }, 1500);
-
-        return () => { if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current); };
-    }, [studyPlan, globalMasterResourcePool, userExceptions, isLoading]);
-
-
-    const updatePreviousStudyPlan = (currentPlan: StudyPlan | null) => {
-        if (currentPlan) setPreviousStudyPlan(JSON.parse(JSON.stringify(currentPlan)));
-    };
-
-    const triggerRebalance = (plan: StudyPlan, options: RebalanceOptions) => {
-        setIsLoading(true);
-        setSystemNotification({ type: 'info', message: 'Rebalancing schedule... This will preserve past completed work.' });
-        
-        setTimeout(() => {
-            try {
-                // Use a deep copy of the pool to prevent mutations from affecting the global state
-                const poolForRebalance = globalMasterResourcePool.map(r => ({...r}));
-                const outcome = rebalanceSchedule(plan, options, userExceptions, poolForRebalance);
-                setStudyPlan(outcome.plan);
-
-                if (outcome.notifications && outcome.notifications.length > 0) {
-                     setSystemNotification(outcome.notifications[0]);
-                } else {
-                    setSystemNotification({ type: 'info', message: 'Rebalance complete!' });
-                    setTimeout(() => setSystemNotification(null), 3000);
-                }
-            } catch (err) {
-                const error = err as any;
-                console.error("Error during rebalance:", error);
-                setSystemNotification({ type: 'error', message: error.message || "Failed to rebalance." });
-            } finally {
-                setIsLoading(false);
-            }
-        }, 50);
-    };
-
-    const handleRebalance = (options: RebalanceOptions, planToUse?: StudyPlan) => {
-        const planForRebalance = planToUse || studyPlan;
-        if (!planForRebalance) return;
-        updatePreviousStudyPlan(planForRebalance);
-        triggerRebalance(planForRebalance, options);
-    };
-
-    const handleAddOrUpdateException = useCallback((newRule: ExceptionDateRule) => {
-        if (!studyPlan) return;
-        updatePreviousStudyPlan(studyPlan);
-
-        const newExceptions = [...userExceptions.filter(r => r.date !== newRule.date), newRule];
-        setUserExceptions(newExceptions);
-
-        setIsLoading(true);
-        setSystemNotification({ type: 'info', message: 'Adding exception and rebalancing...' });
-        
-        setTimeout(() => {
-            try {
-                const poolForRebalance = globalMasterResourcePool.map(r => ({...r}));
-                const outcome = rebalanceSchedule(studyPlan, { type: 'standard' }, newExceptions, poolForRebalance);
-                setStudyPlan(outcome.plan);
-                setSystemNotification({ type: 'info', message: 'Schedule updated with exception!' });
-                setTimeout(() => setSystemNotification(null), 3000);
-            } catch (err: any) {
-                console.error("Error during exception rebalance:", err);
-                setSystemNotification({ type: 'error', message: err.message || "Failed to update schedule." });
-            } finally {
-                setIsLoading(false);
-            }
-        }, 50);
-    }, [studyPlan, userExceptions, globalMasterResourcePool]);
-
-    const handleToggleRestDay = useCallback((date: string, isCurrentlyRestDay: boolean) => {
-        if (!studyPlan) return;
-        updatePreviousStudyPlan(studyPlan);
-    
-        const newExceptions = [...userExceptions];
-        const existingExceptionIndex = newExceptions.findIndex(ex => ex.date === date);
-    
-        if (isCurrentlyRestDay) {
-            // Make it a study day by removing the exception
-            if (existingExceptionIndex > -1) {
-                newExceptions.splice(existingExceptionIndex, 1);
-            }
-        } else {
-            // Make it a rest day by adding/updating an exception
-            const newException: ExceptionDateRule = {
-                date: date,
-                dayType: 'specific-rest',
-                isRestDayOverride: true,
-                targetMinutes: 0,
-            };
-            if (existingExceptionIndex > -1) {
-                newExceptions[existingExceptionIndex] = newException;
-            } else {
-                newExceptions.push(newException);
-            }
-        }
-        
-        setUserExceptions(newExceptions);
-    
-        setIsLoading(true);
-        setSystemNotification({ type: 'info', message: 'Updating day status and rebalancing...' });
-        
-        setTimeout(() => {
-            try {
-                const poolForRebalance = globalMasterResourcePool.map(r => ({...r}));
-                const outcome = rebalanceSchedule(studyPlan, { type: 'standard' }, newExceptions, poolForRebalance);
-                setStudyPlan(outcome.plan);
-                setSystemNotification({ type: 'info', message: 'Schedule updated successfully!' });
-                setTimeout(() => setSystemNotification(null), 3000);
-            } catch (err: any) {
-                console.error("Error during day toggle rebalance:", err);
-                setSystemNotification({ type: 'error', message: err.message || "Failed to update schedule." });
-            } finally {
-                setIsLoading(false);
-            }
-        }, 50);
-    }, [studyPlan, userExceptions, globalMasterResourcePool]);
-
-    const handleUpdatePlanDates = useCallback((newStartDate: string, newEndDate: string) => {
-        showConfirmation({
-            title: "Regenerate Entire Schedule?",
-            message: "Changing the study dates will erase all current progress and regenerate the plan from scratch using the current resource pool. Are you sure you want to continue?",
-            confirmText: "Yes, Regenerate",
-            confirmVariant: 'danger',
-            onConfirm: () => {
-                setIsLoading(true);
-                setSystemNotification({ type: 'info', message: 'Regenerating schedule with new dates...' });
-                setTimeout(() => {
-                    const outcome = generateInitialSchedule(
-                        globalMasterResourcePool.map(r => ({...r})),
-                        userExceptions,
-                        studyPlan?.topicOrder,
-                        studyPlan?.deadlines,
-                        newStartDate,
-                        newEndDate,
-                        studyPlan?.areSpecialTopicsInterleaved
-                    );
-                    setStudyPlan(outcome.plan);
-                    setPreviousStudyPlan(null);
-                    if (outcome.notifications && outcome.notifications.length > 0) {
-                        setSystemNotification(outcome.notifications[0]);
-                    } else {
-                         setSystemNotification({ type: 'info', message: `Plan regenerated for ${newStartDate} to ${newEndDate}.` });
-                    }
-                    setIsLoading(false);
-                }, 50);
+                resourcesByCategory[category].forEach(resource => {
+                    const resourceItem = document.createElement('li');
+                    resourceItem.className = 'resource-item';
+                    resourceItem.innerHTML = `
+                        <div class="resource-title">${resource.title}</div>
+                        <div class="resource-meta">
+                            <span class="duration">${resource.duration_minutes} min</span>
+                            <span class="domain">${resource.domain}</span>
+                            <span class="type">${resource.type}</span>
+                        </div>
+                    `;
+                    resourcesList.appendChild(resourceItem);
+                });
+                
+                categoryDiv.appendChild(resourcesList);
+                dayDiv.appendChild(categoryDiv);
             }
         });
-    }, [showConfirmation, globalMasterResourcePool, userExceptions, studyPlan]);
-    
-
-    const handleUpdateTopicOrderAndRebalance = (newOrder: Domain[]) => {
-        if (!studyPlan) return;
-        updatePreviousStudyPlan(studyPlan);
-        const updatedPlan = { ...studyPlan, topicOrder: newOrder };
-        setStudyPlan(updatedPlan);
-        triggerRebalance(updatedPlan, { type: 'standard' });
-    };
-    
-    const handleUpdateCramTopicOrderAndRebalance = (newOrder: Domain[]) => {
-        if (!studyPlan) return;
-        updatePreviousStudyPlan(studyPlan);
-        const updatedPlan = { ...studyPlan, cramTopicOrder: newOrder };
-        setStudyPlan(updatedPlan);
-        triggerRebalance(updatedPlan, { type: 'standard' });
-    };
-
-    const handleToggleCramMode = (isActive: boolean) => {
-        if (!studyPlan || isLoading) return;
-        updatePreviousStudyPlan(studyPlan);
-        const updatedPlan = { ...studyPlan, isCramModeActive: isActive };
-        setStudyPlan(updatedPlan); 
-        triggerRebalance(updatedPlan, { type: 'standard' });
-        setSystemNotification({ type: 'info', message: `Cram mode ${isActive ? 'activated' : 'deactivated'}. Rebalancing schedule.` });
-    };
-
-    const handleToggleSpecialTopicsInterleaving = (isActive: boolean) => {
-        if (!studyPlan || isLoading) return;
-        updatePreviousStudyPlan(studyPlan);
-        const updatedPlan = { ...studyPlan, areSpecialTopicsInterleaved: isActive };
-        setStudyPlan(updatedPlan);
-        triggerRebalance(updatedPlan, { type: 'standard' });
-        setSystemNotification({ type: 'info', message: `Interleaving is now ${isActive ? 'ON' : 'OFF'}. Rebalancing...` });
-    };
-
-    // FIX: Add function to handle deadline updates and rebalance.
-    const handleUpdateDeadlines = (newDeadlines: DeadlineSettings) => {
-        if (!studyPlan) return;
-        updatePreviousStudyPlan(studyPlan);
-        const updatedPlan = { ...studyPlan, deadlines: newDeadlines };
-        setStudyPlan(updatedPlan);
-        triggerRebalance(updatedPlan, { type: 'standard' });
-        setSystemNotification({ type: 'info', message: `Deadlines updated. Rebalancing schedule.` });
-    };
-
-    const handleTaskToggle = (taskId: string, selectedDate: string) => {
-        setStudyPlan((prevPlan): StudyPlan | null => {
-            if (!prevPlan) return null;
-            updatePreviousStudyPlan(prevPlan);
-            const newSchedule = prevPlan.schedule.map(day => {
-                if (day.date === selectedDate) {
-                    const newTasks = day.tasks.map(task => {
-                        if (task.id !== taskId) {
-                            return task;
-                        }
-                        const newStatus: 'pending' | 'completed' = task.status === 'completed' ? 'pending' : 'completed';
-                        return { ...task, status: newStatus };
-                    });
-                    return { ...day, tasks: newTasks };
-                }
-                return day;
-            });
-            const updatedPlan = { ...prevPlan, schedule: newSchedule };
-            const newProgressPerDomain = { ...prevPlan.progressPerDomain };
-            Object.keys(newProgressPerDomain).forEach(domainKey => {
-                const domain = domainKey as Domain;
-                if (newProgressPerDomain[domain]) {
-                    newProgressPerDomain[domain]!.completedMinutes = newSchedule.reduce((sum, day) => sum + day.tasks.reduce((taskSum, task) => (task.originalTopic === domain && task.status === 'completed') ? taskSum + task.durationMinutes : taskSum, 0), 0);
-                }
-            });
-            return { ...updatedPlan, progressPerDomain: newProgressPerDomain };
-        });
-    };
-    
-    const handleSaveModifiedDayTasks = (updatedTasks: ScheduledTask[], selectedDate: string) => {
-        if (!studyPlan) return;
-        updatePreviousStudyPlan(studyPlan);
-        const reorderedTasks = updatedTasks.map((task, index) => ({ ...task, order: index }));
         
-        const newTotalTime = reorderedTasks.reduce((sum, t) => sum + t.durationMinutes, 0);
-
-        const newSchedule = studyPlan.schedule.map(day => {
-            if (day.date === selectedDate) {
-                return {
-                    ...day,
-                    tasks: reorderedTasks,
-                    totalStudyTimeMinutes: newTotalTime,
-                    isRestDay: reorderedTasks.length === 0,
-                    isManuallyModified: true,
-                };
-            }
-            return day;
-        });
-        const updatedPlan = { ...studyPlan, schedule: newSchedule };
-        setStudyPlan(updatedPlan);
-        triggerRebalance(updatedPlan, { type: 'standard' });
-        setSystemNotification({ type: 'info', message: `Tasks for ${selectedDate} updated. Rebalancing future days.` });
-    };
-
-    const handleUndo = () => {
-        if (previousStudyPlan) {
-            setStudyPlan(JSON.parse(JSON.stringify(previousStudyPlan)));
-            setPreviousStudyPlan(null);
-            setSystemNotification(null);
+        // Add Board Vitals suggestions
+        if (day.board_vitals_suggestions) {
+            const bvDiv = document.createElement('div');
+            bvDiv.className = 'board-vitals-suggestions';
+            bvDiv.innerHTML = `
+                <h5>Board Vitals Mixed Review</h5>
+                <p><strong>${day.board_vitals_suggestions.suggested_questions} questions</strong></p>
+                <p>Topics: ${day.board_vitals_suggestions.covered_topics.join(', ')}</p>
+                <p class="note">${day.board_vitals_suggestions.note}</p>
+            `;
+            dayDiv.appendChild(bvDiv);
         }
-    };
+        
+        scheduleDiv.appendChild(dayDiv);
+    });
+    
+    resultsContainer.appendChild(scheduleDiv);
+}
 
-    return {
-        studyPlan,
-        setStudyPlan,
-        previousStudyPlan,
-        globalMasterResourcePool,
-        setGlobalMasterResourcePool,
-        userExceptions,
-        isLoading,
-        systemNotification,
-        setSystemNotification,
-        isNewUser,
-        // FIX: Export setIsNewUser to be used by the WelcomeModal.
-        setIsNewUser,
-        loadSchedule,
-        handleRebalance,
-        handleUpdatePlanDates,
-        handleUpdateTopicOrderAndRebalance,
-        handleUpdateCramTopicOrderAndRebalance,
-        handleToggleCramMode,
-        handleToggleSpecialTopicsInterleaving,
-        handleTaskToggle,
-        handleSaveModifiedDayTasks,
-        handleUndo,
-        updatePreviousStudyPlan,
-        saveStatus,
-        handleToggleRestDay,
-        handleAddOrUpdateException,
-        // FIX: Export the new handler.
-        handleUpdateDeadlines,
+function getCategoryDisplayName(category) {
+    const names = {
+        'TITAN_VIDEO_GROUP': '1. Titan Radiology Videos & Paired Resources',
+        'HUDA_PHYSICS_GROUP': '2. Huda Physics & Paired Resources',
+        'TITAN_NUCS_GROUP': '3. Titan Nuclear Medicine & Paired Resources',
+        'NIS_RISC_GROUP': '4. NIS/RISC Documents & Questions',
+        'BOARD_VITALS_GROUP': '5. Board Vitals Mixed Review',
+        'TITAN_PHYSICS_GROUP': '6. Titan Physics & Paired Resources',
+        'RAD_DISCORD_GROUP': '7. Radiology Discord Lectures (Optional)',
+        'CORE_RADIOLOGY_GROUP': '8. Core Radiology Text (Optional)'
     };
-};
+    return names[category] || category;
+}
+
+function formatDate(dateString) {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', { 
+        weekday: 'long', 
+        year: 'numeric', 
+        month: 'long', 
+        day: 'numeric' 
+    });
+}
+
+function showLoading() {
+    document.getElementById('loading').style.display = 'block';
+    document.getElementById('generateButton').disabled = true;
+}
+
+function hideLoading() {
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('generateButton').disabled = false;
+}
