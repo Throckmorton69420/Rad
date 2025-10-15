@@ -290,11 +290,45 @@ class Scheduler {
       if (!this.remaining.has(id)) continue;
       seen.add(id);
       items.push(r);
+
+      // 1) Explicit pairing via pairedResourceIds
       for (const pid of r.pairedResourceIds ?? []) if (!seen.has(pid)) q.push(pid);
+
+      // 2) Implicit topic-based pairing within same domain (chapter/title match)
+      const relatedByTopic = [...this.allResources.values()].filter(candidate => {
+        if (seen.has(candidate.id)) return false;
+        if (!this.remaining.has(candidate.id)) return false;
+        if (candidate.domain !== r.domain) return false;
+        // Chapter alignment
+        if (r.chapterNumber && candidate.chapterNumber && r.chapterNumber === candidate.chapterNumber) return true;
+        // Title/topic keyword alignment
+        const rTopic = (r.title || '').toLowerCase();
+        const cTopic = (candidate.title || '').toLowerCase();
+        return this.topicsMatch(rTopic, cTopic);
+      });
+      for (const related of relatedByTopic) if (!seen.has(related.id)) q.push(related.id);
     }
     items = sortResourcesByTaskPriority(items);
     const total = items.reduce((s, r) => s + r.durationMinutes, 0);
     return { anchorId: anchor.id, domain: anchor.domain, items, totalMinutes: total };
+  }
+
+  // Heuristic topic matcher to keep paired content together by subject
+  private topicsMatch(topic1: string, topic2: string): boolean {
+    if (!topic1 || !topic2) return false;
+    const kws = [
+      'pancreas','liver','renal','kidney','adrenal','spleen','biliary','gallbladder','gi','bowel','barium',
+      'thorax','chest','lung','mediastinum','pleura','thyroid','parathyroid',
+      'msk','musculoskeletal','bone','joint','soft tissue',
+      'neuro','brain','spine','spinal','head and neck','hn',
+      'peds','pediatric','paediatric','infant','child',
+      'cardiac','heart','coronary',
+      'breast','mamm',
+      'interventional','ir','vascular',
+      'nuclear','spect','pet',
+      'physics','ct','mr','mri','dose','artifact','resolution'
+    ];
+    return kws.some(kw => topic1.includes(kw) && topic2.includes(kw));
   }
 
   private tryPlaceWholeBlockOnDay(block: Block, dayIndexStart: number): number | null {
