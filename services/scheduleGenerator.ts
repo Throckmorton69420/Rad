@@ -24,7 +24,7 @@ import { getTodayInNewYork, parseDateString, isoDate } from '../utils/timeFormat
 import { sortTasksByGlobalPriority } from '../utils/taskPriority';
 
 /**
- * Complete 4-Phase Scheduling Algorithm Implementation
+ * Complete 4-Phase Scheduling Algorithm Implementation - FIXED VERSION
  * 
  * Phase 1: Primary Content Distribution (Round-Robin with Resource Prioritization)
  *   - Pass 1a: Titan Block Round-Robin (Titan video + Crack the Core + Case Companion + Qevlar)
@@ -32,17 +32,17 @@ import { sortTasksByGlobalPriority } from '../utils/taskPriority';
  *   - Pass 1c: Nuclear Medicine Round-Robin (Titan + Crack the Core + War Machine + Cases + Questions)
  * 
  * Phase 2: Other Daily Requirements (Daily First-Fit with Priority)
- *   - Pass 2a: NIS and RISC (First-Fit)
- *   - Pass 2b: Board Vitals questions with intelligent suggestions
- *   - Pass 2c: Physics content (Titan Route First-Fit)
+ *   - Pass 2a: NIS and RISC (First-Fit with saturation)
+ *   - Pass 2b: Board Vitals questions with intelligent suggestions and full pool coverage
+ *   - Pass 2c: Physics content (Titan Route First-Fit with saturation)
  * 
- * Phase 3: Supplementary Content (Only after Phases 1&2 complete)
+ * Phase 3: Supplementary Content (STRICT: Only after ALL Phase 1&2 complete globally)
  *   - Pass 3a: Discord lectures with relevancy matching
  *   - Pass 3b: Core Radiology textbook with relevancy matching
  * 
  * Phase 4: Validation and Optimization (Iterative Constraint Checking)
  *   - Constraint checking for 14-hour daily maximum
- *   - Resource pairing validation
+ *   - Resource pairing validation with corrective reallocation
  *   - Iterative correction with task reallocation
  */
 
@@ -61,6 +61,7 @@ interface BoardVitalsSuggestion {
   questionCount: number;
   availableTime: number;
   totalQuestionsPool: number;
+  targetMinutes: number;
 }
 
 interface RelevancyScore {
@@ -69,7 +70,14 @@ interface RelevancyScore {
   matchedTopics: Domain[];
 }
 
-class FourPhaseAdvancedScheduler {
+interface DailyBoardVitalsAllocation {
+  date: string;
+  targetQuestions: number;
+  targetMinutes: number;
+  subjects: Domain[];
+}
+
+class StrictFourPhaseScheduler {
   private allResources: Map<string, StudyResource>;
   private remainingResources: Set<string>;
   private schedule: DailySchedule[];
@@ -80,22 +88,30 @@ class FourPhaseAdvancedScheduler {
   private areSpecialTopicsInterleaved: boolean;
   private taskCounter = 0;
   
-  // Phase tracking
+  // Phase tracking with strict enforcement
   private coveredTopicsPerDay: Map<string, Set<Domain>> = new Map();
-  private phase1Complete = false;
-  private phase2Complete = false;
-  private phase3Complete = false;
+  private phase1Resources: Set<string> = new Set();
+  private phase2Resources: Set<string> = new Set();
+  private phase3Resources: Set<string> = new Set();
+  private allRequiredResourcesScheduled = false;
   
-  // Resource categorization
+  // Resource categorization with enhanced tracking
   private titanResources: StudyResource[] = [];
   private hudaResources: StudyResource[] = [];
   private nuclearMedicineResources: StudyResource[] = [];
   private nisRiscResources: StudyResource[] = [];
   private boardVitalsResources: StudyResource[] = [];
   private physicsResources: StudyResource[] = [];
+  private qevlarResources: StudyResource[] = [];
+  private nucAppResources: StudyResource[] = [];
   private discordResources: StudyResource[] = [];
   private coreRadiologyResources: StudyResource[] = [];
   private otherResources: StudyResource[] = [];
+  
+  // Board Vitals enhanced tracking
+  private totalBoardVitalsQuestions: number = 0;
+  private scheduledBoardVitalsQuestions: number = 0;
+  private dailyBoardVitalsAllocations: DailyBoardVitalsAllocation[] = [];
 
   constructor(
     startDateStr: string,
@@ -123,6 +139,9 @@ class FourPhaseAdvancedScheduler {
     
     // Categorize all resources for phase-specific processing
     this.categorizeResources();
+    
+    // Pre-calculate Board Vitals daily allocations
+    this.calculateBoardVitalsAllocations();
   }
 
   /**
@@ -190,9 +209,15 @@ class FourPhaseAdvancedScheduler {
       // Titan Radiology resources (videos, Crack the Core, Case Companion, Qevlar)
       if (lowerVideoSource.includes('titan radiology') || 
           lowerBookSource.includes('crack the core') ||
-          lowerBookSource.includes('case companion') ||
-          lowerBookSource.includes('qevlar')) {
+          lowerBookSource.includes('case companion')) {
         this.titanResources.push(resource);
+        this.phase1Resources.add(resource.id);
+      }
+      
+      // QEVLAR resources (separate tracking for pairing)
+      else if (lowerBookSource.includes('qevlar')) {
+        this.qevlarResources.push(resource);
+        this.phase1Resources.add(resource.id);
       }
       
       // Huda Physics resources
@@ -200,42 +225,100 @@ class FourPhaseAdvancedScheduler {
                lowerBookSource.includes('huda physics') ||
                (resource.domain === Domain.PHYSICS && lowerBookSource.includes('huda'))) {
         this.hudaResources.push(resource);
+        this.phase1Resources.add(resource.id);
       }
       
-      // Nuclear Medicine resources (including War Machine)
+      // Nuclear Medicine resources (including War Machine, NucApp)
       else if (resource.domain === Domain.NUCLEAR_MEDICINE) {
         this.nuclearMedicineResources.push(resource);
+        if (lowerBookSource.includes('nucapp')) {
+          this.nucAppResources.push(resource);
+        }
+        this.phase1Resources.add(resource.id);
       }
       
       // NIS and RISC resources
       else if (resource.domain === Domain.NIS || resource.domain === Domain.RISC) {
         this.nisRiscResources.push(resource);
+        this.phase2Resources.add(resource.id);
       }
       
       // Board Vitals resources
       else if (lowerBookSource.includes('board vitals')) {
         this.boardVitalsResources.push(resource);
+        this.phase2Resources.add(resource.id);
+        this.totalBoardVitalsQuestions += (resource.questionCount || 0);
       }
       
-      // Physics resources (non-Huda)
+      // Physics resources (non-Huda, including Titan Physics)
       else if (resource.domain === Domain.PHYSICS) {
         this.physicsResources.push(resource);
+        this.phase2Resources.add(resource.id);
       }
       
       // Discord resources
       else if (lowerVideoSource.includes('discord')) {
         this.discordResources.push(resource);
+        this.phase3Resources.add(resource.id);
       }
       
       // Core Radiology textbook resources
       else if (lowerBookSource.includes('core radiology') || lowerTitle.includes('core radiology')) {
         this.coreRadiologyResources.push(resource);
+        this.phase3Resources.add(resource.id);
       }
       
-      // Other resources
+      // Other resources - categorize based on priority
       else {
         this.otherResources.push(resource);
+        if (resource.isPrimaryMaterial || !resource.isOptional) {
+          this.phase2Resources.add(resource.id);
+        } else {
+          this.phase3Resources.add(resource.id);
+        }
       }
+    }
+  }
+
+  private calculateBoardVitalsAllocations(): void {
+    if (this.totalBoardVitalsQuestions === 0) return;
+    
+    const questionsPerMinute = 0.5; // 2 minutes per question average
+    let remainingQuestions = this.totalBoardVitalsQuestions;
+    
+    for (let i = 0; i < this.studyDays.length; i++) {
+      const day = this.studyDays[i];
+      const remainingDays = this.studyDays.length - i;
+      
+      // Calculate target questions for this day
+      const avgQuestionsPerDay = Math.ceil(remainingQuestions / remainingDays);
+      const maxQuestionsByTime = Math.floor(day.totalStudyTimeMinutes * 0.3 * questionsPerMinute); // Up to 30% of day for BV
+      
+      const targetQuestions = Math.min(avgQuestionsPerDay, maxQuestionsByTime, remainingQuestions);
+      const targetMinutes = Math.ceil(targetQuestions / questionsPerMinute);
+      
+      // Get subjects covered up to this day (for suggestion purposes)
+      const coveredSubjects: Domain[] = [];
+      for (let j = 0; j <= i; j++) {
+        const dayTopics = this.coveredTopicsPerDay.get(this.studyDays[j].date) || new Set();
+        dayTopics.forEach(topic => {
+          if (!coveredSubjects.includes(topic) && 
+              ![Domain.NIS, Domain.RISC, Domain.HIGH_YIELD, Domain.MIXED_REVIEW, 
+                Domain.WEAK_AREA_REVIEW, Domain.QUESTION_BANK_CATCHUP, Domain.FINAL_REVIEW, 
+                Domain.LIGHT_REVIEW].includes(topic)) {
+            coveredSubjects.push(topic);
+          }
+        });
+      }
+      
+      this.dailyBoardVitalsAllocations.push({
+        date: day.date,
+        targetQuestions: targetQuestions,
+        targetMinutes: targetMinutes,
+        subjects: coveredSubjects.length > 0 ? coveredSubjects : [Domain.PHYSICS, Domain.NUCLEAR_MEDICINE] // Default subjects
+      });
+      
+      remainingQuestions -= targetQuestions;
     }
   }
 
@@ -283,21 +366,27 @@ class FourPhaseAdvancedScheduler {
       day.tasks.push(task);
       this.remainingResources.delete(resource.id);
       this.coveredTopicsPerDay.get(day.date)?.add(resource.domain);
+      
+      // Track Board Vitals questions scheduled
+      if (resource.questionCount && resource.bookSource?.toLowerCase().includes('board vitals')) {
+        this.scheduledBoardVitalsQuestions += resource.questionCount;
+      }
+      
       return true;
     }
     return false;
   }
 
   /**
-   * TOPIC BLOCK BUILDING METHODS
+   * ENHANCED TOPIC BLOCK BUILDING METHODS
    */
   
   private buildTopicBlock(anchorResource: StudyResource, blockType: 'titan' | 'huda' | 'nuclear'): TopicBlock {
     const visited = new Set<string>([anchorResource.id]);
     const pairedResources: StudyResource[] = [];
-    const processingQueue = [...(anchorResource.pairedResourceIds || [])];
     
-    // Process explicitly paired resources
+    // Process explicitly paired resources first
+    const processingQueue = [...(anchorResource.pairedResourceIds || [])];
     while (processingQueue.length > 0) {
       const resourceId = processingQueue.shift()!;
       if (visited.has(resourceId)) continue;
@@ -308,7 +397,6 @@ class FourPhaseAdvancedScheduler {
       visited.add(resourceId);
       pairedResources.push(resource);
       
-      // Add any additional paired resources from this resource
       if (resource.pairedResourceIds) {
         processingQueue.push(...resource.pairedResourceIds.filter(id => !visited.has(id)));
       }
@@ -317,6 +405,28 @@ class FourPhaseAdvancedScheduler {
     // Find topic and context-related resources based on block type
     const relatedResources = this.findRelatedResources(anchorResource, blockType, visited);
     pairedResources.push(...relatedResources);
+    
+    // For Titan blocks, explicitly look for QEVLAR pairings
+    if (blockType === 'titan') {
+      const qevlarMatches = this.qevlarResources.filter(qr => 
+        !visited.has(qr.id) && 
+        this.remainingResources.has(qr.id) &&
+        this.hasMatchingTopicKeywords(anchorResource.title, qr.title)
+      );
+      pairedResources.push(...qevlarMatches);
+      qevlarMatches.forEach(qr => visited.add(qr.id));
+    }
+    
+    // For Nuclear blocks, include NucApp resources
+    if (blockType === 'nuclear') {
+      const nucAppMatches = this.nucAppResources.filter(nr => 
+        !visited.has(nr.id) && 
+        this.remainingResources.has(nr.id) &&
+        (nr.domain === anchorResource.domain || this.hasMatchingTopicKeywords(anchorResource.title, nr.title))
+      );
+      pairedResources.push(...nucAppMatches);
+      nucAppMatches.forEach(nr => visited.add(nr.id));
+    }
     
     const totalMinutes = [anchorResource, ...pairedResources]
       .reduce((sum, resource) => sum + resource.durationMinutes, 0);
@@ -426,13 +536,13 @@ class FourPhaseAdvancedScheduler {
   }
 
   /**
-   * PHASE 1: PRIMARY CONTENT DISTRIBUTION (ROUND-ROBIN WITH RESOURCE PRIORITIZATION)
+   * PHASE 1: PRIMARY CONTENT DISTRIBUTION (ROUND-ROBIN WITH ENHANCED PAIRING)
    */
   
   private executePhase1(): void {
     this.notifications.push({
       type: 'info',
-      message: 'Phase 1: Starting primary content distribution with round-robin scheduling'
+      message: 'Phase 1: Starting primary content distribution with strict round-robin and pairing'
     });
     
     // Pass 1a: Titan Block Round-Robin
@@ -444,7 +554,6 @@ class FourPhaseAdvancedScheduler {
     // Pass 1c: Nuclear Medicine Round-Robin
     this.executeNuclearMedicineRoundRobin();
     
-    this.phase1Complete = true;
     this.notifications.push({
       type: 'info',
       message: 'Phase 1: Primary content distribution completed'
@@ -471,12 +580,12 @@ class FourPhaseAdvancedScheduler {
     // Sort blocks by priority
     titanBlocks.sort((a, b) => b.priority - a.priority);
     
-    // Round-robin distribution
-    this.scheduleBlocksRoundRobin(titanBlocks, 0);
+    // Round-robin distribution with enhanced pairing preservation
+    this.scheduleBlocksRoundRobinWithPairing(titanBlocks, 0);
     
     this.notifications.push({
       type: 'info', 
-      message: `Pass 1a: Scheduled ${titanBlocks.length} Titan blocks using round-robin distribution`
+      message: `Pass 1a: Scheduled ${titanBlocks.length} Titan blocks using round-robin with pairing preservation`
     });
   }
 
@@ -496,16 +605,16 @@ class FourPhaseAdvancedScheduler {
     
     // Resume round-robin from where Titan blocks left off
     const startingDayIndex = this.getNextAvailableDayIndex();
-    this.scheduleBlocksRoundRobin(hudaBlocks, startingDayIndex);
+    this.scheduleBlocksRoundRobinWithPairing(hudaBlocks, startingDayIndex);
     
     this.notifications.push({
       type: 'info',
-      message: `Pass 1b: Scheduled ${hudaBlocks.length} Huda Physics blocks using round-robin distribution`
+      message: `Pass 1b: Scheduled ${hudaBlocks.length} Huda Physics blocks using round-robin with pairing preservation`
     });
   }
 
   private executeNuclearMedicineRoundRobin(): void {
-    // Build Nuclear Medicine blocks (Titan + Crack the Core + War Machine + Cases + Questions)
+    // Build Nuclear Medicine blocks (Titan + Crack the Core + War Machine + Cases + Questions + NucApp)
     const nuclearAnchors = this.nuclearMedicineResources
       .filter(resource => 
         this.remainingResources.has(resource.id) && 
@@ -520,15 +629,15 @@ class FourPhaseAdvancedScheduler {
     
     // Continue round-robin distribution
     const startingDayIndex = this.getNextAvailableDayIndex();
-    this.scheduleBlocksRoundRobin(nuclearBlocks, startingDayIndex);
+    this.scheduleBlocksRoundRobinWithPairing(nuclearBlocks, startingDayIndex);
     
     this.notifications.push({
       type: 'info',
-      message: `Pass 1c: Scheduled ${nuclearBlocks.length} Nuclear Medicine blocks using round-robin distribution`
+      message: `Pass 1c: Scheduled ${nuclearBlocks.length} Nuclear Medicine blocks using round-robin with pairing preservation`
     });
   }
 
-  private scheduleBlocksRoundRobin(blocks: TopicBlock[], startDayIndex: number): number {
+  private scheduleBlocksRoundRobinWithPairing(blocks: TopicBlock[], startDayIndex: number): number {
     let currentDayIndex = startDayIndex;
     
     for (const block of blocks) {
@@ -537,7 +646,7 @@ class FourPhaseAdvancedScheduler {
       
       if (allBlockResources.length === 0) continue;
       
-      // Try to fit entire block on one day
+      // Try to fit entire block on one day first
       let blockScheduled = false;
       
       for (let dayOffset = 0; dayOffset < this.studyDays.length && !blockScheduled; dayOffset++) {
@@ -557,32 +666,75 @@ class FourPhaseAdvancedScheduler {
         }
       }
       
-      // If block doesn't fit entirely, split across days while maintaining pairings
+      // If block doesn't fit entirely, use enhanced carryover with pairing preservation
       if (!blockScheduled) {
-        for (const resource of allBlockResources) {
-          let resourceScheduled = false;
-          
-          for (let dayOffset = 0; dayOffset < this.studyDays.length && !resourceScheduled; dayOffset++) {
-            const dayIndex = (currentDayIndex + dayOffset) % this.studyDays.length;
-            const day = this.studyDays[dayIndex];
-            
-            if (this.addTaskToDay(day, resource)) {
-              currentDayIndex = (dayIndex + 1) % this.studyDays.length;
-              resourceScheduled = true;
-            }
-          }
-          
-          if (!resourceScheduled) {
-            this.notifications.push({
-              type: 'warning',
-              message: `Could not schedule resource: "${resource.title}" (${resource.durationMinutes} min) - insufficient time available`
-            });
-          }
-        }
+        currentDayIndex = this.scheduleBlockWithCarryover(allBlockResources, currentDayIndex);
       }
     }
     
     return currentDayIndex;
+  }
+
+  private scheduleBlockWithCarryover(blockResources: StudyResource[], startDayIndex: number): number {
+    let currentDayIndex = startDayIndex;
+    let resourceIndex = 0;
+    
+    while (resourceIndex < blockResources.length) {
+      const dayIndex = currentDayIndex % this.studyDays.length;
+      const day = this.studyDays[dayIndex];
+      const remainingTime = this.getRemainingTimeInDay(day);
+      
+      // Find how many consecutive resources from the block can fit in remaining time
+      let resourcesForThisDay: StudyResource[] = [];
+      let totalTimeForDay = 0;
+      
+      for (let i = resourceIndex; i < blockResources.length; i++) {
+        const resource = blockResources[i];
+        if (totalTimeForDay + resource.durationMinutes <= remainingTime) {
+          resourcesForThisDay.push(resource);
+          totalTimeForDay += resource.durationMinutes;
+        } else {
+          break; // Stop when we can't fit more
+        }
+      }
+      
+      // Schedule the resources that fit
+      for (const resource of resourcesForThisDay) {
+        this.addTaskToDay(day, resource);
+      }
+      
+      resourceIndex += resourcesForThisDay.length;
+      currentDayIndex++;
+      
+      // Prevent infinite loop
+      if (resourcesForThisDay.length === 0) {
+        // If no resources could be scheduled, try individual placement
+        const resource = blockResources[resourceIndex];
+        let placed = false;
+        
+        for (let dayOffset = 0; dayOffset < this.studyDays.length; dayOffset++) {
+          const tryDayIndex = (currentDayIndex + dayOffset) % this.studyDays.length;
+          const tryDay = this.studyDays[tryDayIndex];
+          
+          if (this.addTaskToDay(tryDay, resource)) {
+            resourceIndex++;
+            currentDayIndex = tryDayIndex + 1;
+            placed = true;
+            break;
+          }
+        }
+        
+        if (!placed) {
+          this.notifications.push({
+            type: 'warning',
+            message: `Could not schedule block resource: "${resource.title}" (${resource.durationMinutes} min) - insufficient time available`
+          });
+          resourceIndex++;
+        }
+      }
+    }
+    
+    return currentDayIndex % this.studyDays.length;
   }
 
   private getNextAvailableDayIndex(): number {
@@ -602,140 +754,153 @@ class FourPhaseAdvancedScheduler {
   }
 
   /**
-   * PHASE 2: OTHER DAILY REQUIREMENTS (DAILY FIRST-FIT WITH PRIORITY)
+   * PHASE 2: ENHANCED DAILY REQUIREMENTS WITH SATURATION
    */
   
   private executePhase2(): void {
     this.notifications.push({
       type: 'info',
-      message: 'Phase 2: Starting daily requirements scheduling'
+      message: 'Phase 2: Starting enhanced daily requirements with full saturation'
     });
     
-    // Pass 2a: NIS and RISC (First-Fit)
-    this.scheduleNisRiscFirstFit();
+    // Pass 2a: NIS and RISC with saturation
+    this.scheduleNisRiscWithSaturation();
     
-    // Pass 2b: Board Vitals questions (mixed random with intelligent suggestions)
-    this.scheduleBoardVitalsWithSuggestions();
+    // Pass 2b: Board Vitals with enhanced allocation system
+    this.scheduleBoardVitalsEnhanced();
     
-    // Pass 2c: Physics (Titan Route First-Fit)
-    this.schedulePhysicsFirstFit();
+    // Pass 2c: Physics content with saturation
+    this.schedulePhysicsWithSaturation();
     
-    this.phase2Complete = true;
     this.notifications.push({
       type: 'info',
-      message: 'Phase 2: Daily requirements scheduling completed'
+      message: 'Phase 2: Enhanced daily requirements completed'
     });
   }
 
-  private scheduleNisRiscFirstFit(): void {
+  private scheduleNisRiscWithSaturation(): void {
     const nisRiscResources = this.nisRiscResources
       .filter(resource => this.remainingResources.has(resource.id))
       .sort((a, b) => (a.sequenceOrder || 999) - (b.sequenceOrder || 999));
     
-    this.scheduleResourcesFirstFit(nisRiscResources, 'NIS and RISC');
+    this.scheduleResourcesWithSaturation(nisRiscResources, 'NIS and RISC');
     
     this.notifications.push({
       type: 'info',
-      message: `Pass 2a: Scheduled ${nisRiscResources.length} NIS and RISC resources using first-fit`
+      message: `Pass 2a: Scheduled ${nisRiscResources.filter(r => !this.remainingResources.has(r.id)).length}/${nisRiscResources.length} NIS and RISC resources with saturation`
     });
   }
 
-  private scheduleBoardVitalsWithSuggestions(): void {
-    // Generate Board Vitals suggestions for each day
-    for (const day of this.studyDays) {
-      const suggestion = this.generateBoardVitalsSuggestion(day);
+  private scheduleBoardVitalsEnhanced(): void {
+    // Process each day with its pre-calculated allocation
+    for (let dayIndex = 0; dayIndex < this.studyDays.length; dayIndex++) {
+      const day = this.studyDays[dayIndex];
+      const allocation = this.dailyBoardVitalsAllocations[dayIndex];
       
-      if (suggestion.subjects.length > 0 && suggestion.questionCount > 0) {
-        const suggestionMessage = `Day ${day.date}: Suggested Board Vitals - ${suggestion.questionCount} questions covering: ${suggestion.subjects.join(', ')} (${suggestion.availableTime} min available)`;
+      if (!allocation || allocation.targetQuestions === 0) continue;
+      
+      // Find suitable Board Vitals resources for this day
+      const availableBoardVitals = this.boardVitalsResources
+        .filter(resource => this.remainingResources.has(resource.id))
+        .sort((a, b) => {
+          // Prioritize resources matching covered subjects
+          const aMatchesSubjects = allocation.subjects.some(subject => 
+            resource.title.toLowerCase().includes(subject.toLowerCase()) ||
+            resource.domain === subject
+          );
+          const bMatchesSubjects = allocation.subjects.some(subject => 
+            resource.title.toLowerCase().includes(subject.toLowerCase()) ||
+            resource.domain === subject
+          );
+          
+          if (aMatchesSubjects && !bMatchesSubjects) return -1;
+          if (!aMatchesSubjects && bMatchesSubjects) return 1;
+          
+          return (a.sequenceOrder || 999) - (b.sequenceOrder || 999);
+        });
+      
+      // Schedule Board Vitals resources up to the target
+      let scheduledQuestions = 0;
+      let scheduledMinutes = 0;
+      
+      for (const resource of availableBoardVitals) {
+        if (scheduledMinutes >= allocation.targetMinutes) break;
+        
+        const remainingTimeInDay = this.getRemainingTimeInDay(day);
+        if (remainingTimeInDay < resource.durationMinutes) continue;
+        
+        if (this.addTaskToDay(day, resource)) {
+          scheduledQuestions += (resource.questionCount || 0);
+          scheduledMinutes += resource.durationMinutes;
+        }
+      }
+      
+      // Generate suggestion message
+      if (allocation.subjects.length > 0) {
+        const suggestionMessage = `Day ${day.date}: Board Vitals allocated ${scheduledQuestions}/${allocation.targetQuestions} questions (${scheduledMinutes}/${allocation.targetMinutes} min) covering: ${allocation.subjects.join(', ')}`;
         
         this.notifications.push({
           type: 'info',
           message: suggestionMessage
         });
       }
-      
-      // Schedule available Board Vitals resources for this day
-      const availableBoardVitals = this.boardVitalsResources
-        .filter(resource => this.remainingResources.has(resource.id))
-        .slice(0, 2); // Limit to avoid overwhelming single day
-      
-      for (const resource of availableBoardVitals) {
-        if (this.addTaskToDay(day, resource)) {
-          break; // Only add one Board Vitals resource per day
-        }
-      }
     }
     
+    const remainingBoardVitals = this.boardVitalsResources.filter(r => this.remainingResources.has(r.id));
     this.notifications.push({
       type: 'info',
-      message: 'Pass 2b: Generated Board Vitals suggestions based on covered topics per day'
+      message: `Pass 2b: Board Vitals enhanced scheduling completed. Remaining: ${remainingBoardVitals.length} resources`
     });
   }
 
-  private generateBoardVitalsSuggestion(day: DailySchedule): BoardVitalsSuggestion {
-    const allCoveredTopics = new Set<Domain>();
-    
-    // Collect all topics covered up to and including the current day
-    for (const scheduleDay of this.studyDays) {
-      if (scheduleDay.date <= day.date) {
-        const dayTopics = this.coveredTopicsPerDay.get(scheduleDay.date) || new Set();
-        dayTopics.forEach(topic => allCoveredTopics.add(topic));
-      }
-    }
-    
-    // Convert to array and filter out meta-domains
-    const subjects = Array.from(allCoveredTopics).filter(topic => 
-      ![Domain.NIS, Domain.RISC, Domain.HIGH_YIELD, Domain.MIXED_REVIEW, 
-        Domain.WEAK_AREA_REVIEW, Domain.QUESTION_BANK_CATCHUP, Domain.FINAL_REVIEW, 
-        Domain.LIGHT_REVIEW].includes(topic)
-    );
-    
-    // Calculate available time and question suggestions
-    const availableTime = this.getRemainingTimeInDay(day);
-    const totalBoardVitalsQuestions = this.boardVitalsResources
-      .reduce((sum, resource) => sum + (resource.questionCount || 0), 0);
-    
-    // Assume 2 minutes per question on average
-    const questionsPerMinute = 0.5;
-    const maxQuestionsByTime = Math.floor(availableTime * questionsPerMinute);
-    const averageQuestionsPerDay = Math.ceil(totalBoardVitalsQuestions / this.studyDays.length);
-    
-    const questionCount = Math.min(maxQuestionsByTime, averageQuestionsPerDay, 50); // Cap at 50 questions
-    
-    return {
-      subjects,
-      questionCount: Math.max(0, questionCount),
-      availableTime,
-      totalQuestionsPool: totalBoardVitalsQuestions
-    };
-  }
-
-  private schedulePhysicsFirstFit(): void {
+  private schedulePhysicsWithSaturation(): void {
     const physicsResources = this.physicsResources
       .filter(resource => this.remainingResources.has(resource.id))
       .sort((a, b) => (a.sequenceOrder || 999) - (b.sequenceOrder || 999));
     
-    this.scheduleResourcesFirstFit(physicsResources, 'Physics (Titan Route)');
+    this.scheduleResourcesWithSaturation(physicsResources, 'Physics (Titan Route)');
     
     this.notifications.push({
       type: 'info',
-      message: `Pass 2c: Scheduled ${physicsResources.length} Physics resources using first-fit`
+      message: `Pass 2c: Scheduled ${physicsResources.filter(r => !this.remainingResources.has(r.id)).length}/${physicsResources.length} Physics resources with saturation`
     });
   }
 
-  private scheduleResourcesFirstFit(resources: StudyResource[], resourceTypeName: string): void {
+  private scheduleResourcesWithSaturation(resources: StudyResource[], resourceTypeName: string): void {
     let scheduledCount = 0;
+    const bufferMinutes = 15; // Leave small buffer before hitting daily limit
     
     for (const resource of resources) {
       if (!this.remainingResources.has(resource.id)) continue;
       
       let resourceScheduled = false;
       
-      for (const day of this.studyDays) {
-        if (this.addTaskToDay(day, resource)) {
-          resourceScheduled = true;
-          scheduledCount++;
-          break;
+      // Try to schedule on each day, prioritizing days with more available time
+      const sortedDays = [...this.studyDays].sort((a, b) => 
+        this.getRemainingTimeInDay(b) - this.getRemainingTimeInDay(a)
+      );
+      
+      for (const day of sortedDays) {
+        const remainingTime = this.getRemainingTimeInDay(day);
+        
+        // Only schedule if we have sufficient time including buffer
+        if (remainingTime >= resource.durationMinutes + bufferMinutes) {
+          if (this.addTaskToDay(day, resource)) {
+            resourceScheduled = true;
+            scheduledCount++;
+            break;
+          }
+        }
+      }
+      
+      if (!resourceScheduled) {
+        // Try without buffer as last resort
+        for (const day of sortedDays) {
+          if (this.addTaskToDay(day, resource)) {
+            resourceScheduled = true;
+            scheduledCount++;
+            break;
+          }
         }
       }
       
@@ -749,28 +914,41 @@ class FourPhaseAdvancedScheduler {
   }
 
   /**
-   * PHASE 3: SUPPLEMENTARY CONTENT (ONLY AFTER PHASES 1&2 COMPLETE)
+   * STRICT PHASE 3: SUPPLEMENTARY CONTENT (GLOBAL GATING)
    */
   
   private executePhase3(): void {
-    // Only proceed if Phases 1 and 2 are complete and no primary material remains
-    const primaryMaterialRemaining = Array.from(this.remainingResources)
-      .some(resourceId => {
-        const resource = this.allResources.get(resourceId);
-        return resource && (resource.isPrimaryMaterial || !resource.isOptional);
-      });
+    // STRICT CHECK: Only proceed if ALL Phase 1 and 2 resources are scheduled
+    const unscheduledPhase1And2 = Array.from(this.remainingResources)
+      .filter(resourceId => 
+        this.phase1Resources.has(resourceId) || this.phase2Resources.has(resourceId)
+      );
     
-    if (primaryMaterialRemaining) {
+    if (unscheduledPhase1And2.length > 0) {
       this.notifications.push({
         type: 'info',
-        message: 'Phase 3: Deferred - Primary material still remains unscheduled'
+        message: `Phase 3: BLOCKED - ${unscheduledPhase1And2.length} Phase 1&2 resources remain unscheduled. Supplementary content deferred.`
       });
+      
+      // Log some examples of what's blocking Phase 3
+      const examples = unscheduledPhase1And2.slice(0, 3).map(id => {
+        const resource = this.allResources.get(id);
+        return resource ? `"${resource.title}" (${resource.durationMinutes}min)` : id;
+      });
+      
+      this.notifications.push({
+        type: 'info',
+        message: `Examples of blocking resources: ${examples.join(', ')}${unscheduledPhase1And2.length > 3 ? ` and ${unscheduledPhase1And2.length - 3} more` : ''}`
+      });
+      
+      this.allRequiredResourcesScheduled = false;
       return;
     }
     
+    this.allRequiredResourcesScheduled = true;
     this.notifications.push({
       type: 'info',
-      message: 'Phase 3: Starting supplementary content scheduling (all primary material completed)'
+      message: 'Phase 3: UNLOCKED - All Phase 1&2 resources completed. Starting supplementary content scheduling.'
     });
     
     // Pass 3a: Discord lectures with relevancy matching
@@ -779,7 +957,6 @@ class FourPhaseAdvancedScheduler {
     // Pass 3b: Core Radiology textbook with relevancy matching
     this.scheduleCoreRadiologyWithRelevancy();
     
-    this.phase3Complete = true;
     this.notifications.push({
       type: 'info',
       message: 'Phase 3: Supplementary content scheduling completed'
@@ -794,7 +971,7 @@ class FourPhaseAdvancedScheduler {
     
     this.notifications.push({
       type: 'info',
-      message: `Pass 3a: Scheduled Discord lectures based on topic relevancy`
+      message: `Pass 3a: Scheduled ${discordResources.filter(r => !this.remainingResources.has(r.id)).length}/${discordResources.length} Discord lectures based on topic relevancy`
     });
   }
 
@@ -806,7 +983,7 @@ class FourPhaseAdvancedScheduler {
     
     this.notifications.push({
       type: 'info',
-      message: `Pass 3b: Scheduled Core Radiology textbook based on topic relevancy`
+      message: `Pass 3b: Scheduled ${coreRadiologyResources.filter(r => !this.remainingResources.has(r.id)).length}/${coreRadiologyResources.length} Core Radiology topics based on topic relevancy`
     });
   }
 
@@ -828,14 +1005,22 @@ class FourPhaseAdvancedScheduler {
       relevancyScores.sort((a, b) => b.score - a.score);
       
       // Greedily fill remaining time with most relevant resources
+      const bufferMinutes = 10; // Small buffer for supplementary content
+      
       for (const relevancyScore of relevancyScores) {
         const resource = this.allResources.get(relevancyScore.resourceId);
         if (resource && this.remainingResources.has(resource.id)) {
-          if (this.addTaskToDay(day, resource)) {
-            // Resource successfully scheduled
+          const remainingTime = this.getRemainingTimeInDay(day);
+          
+          if (remainingTime >= resource.durationMinutes + bufferMinutes) {
+            this.addTaskToDay(day, resource);
           } else {
-            // No more time available in this day
-            break;
+            // Try without buffer for small resources
+            if (resource.durationMinutes <= 10 && remainingTime >= resource.durationMinutes) {
+              this.addTaskToDay(day, resource);
+            } else {
+              break; // No more time available in this day
+            }
           }
         }
       }
@@ -875,6 +1060,13 @@ class FourPhaseAdvancedScheduler {
       score -= 10;
     }
     
+    // Bonus for shorter resources that fit gaps better
+    if (resource.durationMinutes <= 5) {
+      score += 15;
+    } else if (resource.durationMinutes <= 15) {
+      score += 10;
+    }
+    
     return score;
   }
 
@@ -898,13 +1090,13 @@ class FourPhaseAdvancedScheduler {
   }
 
   /**
-   * PHASE 4: VALIDATION AND OPTIMIZATION (ITERATIVE CONSTRAINT CHECKING)
+   * PHASE 4: ENHANCED VALIDATION WITH CORRECTIVE ACTIONS
    */
   
   private executePhase4(): void {
     this.notifications.push({
       type: 'info',
-      message: 'Phase 4: Starting validation and optimization'
+      message: 'Phase 4: Starting enhanced validation and optimization'
     });
     
     let iterationCount = 0;
@@ -915,12 +1107,12 @@ class FourPhaseAdvancedScheduler {
       iterationCount++;
       violationsFound = false;
       
-      // Pass 4a: Check 14-hour daily maximum constraints
+      // Pass 4a: Check and correct time constraints
       if (this.validateAndCorrectTimeConstraints()) {
         violationsFound = true;
       }
       
-      // Pass 4b: Validate resource pairings
+      // Pass 4b: Validate and correct resource pairings
       if (this.validateAndCorrectResourcePairings()) {
         violationsFound = true;
       }
@@ -933,13 +1125,13 @@ class FourPhaseAdvancedScheduler {
     
     this.notifications.push({
       type: 'info',
-      message: `Phase 4: Validation completed after ${iterationCount} iteration(s)`
+      message: `Phase 4: Enhanced validation completed after ${iterationCount} iteration(s)`
     });
     
     if (violationsFound) {
       this.notifications.push({
         type: 'warning',
-        message: 'Some constraint violations could not be automatically corrected'
+        message: 'Some constraint violations could not be automatically corrected within iteration limit'
       });
     }
   }
@@ -957,19 +1149,19 @@ class FourPhaseAdvancedScheduler {
         
         this.notifications.push({
           type: 'warning',
-          message: `Day ${day.date} exceeds time limit by ${excessTime} minutes - attempting reallocation`
+          message: `Day ${day.date} exceeds time limit by ${excessTime} minutes - attempting intelligent reallocation`
         });
         
-        // Move lowest-priority tasks to next available days
-        this.reallocateExcessTasks(day, excessTime);
+        // Enhanced reallocation with priority-aware movement
+        this.reallocateExcessTasksIntelligently(day, excessTime);
       }
     }
     
     return violationsFound;
   }
 
-  private reallocateExcessTasks(overloadedDay: DailySchedule, excessTime: number): void {
-    // Sort tasks by priority (lowest priority first for removal)
+  private reallocateExcessTasksIntelligently(overloadedDay: DailySchedule, excessTime: number): void {
+    // Sort tasks by priority for intelligent removal (lowest priority first)
     const sortedTasks = [...overloadedDay.tasks].sort((a, b) => {
       const priorityA = TASK_TYPE_PRIORITY[a.type] || 99;
       const priorityB = TASK_TYPE_PRIORITY[b.type] || 99;
@@ -979,6 +1171,11 @@ class FourPhaseAdvancedScheduler {
       
       // Optional tasks are lower priority
       if (a.isOptional !== b.isOptional) return (a.isOptional ? 1 : 0) - (b.isOptional ? 1 : 0);
+      
+      // Phase 3 resources are lower priority than Phase 1&2
+      const aIsPhase3 = this.phase3Resources.has(a.originalResourceId || a.resourceId);
+      const bIsPhase3 = this.phase3Resources.has(b.originalResourceId || b.resourceId);
+      if (aIsPhase3 !== bIsPhase3) return aIsPhase3 ? 1 : -1;
       
       // Longer tasks are slightly lower priority for easier reallocation
       return b.durationMinutes - a.durationMinutes;
@@ -1000,30 +1197,22 @@ class FourPhaseAdvancedScheduler {
       !tasksToReallocate.some(t => t.id === task.id)
     );
     
-    // Find placement for reallocated tasks
+    // Find optimal placement for reallocated tasks
     const overloadedDayIndex = this.studyDays.findIndex(d => d.date === overloadedDay.date);
     
     for (const task of tasksToReallocate) {
       let taskReallocated = false;
       
-      // Try subsequent days first
-      for (let i = overloadedDayIndex + 1; i < this.studyDays.length && !taskReallocated; i++) {
-        const targetDay = this.studyDays[i];
-        if (this.getRemainingTimeInDay(targetDay) >= task.durationMinutes) {
-          targetDay.tasks.push(task);
-          taskReallocated = true;
-        }
-      }
+      // Try to place on the best available day (most available time first)
+      const availableDays = this.studyDays
+        .map((day, index) => ({ day, index, availableTime: this.getRemainingTimeInDay(day) }))
+        .filter(({availableTime}) => availableTime >= task.durationMinutes)
+        .sort((a, b) => b.availableTime - a.availableTime);
       
-      // If not placed, try previous days
-      if (!taskReallocated) {
-        for (let i = overloadedDayIndex - 1; i >= 0 && !taskReallocated; i--) {
-          const targetDay = this.studyDays[i];
-          if (this.getRemainingTimeInDay(targetDay) >= task.durationMinutes) {
-            targetDay.tasks.push(task);
-            taskReallocated = true;
-          }
-        }
+      if (availableDays.length > 0) {
+        const bestDay = availableDays[0].day;
+        bestDay.tasks.push(task);
+        taskReallocated = true;
       }
       
       if (!taskReallocated) {
@@ -1039,7 +1228,6 @@ class FourPhaseAdvancedScheduler {
   }
 
   private validateAndCorrectResourcePairings(): boolean {
-    // This validation ensures that paired resources are scheduled close together
     let violationsFound = false;
     
     for (const [resourceId, resource] of this.allResources) {
@@ -1051,6 +1239,8 @@ class FourPhaseAdvancedScheduler {
       const resourceDay = this.findDayForTask(resourceTask.id);
       if (!resourceDay) continue;
       
+      const resourceDayIndex = this.studyDays.findIndex(d => d.date === resourceDay.date);
+      
       // Check if paired resources are scheduled within reasonable proximity
       for (const pairedResourceId of resource.pairedResourceIds) {
         const pairedTask = this.findTaskForResource(pairedResourceId);
@@ -1059,21 +1249,20 @@ class FourPhaseAdvancedScheduler {
         const pairedDay = this.findDayForTask(pairedTask.id);
         if (!pairedDay) continue;
         
-        const dayDifference = Math.abs(
-          this.studyDays.findIndex(d => d.date === resourceDay.date) - 
-          this.studyDays.findIndex(d => d.date === pairedDay.date)
-        );
+        const pairedDayIndex = this.studyDays.findIndex(d => d.date === pairedDay.date);
+        const dayDifference = Math.abs(resourceDayIndex - pairedDayIndex);
         
-        // If paired resources are more than 3 days apart, attempt to move them closer
-        if (dayDifference > 3) {
+        // If paired resources are more than 2 days apart, attempt to move them closer
+        if (dayDifference > 2) {
           violationsFound = true;
+          
           this.notifications.push({
             type: 'info',
             message: `Paired resources "${resource.title}" and "${this.allResources.get(pairedResourceId)?.title}" are ${dayDifference} days apart - attempting to move closer`
           });
           
-          // Implementation of pairing correction could be added here
-          // For now, we just log the violation
+          // Try to move the paired task closer
+          this.movePairedTaskCloser(pairedTask, resourceDay, pairedDay);
         }
       }
     }
@@ -1081,14 +1270,36 @@ class FourPhaseAdvancedScheduler {
     return violationsFound;
   }
 
+  private movePairedTaskCloser(taskToMove: ScheduledTask, targetDay: DailySchedule, currentDay: DailySchedule): void {
+    // Remove task from current day
+    currentDay.tasks = currentDay.tasks.filter(t => t.id !== taskToMove.id);
+    
+    // Try to add to target day
+    if (this.getRemainingTimeInDay(targetDay) >= taskToMove.durationMinutes) {
+      targetDay.tasks.push(taskToMove);
+      return;
+    }
+    
+    // Try adjacent days to target day
+    const targetDayIndex = this.studyDays.findIndex(d => d.date === targetDay.date);
+    const adjacentIndices = [targetDayIndex - 1, targetDayIndex + 1].filter(i => i >= 0 && i < this.studyDays.length);
+    
+    for (const adjacentIndex of adjacentIndices) {
+      const adjacentDay = this.studyDays[adjacentIndex];
+      if (this.getRemainingTimeInDay(adjacentDay) >= taskToMove.durationMinutes) {
+        adjacentDay.tasks.push(taskToMove);
+        return;
+      }
+    }
+    
+    // If can't move closer, put back in original day
+    currentDay.tasks.push(taskToMove);
+  }
+
   private validateAndCorrectTopicRelevancy(): boolean {
-    // Validate that supplementary content is appropriately matched to daily topics
-    let violationsFound = false;
-    
-    // This is a placeholder for more sophisticated relevancy validation
-    // The current implementation already handles relevancy during scheduling
-    
-    return violationsFound;
+    // This could validate that Phase 3 content is appropriately matched to daily topics
+    // For now, we trust the relevancy scoring system used during scheduling
+    return false;
   }
 
   private findTaskForResource(resourceId: string): ScheduledTask | null {
@@ -1144,27 +1355,38 @@ class FourPhaseAdvancedScheduler {
     }
     
     if (unscheduledResources.length > 0) {
+      // Categorize unscheduled by phase
+      const unscheduledPhase1 = unscheduledResources.filter(r => this.phase1Resources.has(r.id));
+      const unscheduledPhase2 = unscheduledResources.filter(r => this.phase2Resources.has(r.id));
+      const unscheduledPhase3 = unscheduledResources.filter(r => this.phase3Resources.has(r.id));
+      
       this.notifications.push({
         type: 'warning',
-        message: `${unscheduledResources.length} resources could not be scheduled due to time constraints`
+        message: `${unscheduledResources.length} resources unscheduled: ${unscheduledPhase1.length} Phase 1, ${unscheduledPhase2.length} Phase 2, ${unscheduledPhase3.length} Phase 3`
       });
       
-      // Log details of first few unscheduled resources
-      const detailLimit = Math.min(5, unscheduledResources.length);
-      for (let i = 0; i < detailLimit; i++) {
-        const resource = unscheduledResources[i];
-        this.notifications.push({
-          type: 'warning',
-          message: `Unscheduled: "${resource.title}" (${resource.durationMinutes} min, ${resource.domain})`
-        });
-      }
-      
-      if (unscheduledResources.length > detailLimit) {
-        this.notifications.push({
-          type: 'info',
-          message: `... and ${unscheduledResources.length - detailLimit} more unscheduled resources`
-        });
-      }
+      // Log details of first few unscheduled resources from each phase
+      [
+        { resources: unscheduledPhase1, phase: 'Phase 1' },
+        { resources: unscheduledPhase2, phase: 'Phase 2' },
+        { resources: unscheduledPhase3, phase: 'Phase 3' }
+      ].forEach(({ resources, phase }) => {
+        const detailLimit = Math.min(3, resources.length);
+        for (let i = 0; i < detailLimit; i++) {
+          const resource = resources[i];
+          this.notifications.push({
+            type: 'warning',
+            message: `${phase} unscheduled: "${resource.title}" (${resource.durationMinutes} min, ${resource.domain})`
+          });
+        }
+        
+        if (resources.length > detailLimit) {
+          this.notifications.push({
+            type: 'info',
+            message: `... and ${resources.length - detailLimit} more ${phase} resources`
+          });
+        }
+      });
     }
   }
 
@@ -1179,23 +1401,39 @@ class FourPhaseAdvancedScheduler {
       ? ((totalScheduledTime / totalAvailableTime) * 100).toFixed(1)
       : '0';
     
-    this.notifications.push({
-      type: 'info',
-      message: `Schedule generated: ${totalScheduledTime} minutes scheduled out of ${totalAvailableTime} minutes available (${utilizationPercentage}% utilization)`
-    });
-    
-    // Count resources by phase
+    // Calculate statistics by phase
     const scheduledResourceIds = new Set<string>();
+    let phase1Count = 0, phase2Count = 0, phase3Count = 0;
+    
     for (const day of this.schedule) {
       for (const task of day.tasks) {
-        scheduledResourceIds.add(task.originalResourceId || task.resourceId);
+        const resourceId = task.originalResourceId || task.resourceId;
+        scheduledResourceIds.add(resourceId);
+        
+        if (this.phase1Resources.has(resourceId)) phase1Count++;
+        else if (this.phase2Resources.has(resourceId)) phase2Count++;
+        else if (this.phase3Resources.has(resourceId)) phase3Count++;
       }
     }
     
     this.notifications.push({
       type: 'info',
-      message: `Total resources scheduled: ${scheduledResourceIds.size} out of ${this.allResources.size} available`
+      message: `Schedule: ${totalScheduledTime} min scheduled / ${totalAvailableTime} min available (${utilizationPercentage}% utilization)`
     });
+    
+    this.notifications.push({
+      type: 'info',
+      message: `Resources by phase: ${phase1Count} Phase 1, ${phase2Count} Phase 2, ${phase3Count} Phase 3 (${scheduledResourceIds.size} total)`
+    });
+    
+    // Board Vitals completion rate
+    if (this.totalBoardVitalsQuestions > 0) {
+      const bvCompletionRate = ((this.scheduledBoardVitalsQuestions / this.totalBoardVitalsQuestions) * 100).toFixed(1);
+      this.notifications.push({
+        type: 'info',
+        message: `Board Vitals: ${this.scheduledBoardVitalsQuestions}/${this.totalBoardVitalsQuestions} questions scheduled (${bvCompletionRate}%)`
+      });
+    }
   }
 
   /**
@@ -1214,14 +1452,14 @@ class FourPhaseAdvancedScheduler {
       
       this.notifications.push({
         type: 'info',
-        message: `Starting 4-phase scheduling algorithm for ${this.studyDays.length} study days`
+        message: `Starting ENHANCED 4-phase scheduling for ${this.studyDays.length} study days with strict compliance`
       });
       
-      // Execute the complete 4-phase algorithm
-      this.executePhase1(); // Primary Content Distribution (Round-Robin)
-      this.executePhase2(); // Daily Requirements (First-Fit)
-      this.executePhase3(); // Supplementary Content (Relevancy-Based)
-      this.executePhase4(); // Validation and Optimization
+      // Execute the complete enhanced 4-phase algorithm
+      this.executePhase1(); // Primary Content Distribution (Round-Robin with Enhanced Pairing)
+      this.executePhase2(); // Daily Requirements (Saturating First-Fit)
+      this.executePhase3(); // Supplementary Content (STRICT Global Gating)
+      this.executePhase4(); // Enhanced Validation and Optimization
       
       // Finalize the schedule
       this.finalizeSchedule();
@@ -1231,7 +1469,7 @@ class FourPhaseAdvancedScheduler {
       
       this.notifications.push({
         type: 'info',
-        message: '4-phase scheduling algorithm completed successfully'
+        message: 'ENHANCED 4-phase scheduling algorithm completed with strict compliance enforcement'
       });
       
       return {
@@ -1253,7 +1491,7 @@ class FourPhaseAdvancedScheduler {
     } catch (error) {
       this.notifications.push({
         type: 'error',
-        message: `Scheduling algorithm failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+        message: `Enhanced scheduling algorithm failed: ${error instanceof Error ? error.message : 'Unknown error'}`
       });
       
       return this.createEmptyPlan();
@@ -1318,7 +1556,7 @@ export const generateInitialSchedule = (
   endDateStr: string,
   areSpecialTopicsInterleaved: boolean | undefined
 ): GeneratedStudyPlanOutcome => {
-  const scheduler = new FourPhaseAdvancedScheduler(
+  const scheduler = new StrictFourPhaseScheduler(
     startDateStr,
     endDateStr,
     exceptionRules,
@@ -1362,8 +1600,8 @@ export const rebalanceSchedule = (
     !completedResourceIds.has(resource.id) && !resource.isArchived
   );
   
-  // Create new scheduler for remaining period
-  const scheduler = new FourPhaseAdvancedScheduler(
+  // Create new enhanced scheduler for remaining period
+  const scheduler = new StrictFourPhaseScheduler(
     rebalanceStartDate,
     currentPlan.endDate,
     exceptionRules,
