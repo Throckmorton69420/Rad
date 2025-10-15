@@ -1,6 +1,6 @@
 import React from 'react';
 import { StudyPlan, DailySchedule } from '../types';
-import { formatDuration, parseDateString } from '../utils/timeFormatter';
+import { formatDuration } from '../utils/timeFormatter';
 
 interface ScheduleReportProps {
   studyPlan: StudyPlan;
@@ -8,140 +8,167 @@ interface ScheduleReportProps {
 }
 
 const ScheduleReport: React.FC<ScheduleReportProps> = ({ studyPlan, schedule }) => {
-  const scheduleToRender = schedule || studyPlan.schedule;
-  const totalPlannedMinutes = scheduleToRender.reduce(
-    (acc, day) =>
-      acc +
-      (day.isRestDay
-        ? 0
-        : day.tasks.reduce((taskAcc, task) => taskAcc + task.durationMinutes, 0)),
-    0
+  const scheduleToShow = schedule || studyPlan.schedule;
+  const studyDays = scheduleToShow.filter(day => !day.isRestDay);
+  
+  const totalTime = studyDays.reduce((sum, day) => 
+    sum + day.tasks.reduce((daySum, task) => daySum + task.durationMinutes, 0), 0
   );
 
   return (
-    <div className="printable-report" style={{ padding: '16px', fontFamily: 'serif', color: 'black', backgroundColor: 'white' }}>
-      {/* Inline header - NO separate container */}
-      <div style={{ textAlign: 'center', marginBottom: '24px', borderBottom: '1px solid #ddd', paddingBottom: '16px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: '#666', marginBottom: '8px' }}>
-          <span>Radiology Core Exam Study Planner</span>
-          <span>{new Date().toLocaleString()}</span>
-        </div>
-        <h1 style={{ fontSize: '24px', fontWeight: 'bold', margin: '8px 0' }}>
-          Radiology Core Exam - Study Schedule Report
-        </h1>
-        {scheduleToRender.length > 0 && (
-          <>
-            <p style={{ fontSize: '16px', color: '#666', margin: '4px 0' }}>
-              {parseDateString(scheduleToRender[0].date).toLocaleDateString('en-US', {
-                timeZone: 'UTC',
-                month: 'long',
-                day: 'numeric',
-                year: 'numeric',
-              })}{' '}
-              -{' '}
-              {parseDateString(
-                scheduleToRender[scheduleToRender.length - 1].date
-              ).toLocaleDateString('en-US', {
-                timeZone: 'UTC',
-                month: 'long',
-                day: 'numeric',
-                year: 'numeric',
-              })}
-            </p>
-            <p style={{ fontSize: '14px', color: '#888', margin: '4px 0' }}>
-              Total Planned Study Time: {formatDuration(totalPlannedMinutes)}
-            </p>
-          </>
-        )}
+    <div className="print-report">
+      {/* Print Styles */}
+      <style>{`
+        @media print {
+          body * { visibility: hidden; }
+          .print-report, .print-report * { visibility: visible; }
+          .print-report {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+            background: white !important;
+            color: black !important;
+            font-family: Arial, sans-serif;
+            font-size: 11px;
+            line-height: 1.3;
+          }
+          .print-header {
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #333;
+          }
+          .print-title {
+            font-size: 24px;
+            font-weight: bold;
+            margin: 0 0 10px 0;
+            text-align: center;
+          }
+          .print-subtitle {
+            font-size: 16px;
+            margin: 0 0 5px 0;
+            text-align: center;
+          }
+          .print-summary {
+            font-size: 12px;
+            text-align: center;
+            margin: 0;
+          }
+          .day-section {
+            margin-bottom: 25px;
+            page-break-inside: avoid;
+          }
+          .day-header {
+            font-size: 16px;
+            font-weight: bold;
+            margin-bottom: 8px;
+            padding: 5px;
+            background: #f0f0f0;
+            border: 1px solid #ccc;
+          }
+          .task-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 10px;
+          }
+          .task-table th,
+          .task-table td {
+            border: 1px solid #ccc;
+            padding: 4px 6px;
+            text-align: left;
+            vertical-align: top;
+          }
+          .task-table th {
+            background: #f8f8f8;
+            font-weight: bold;
+            font-size: 10px;
+          }
+          .task-table td {
+            font-size: 10px;
+          }
+          .day-total {
+            font-weight: bold;
+            text-align: right;
+            background: #f0f0f0;
+          }
+          .no-tasks {
+            text-align: center;
+            color: #666;
+            font-style: italic;
+            padding: 20px;
+          }
+          @page {
+            margin: 0.5in;
+            size: letter;
+          }
+        }
+      `}</style>
+
+      {/* Report Header */}
+      <div className="print-header">
+        <h1 className="print-title">Radiology Core Exam - Study Schedule Report</h1>
+        <h2 className="print-subtitle">
+          {studyPlan.startDate} - {studyPlan.endDate}
+        </h2>
+        <p className="print-summary">
+          Total Planned Study Time: {formatDuration(totalTime)}
+        </p>
       </div>
 
-      {/* Schedule content starts IMMEDIATELY after header */}
-      <main style={{ marginTop: 0 }}>
-        {scheduleToRender.map((day) => (
-          <div key={day.date} className="print-no-break" style={{ marginBottom: '32px' }}>
-            <h2
-              style={{
-                fontSize: '18px',
-                fontWeight: 'bold',
-                marginBottom: '12px',
-                borderBottom: '2px solid #666',
-                paddingBottom: '8px',
-                color: '#333',
-              }}
-            >
-              {parseDateString(day.date).toLocaleDateString('en-US', {
-                weekday: 'long',
-                year: 'numeric',
-                month: 'long',
-                day: 'numeric',
-                timeZone: 'UTC',
-              })}
-            </h2>
-            {day.isRestDay ? (
-              <p style={{ fontStyle: 'italic', color: '#888', padding: '16px 8px', backgroundColor: '#f9f9f9', borderRadius: '4px' }}>
-                Rest Day
-              </p>
-            ) : day.tasks.length === 0 ? (
-              <p style={{ fontStyle: 'italic', color: '#888', padding: '16px 8px', backgroundColor: '#f9f9f9', borderRadius: '4px' }}>
-                No tasks scheduled for a planned duration of{' '}
-                {formatDuration(day.totalStudyTimeMinutes)}.
-              </p>
-            ) : (
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px' }}>
-                <thead style={{ borderBottom: '2px solid #ddd', backgroundColor: '#f3f3f3' }}>
-                  <tr>
-                    <th style={{ padding: '8px', textAlign: 'left', width: '60%', fontWeight: '600', color: '#555' }}>
-                      Task
-                    </th>
-                    <th style={{ padding: '8px', textAlign: 'right', width: '15%', fontWeight: '600', color: '#555' }}>
-                      Duration
-                    </th>
-                    <th style={{ padding: '8px', textAlign: 'left', width: '25%', fontWeight: '600', color: '#555' }}>
-                      Topic
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {day.tasks.map((task, index) => (
-                    <tr
-                      key={task.id}
-                      className="print-no-break"
-                      style={{
-                        borderBottom: '1px solid #eee',
-                        backgroundColor: index % 2 !== 0 ? '#fafafa' : 'transparent',
-                      }}
-                    >
-                      <td style={{ padding: '6px 8px' }}>{task.title}</td>
-                      <td style={{ padding: '6px 8px', textAlign: 'right' }}>
-                        {formatDuration(task.durationMinutes)}
-                      </td>
-                      <td style={{ padding: '6px 8px', fontSize: '10px', color: '#666' }}>
-                        {task.originalTopic}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-                <tfoot>
-                  <tr style={{ borderTop: '2px solid #ddd' }}>
-                    <td style={{ paddingTop: '8px', fontWeight: 'bold', textAlign: 'right' }}>
-                      Total Time:
-                    </td>
-                    <td style={{ paddingTop: '8px', fontWeight: 'bold', textAlign: 'right', paddingRight: '8px' }}>
-                      {formatDuration(
-                        day.tasks.reduce((acc, t) => acc + t.durationMinutes, 0)
-                      )}
-                    </td>
-                    <td></td>
-                  </tr>
-                </tfoot>
-              </table>
-            )}
-          </div>
-        ))}
-      </main>
-      <footer style={{ marginTop: '32px', paddingTop: '16px', borderTop: '1px solid #ddd', textAlign: 'center', fontSize: '10px', color: '#888' }}>
-        End of Report
-      </footer>
+      {/* Schedule Content */}
+      {studyDays.length > 0 ? (
+        studyDays.map((day) => {
+          const dayTotal = day.tasks.reduce((sum, task) => sum + task.durationMinutes, 0);
+          
+          return (
+            <div key={day.date} className="day-section">
+              <div className="day-header">
+                {day.dayName}, {new Date(day.date + 'T00:00:00Z').toLocaleDateString('en-US', { 
+                  month: 'long', 
+                  day: 'numeric', 
+                  year: 'numeric',
+                  timeZone: 'UTC'
+                })}
+              </div>
+              
+              {day.tasks.length > 0 ? (
+                <>
+                  <table className="task-table">
+                    <thead>
+                      <tr>
+                        <th style={{width: '60%'}}>Task</th>
+                        <th style={{width: '15%'}}>Duration</th>
+                        <th style={{width: '25%'}}>Topic</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {day.tasks.map((task) => (
+                        <tr key={task.id}>
+                          <td>{task.title}</td>
+                          <td>{formatDuration(task.durationMinutes)}</td>
+                          <td>{task.originalTopic.replace(/_/g, ' ')}</td>
+                        </tr>
+                      ))}
+                      <tr>
+                        <td className="day-total" colSpan={2}>
+                          <strong>Total Time</strong>
+                        </td>
+                        <td className="day-total">
+                          <strong>{formatDuration(dayTotal)}</strong>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </>
+              ) : (
+                <div className="no-tasks">No tasks scheduled for this day</div>
+              )}
+            </div>
+          );
+        })
+      ) : (
+        <div className="no-tasks">No study days found in the selected range</div>
+      )}
     </div>
   );
 };
