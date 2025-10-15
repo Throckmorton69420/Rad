@@ -732,7 +732,8 @@ const App: React.FC = () => {
                                 onReorderTasks={handleReorderTasks}
                               />
                             );
-                          })()}
+                          })()
+                        }
                         </div>
                         
                         <div className={activeTab !== 'progress' ? 'hidden' : ''}>
@@ -753,6 +754,7 @@ const App: React.FC = () => {
                                 onClearHighlights={() => setHighlightedDates([])}
                                 filters={contentUiFilters}
                                 onFiltersChange={setContentUiFilters}
+                                onOpenPrintModal={() => { setActiveTab('content'); setIsPrintModalOpen(true); }}
                             />
                         </div>
                     </div>
