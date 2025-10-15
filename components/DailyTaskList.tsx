@@ -17,7 +17,7 @@ type DragState = { fromId: string | null };
 const normalizeSource = (t: ScheduledTask) =>
   (t.bookSource || t.videoSource || 'Custom Task').trim();
 
-// Default group order as requested by user
+// Your preferred source order
 const SOURCE_RANK: Record<string, number> = {
   'Titan Radiology': 1,
   'Crack the Core': 2,
