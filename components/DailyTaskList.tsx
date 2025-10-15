@@ -1,8 +1,9 @@
-import React, { useMemo, useState, useEffect } from 'react';
+import React from 'react';
 import { DailySchedule, ScheduledTask } from '../types';
-import { formatDuration, parseDateString } from '../utils/timeFormatter';
+import { parseDateString, formatDuration } from '../utils/timeFormatter';
 import { Button } from './Button';
-import { getCategoryRankFromTask, sortTasksByGlobalPriority, CATEGORY_LABEL } from '../utils/taskPriority';
+import TaskGroupItem from './TaskGroupItem';
+import TaskItem from './TaskItem';
 
 interface DailyTaskListProps {
   day: DailySchedule;
@@ -11,182 +12,159 @@ interface DailyTaskListProps {
   onReorderTasks?: (date: string, tasks: ScheduledTask[]) => void;
 }
 
-// Build grouped tabs from tasks in canonical (global) order
-const useGroupedTabs = (tasks: ScheduledTask[]) => {
-  const canonical = useMemo(() => [...tasks].sort(sortTasksByGlobalPriority), [tasks]);
+type DragState = { fromId: string | null };
 
-  const grouped = useMemo(() => {
-    const map = new Map<number, ScheduledTask[]>();
-    canonical.forEach(t => {
-      const c = getCategoryRankFromTask(t);
-      if (!map.has(c)) map.set(c, []);
-      map.get(c)!.push(t);
-    });
-    return map;
-  }, [canonical]);
+const normalizeSource = (t: ScheduledTask) =>
+  (t.bookSource || t.videoSource || 'Custom Task').trim();
 
-  const defaultTabOrder = useMemo(() => Array.from(grouped.keys()).sort((a, b) => a - b), [grouped]);
-
-  return { canonical, grouped, defaultTabOrder };
+// Default group order as requested by user
+const SOURCE_RANK: Record<string, number> = {
+  'Titan Radiology': 1,
+  'Crack the Core': 2,
+  'Case Companion': 3,
+  'Core Radiology': 4,
+  'Board Vitals': 5,
+  'Huda Text': 6,
+  'Huda Gbank': 7,
+  'Qevlar': 8,
+  'Nuclear Medicine': 9,
+  'Discord': 10,
+  'NIS / RISC': 11,
+  'RadPrimer': 12,
+  'Other': 999,
+  'Custom Task': 1000,
 };
 
-const DailyTaskList: React.FC<DailyTaskListProps> = ({ day, onToggleTask, onOpenModify, onReorderTasks }) => {
-  // Group by category rank
-  const { canonical, grouped, defaultTabOrder } = useGroupedTabs(day.tasks);
+const getSourceRank = (sourceName: string) => SOURCE_RANK[sourceName] ?? 998;
 
-  // Local state for tab order + per-tab item orders
-  const [tabOrder, setTabOrder] = useState<number[]>(defaultTabOrder);
-  const [itemsByTab, setItemsByTab] = useState<Record<number, ScheduledTask[]>>(() => {
-    const rec: Record<number, ScheduledTask[]> = {};
-    defaultTabOrder.forEach(k => (rec[k] = grouped.get(k)!));
-    return rec;
-  });
+const DailyTaskList: React.FC<DailyTaskListProps> = ({
+  day,
+  onToggleTask,
+  onOpenModify,
+  onReorderTasks,
+}) => {
+  // Maintain on-screen order for DnD; reset whenever tasks change
+  const [ordered, setOrdered] = React.useState<ScheduledTask[]>(day.tasks);
+  React.useEffect(() => setOrdered(day.tasks), [day.tasks]);
 
-  // Track what’s being dragged (tab or task)
-  const [dragTab, setDragTab] = useState<number | null>(null);
-  const [dragTask, setDragTask] = useState<{ cat: number; id: string } | null>(null);
+  // Build groups by source; sort groups by preferred rank
+  const groups = React.useMemo(() => {
+    const m = new Map<string, ScheduledTask[]>();
+    for (const t of ordered) {
+      const key = normalizeSource(t);
+      if (!m.has(key)) m.set(key, []);
+      m.get(key)!.push(t);
+    }
+    // sort groups by rank, but keep tasks within group in current order
+    const sortedEntries = Array.from(m.entries()).sort((a, b) => getSourceRank(a[0]) - getSourceRank(b[0]));
+    return new Map(sortedEntries);
+  }, [ordered]);
 
-  // Active tab
-  const [activeTab, setActiveTab] = useState<number>(defaultTabOrder[0] ?? 1);
+  // Collapsed by default: start with no expanded groups
+  const [expanded, setExpanded] = React.useState<Set<string>>(new Set());
 
-  // Sync when external tasks change
-  useEffect(() => {
-    setTabOrder(defaultTabOrder);
-    const rec: Record<number, ScheduledTask[]> = {};
-    defaultTabOrder.forEach(k => (rec[k] = grouped.get(k)!));
-    setItemsByTab(rec);
-    setActiveTab(defaultTabOrder[0] ?? 1);
-  }, [canonical, grouped, defaultTabOrder]);
+  const toggleGroup = (key: string) =>
+    setExpanded(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
 
-  // Helpers
-  const totalTime = useMemo(
-    () => Object.values(itemsByTab).flat().reduce((s, t) => s + t.durationMinutes, 0),
-    [itemsByTab]
+  const totalMinutes = React.useMemo(
+    () => ordered.reduce((s, t) => s + t.durationMinutes, 0),
+    [ordered]
   );
 
-  const flattenedCurrentOrder = useMemo(() => {
-    // Flatten respecting current tab order then each tab’s item order
-    const list: ScheduledTask[] = [];
-    tabOrder.forEach(cat => {
-      const arr = itemsByTab[cat] ?? [];
-      arr.forEach(item => list.push(item));
-    });
-    return list;
-  }, [tabOrder, itemsByTab]);
-
-  // Drag handlers for tabs
-  const onTabDragStart = (cat: number) => setDragTab(cat);
-  const onTabDragOver = (e: React.DragEvent) => e.preventDefault();
-  const onTabDrop = (targetCat: number) => {
-    if (dragTab == null || dragTab === targetCat) return;
-    setTabOrder(prev => {
+  // Native drag-and-drop for tasks across entire day
+  const dragRef = React.useRef<DragState>({ fromId: null });
+  const onTaskDragStart = (id: string) => (dragRef.current.fromId = id);
+  const onTaskDragOver = (e: React.DragEvent) => e.preventDefault();
+  const onTaskDrop = (targetId: string) => {
+    const fromId = dragRef.current.fromId;
+    if (!fromId || fromId === targetId) return;
+    setOrdered(prev => {
       const next = [...prev];
-      const from = next.indexOf(dragTab);
-      const to = next.indexOf(targetCat);
+      const from = next.findIndex(t => t.id === fromId);
+      const to = next.findIndex(t => t.id === targetId);
       if (from < 0 || to < 0) return prev;
-      const [m] = next.splice(from, 1);
-      next.splice(to, 0, m);
+      const [moved] = next.splice(from, 1);
+      next.splice(to, 0, moved);
       return next;
     });
-    setDragTab(null);
+    dragRef.current.fromId = null;
   };
 
-  // Drag handlers for items inside a tab (no cross-tab moves)
-  const onItemDragStart = (cat: number, id: string) => setDragTask({ cat, id });
-  const onItemDragOver = (e: React.DragEvent) => e.preventDefault();
-  const onItemDrop = (cat: number, targetId: string) => {
-    if (!dragTask || dragTask.cat !== cat) return;
-    setItemsByTab(prev => {
-      const arr = prev[cat] ? [...prev[cat]] : [];
-      const from = arr.findIndex(t => t.id === dragTask.id);
-      const to = arr.findIndex(t => t.id === targetId);
-      if (from < 0 || to < 0) return prev;
-      const next = { ...prev };
-      const [m] = arr.splice(from, 1);
-      arr.splice(to, 0, m);
-      next[cat] = arr;
-      return next;
-    });
-    setDragTask(null);
-  };
-
-  // Persist: renumber order and send up
   const persist = () => {
-    const reindexed = flattenedCurrentOrder.map((t, i) => ({ ...t, order: i }));
+    const reindexed = ordered.map((t, i) => ({ ...t, order: i }));
     onReorderTasks?.(day.date, reindexed);
+  };
+
+  const renderGroup = (sourceName: string, tasks: ScheduledTask[]) => {
+    const key = sourceName || 'Custom Task';
+    const isExpanded = expanded.has(key);
+    return (
+      <div key={key} className="mb-3">
+        <TaskGroupItem
+          groupKey={key}
+          sourceName={sourceName}
+          tasks={tasks}
+          isExpanded={isExpanded}
+          onToggle={() => toggleGroup(key)}
+        />
+        {isExpanded && (
+          <div id={`task-group-${key}`} className="mt-2 space-y-1.5 pl-4">
+            {tasks.map(task => (
+              <div
+                key={task.id}
+                draggable
+                onDragStart={() => onTaskDragStart(task.id)}
+                onDragOver={onTaskDragOver}
+                onDrop={() => onTaskDrop(task.id)}
+              >
+                <TaskItem
+                  task={task}
+                  onToggle={onToggleTask}
+                  isCurrentPomodoroTask={false}
+                  isPulsing={false}
+                  onSetPomodoro={() => {}}
+                />
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
   };
 
   return (
     <div className="space-y-3">
-      {/* Header */}
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-semibold">
-          {parseDateString(day.date).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', timeZone: 'UTC' })}
+          {parseDateString(day.date).toLocaleDateString('en-US', {
+            weekday: 'long',
+            month: 'long',
+            day: 'numeric',
+            timeZone: 'UTC',
+          })}
         </h3>
         <div className="flex items-center gap-2">
-          <span className="text-sm opacity-80">{formatDuration(totalTime)}</span>
+          <span className="text-sm opacity-80">{formatDuration(totalMinutes)}</span>
           <Button size="sm" variant="secondary" onClick={() => onOpenModify(day.date)}>
-            <i className="fas fa-edit mr-2" /> Modify
+            <i className="fas fa-edit mr-2" />
+            Modify
           </Button>
           {onReorderTasks && (
             <Button size="sm" variant="primary" onClick={persist}>
-              <i className="fas fa-save mr-2" /> Save Order
+              <i className="fas fa-save mr-2" />
+              Save Order
             </Button>
           )}
         </div>
       </div>
 
-      {/* Tab bar with drag handles */}
-      <div className="flex flex-wrap gap-1">
-        {tabOrder.map(cat => {
-          const count = (itemsByTab[cat] ?? []).length;
-          const isActive = cat === activeTab;
-          return (
-            <button
-              key={cat}
-              draggable
-              onDragStart={() => onTabDragStart(cat)}
-              onDragOver={onTabDragOver}
-              onDrop={() => onTabDrop(cat)}
-              onClick={() => setActiveTab(cat)}
-              className={`px-2.5 py-1 rounded-md text-xs transition ${
-                isActive ? 'bg-[var(--accent-purple)] text-white' : 'glass-panel glass-panel-interactive'
-              }`}
-              aria-pressed={isActive}
-              title="Drag to reorder tabs; click to activate"
-            >
-              <i className="fas fa-grip-lines mr-1 opacity-70" />
-              {CATEGORY_LABEL[cat] || `Cat ${cat}`} • {count}
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Tab content */}
-      <div className="rounded-lg glass-panel p-2">
-        {(itemsByTab[activeTab] ?? []).map(task => (
-          <div
-            key={task.id}
-            className={`flex items-center p-2 rounded-lg glass-panel glass-panel-interactive mb-2 ${
-              dragTask?.id === task.id ? 'opacity-50' : ''
-            }`}
-            draggable
-            onDragStart={() => onItemDragStart(activeTab, task.id)}
-            onDragOver={onItemDragOver}
-            onDrop={() => onItemDrop(activeTab, task.id)}
-            onDragEnd={() => setDragTask(null)}
-          >
-            <i className="fas fa-grip-vertical mr-3 cursor-grab text-[var(--text-secondary)]" />
-            <div className="flex-grow min-w-0">
-              <div className="text-sm font-medium truncate" title={task.title}>{task.title}</div>
-              <div className="text-xs opacity-70">{task.originalTopic}</div>
-            </div>
-            <div className="ml-3 text-sm font-semibold">{formatDuration(task.durationMinutes)}</div>
-            <Button size="sm" variant="ghost" className="ml-2" onClick={() => onToggleTask(task.id)}>
-              <i className={`fas ${task.status === 'completed' ? 'fa-check-circle text-green-400' : 'fa-circle text-[var(--text-secondary)]'}`} />
-            </Button>
-          </div>
-        ))}
+      <div>
+        {Array.from(groups.entries()).map(([sourceName, tasks]) => renderGroup(sourceName, tasks))}
       </div>
     </div>
   );
