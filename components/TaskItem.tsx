@@ -42,7 +42,7 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, onToggle, isCurrentPomodoroTa
   };
   
   const containerClasses = [
-    'p-1.5', 'rounded-lg', 'transition-all', 'duration-150', 'relative',
+    'p-1', 'rounded-lg', 'transition-all', 'duration-150', 'relative',
     'overflow-hidden', 'cursor-pointer', 'glass-panel', 'glass-panel-interactive',
     isCompleted ? 'opacity-60' : 'opacity-100',
     isCurrentPomodoroTask ? 'is-pomodoro-active' : ''
@@ -68,12 +68,12 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, onToggle, isCurrentPomodoroTa
           </button>
 
           <div className="flex-grow min-w-0 flex flex-col items-start">
-            <h4 className={`text-base font-semibold ${titleColor} ${isCompleted ? 'line-through' : ''} leading-snug`} title={displayTitle}>
+            <h4 className={`text-sm font-semibold ${titleColor} ${isCompleted ? 'line-through' : ''} leading-tight`} title={displayTitle}>
               {displayTitle}
             </h4>
             {(task.bookSource || task.videoSource) && (
               <span 
-                  className="text-xs font-semibold px-2 py-0.5 rounded-md mt-1 max-w-full truncate"
+                  className="text-xs font-semibold px-2 py-0.5 rounded-md mt-0.5 max-w-full truncate"
                   style={{ backgroundColor: sourceColorStyle.backgroundColor, color: sourceColorStyle.color }}
                   title={task.bookSource || task.videoSource}
               >
@@ -82,7 +82,7 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, onToggle, isCurrentPomodoroTa
             )}
           </div>
 
-          <div className="flex flex-col items-end justify-start ml-2 flex-shrink-0 min-w-[70px]">
+          <div className="flex flex-col items-end justify-start ml-2 flex-shrink-0 min-w-[64px]">
             <div className="text-sm text-[var(--text-primary)] font-medium">
               {(task.actualStudyTimeMinutes !== undefined && task.actualStudyTimeMinutes > 0) ? (
                     <span className="text-[var(--accent-green)]" title={`Logged: ${formatDuration(task.actualStudyTimeMinutes)}`}>{formatDuration(task.durationMinutes)}</span>
@@ -94,7 +94,7 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, onToggle, isCurrentPomodoroTa
               onClick={(e) => { e.stopPropagation(); onSetPomodoro(); }} 
               variant={isCurrentPomodoroTask ? "primary" : "ghost"} 
               size="sm"
-              className={`!text-xxs !py-0.5 !px-1.5 mt-1`}
+              className={`!text-xxs !py-0.5 !px-1 mt-1`}}
               disabled={isCompleted}
               title="Set Pomodoro Timer for this task"
             >
@@ -103,7 +103,7 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, onToggle, isCurrentPomodoroTa
           </div>
         </div>
         
-        <div className="pl-9 mt-1.5 flex items-center flex-wrap gap-x-2 gap-y-1 text-xs">
+        <div className="pl-9 mt-1 flex items-center flex-wrap gap-x-1.5 gap-y-1 text-xs">
             <span 
                 className="text-xxs px-2 py-0.5 rounded-full font-semibold"
                 style={getDomainColorStyle(task.originalTopic)}
