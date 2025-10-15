@@ -94,7 +94,7 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, onToggle, isCurrentPomodoroTa
               onClick={(e) => { e.stopPropagation(); onSetPomodoro(); }} 
               variant={isCurrentPomodoroTask ? "primary" : "ghost"} 
               size="sm"
-              className={`!text-xxs !py-0.5 !px-1 mt-1`}}
+              className={`!text-xxs !py-0.5 !px-1 mt-1`}
               disabled={isCompleted}
               title="Set Pomodoro Timer for this task"
             >
