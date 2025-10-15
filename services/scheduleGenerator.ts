@@ -24,64 +24,82 @@ import { getTodayInNewYork, parseDateString, isoDate } from '../utils/timeFormat
 import { sortTasksByGlobalPriority } from '../utils/taskPriority';
 
 /**
- * TEMPLATE-BASED SEQUENTIAL SCHEDULER
+ * STRICT 6-STEP DAILY TEMPLATE SCHEDULER
  * 
- * Each day follows EXACTLY this template:
- * 1. Titan video(s) + paired Crack the Core + paired Case Companion + paired QEVLAR
- * 2. Huda physics lecture + paired Huda QB + paired Huda textbook
- * 3. Titan nucs + paired Crack the Core + War Machine + NucApp + QEVLAR nucs
- * 4. NIS/RISC documents + paired NIS QB + relevant QEVLAR
- * 5. Board Vitals mixed questions (single synthetic task)
- * 6. Titan physics videos + War Machine + Physics app + QEVLAR physics
- * 7. ONLY THEN: supplementary content (Discord → Core Radiology)
+ * EXACTLY implements your daily structure:
+ * Step 1: Titan video + paired Crack the Core + paired Case Companion + paired QEVLAR
+ * Step 2: Huda physics lecture + paired Huda QB + paired Huda textbook  
+ * Step 3: Titan nucs + paired Crack the Core + War Machine + NucApp + QEVLAR nucs
+ * Step 4: NIS/RISC documents + paired NIS QB + relevant QEVLAR
+ * Step 5: Board Vitals mixed questions (single synthetic task with suggested subjects)
+ * Step 6: Titan physics videos + War Machine + Physics app + QEVLAR physics
+ * Step 7: ONLY AFTER all above complete: Discord lectures → Core Radiology (relevancy-based)
+ *
+ * Topic order follows exact Titan video sequence.
  */
 
-// Exact Titan topic sequence
+// EXACT Titan sequence from your PDF
 const TITAN_SEQUENCE = [
   'pancreas', 'liver', 'renal', 'reproductive', 'abdominal barium',
   'chest', 'thyroid', 'musculoskeletal', 'neuro', 'pediatric', 
   'cardiac', 'breast', 'nuclear', 'interventional', 'vascular', 'physics'
 ];
 
-interface DailyTemplate {
-  date: string;
-  dayIndex: number;
-  titanTopicIndex: number;
-  titanTopic: string;
-  completedSteps: Set<number>; // Track which steps are complete
-}
-
-interface ResourcePool {
+interface ResourcePools {
+  // Primary pools for template steps
   titanVideos: StudyResource[];
   crackTheCore: StudyResource[];
   caseCompanion: StudyResource[];
   qevlar: StudyResource[];
   huda: StudyResource[];
   nuclear: StudyResource[];
+  warMachine: StudyResource[];
   nucApp: StudyResource[];
   nisRisc: StudyResource[];
   boardVitals: StudyResource[];
   physics: StudyResource[];
+  physicsApp: StudyResource[];
+  
+  // Supplementary pools for step 7
   discord: StudyResource[];
   coreRadiology: StudyResource[];
 }
 
-class TemplateBasedScheduler {
+interface DailyExecution {
+  date: string;
+  titanTopic: string;
+  titanTopicIndex: number;
+  stepsCompleted: number;
+  coveredDomains: Set<Domain>;
+}
+
+class StrictTemplateScheduler {
   private allResources = new Map<string, StudyResource>();
-  private remainingResources = new Set<string>();
+  private availableResources = new Set<string>();
+  
   private schedule: DailySchedule[] = [];
   private studyDays: DailySchedule[] = [];
-  private dailyTemplates: DailyTemplate[] = [];
-  private notifications: Array<{type: 'error' | 'warning' | 'info', message: string}> = [];
+  private dailyExecutions: DailyExecution[] = [];
   
-  private pools: ResourcePool;
-  private coveredTopicsPerDay = new Map<string, Set<Domain>>();
+  private pools: ResourcePools;
+  private notifications: Array<{type: 'error' | 'warning' | 'info', message: string}> = [];
   private taskCounter = 0;
   
-  // Board Vitals tracking
+  // Board Vitals quota tracking
   private totalBoardVitalsQuestions = 0;
   private scheduledBoardVitalsQuestions = 0;
   
+  // Global iterators for resource consumption
+  private globalIterators = {
+    titan: 0,
+    huda: 0,
+    nuclear: 0,
+    nisRisc: 0,
+    physics: 0,
+    discord: 0,
+    coreRad: 0
+  };
+
   private topicOrder: Domain[];
   private deadlines: DeadlineSettings;
   private areSpecialTopicsInterleaved: boolean;
@@ -99,134 +117,129 @@ class TemplateBasedScheduler {
     this.deadlines = deadlines || {};
     this.areSpecialTopicsInterleaved = areSpecialTopicsInterleaved ?? true;
     
-    // Process and categorize resources
+    // Process resources
     const processedResources = this.chunkLargeResources(resourcePool);
     processedResources.forEach(resource => {
       this.allResources.set(resource.id, resource);
-      this.remainingResources.add(resource.id);
+      this.availableResources.add(resource.id);
     });
     
-    // Create schedule structure
+    // Create schedule
     this.schedule = this.createDaySchedules(startDateStr, endDateStr, exceptionRules);
     this.studyDays = this.schedule.filter(d => !d.isRestDay && d.totalStudyTimeMinutes > 0);
     
-    // Initialize tracking
-    this.studyDays.forEach(day => {
-      this.coveredTopicsPerDay.set(day.date, new Set<Domain>());
-    });
+    if (this.studyDays.length === 0) {
+      throw new Error('No study days available');
+    }
     
-    // Categorize resources into pools
-    this.pools = this.categorizeResourcesIntoPools();
+    // Categorize into strict pools
+    this.pools = this.categorizeIntoStrictPools();
     
-    // Create daily templates
-    this.createDailyTemplates();
+    // Create daily execution plans
+    this.createDailyExecutionPlans();
     
     this.notifications.push({
       type: 'info',
-      message: `Template scheduler initialized: ${this.studyDays.length} days, ${this.allResources.size} resources`
+      message: `Strict template scheduler: ${this.studyDays.length} days, ${this.allResources.size} resources, ${this.pools.titanVideos.length} Titan videos`
     });
   }
 
   private chunkLargeResources(resources: StudyResource[]): StudyResource[] {
-    const chunkedResources: StudyResource[] = [];
+    const chunked: StudyResource[] = [];
     
     for (const resource of resources) {
       if (resource.isSplittable && resource.durationMinutes > MIN_DURATION_for_SPLIT_PART * 1.5) {
-        const numberOfParts = Math.ceil(resource.durationMinutes / MIN_DURATION_for_SPLIT_PART);
-        const minutesPerPart = Math.floor(resource.durationMinutes / numberOfParts);
+        const parts = Math.ceil(resource.durationMinutes / MIN_DURATION_for_SPLIT_PART);
+        const perPart = Math.floor(resource.durationMinutes / parts);
         
-        for (let i = 0; i < numberOfParts; i++) {
-          const isLastPart = i === numberOfParts - 1;
-          const partDuration = isLastPart 
-            ? resource.durationMinutes - (minutesPerPart * i)
-            : minutesPerPart;
+        for (let i = 0; i < parts; i++) {
+          const isLast = i === parts - 1;
+          const duration = isLast ? resource.durationMinutes - (perPart * i) : perPart;
           
-          chunkedResources.push({
+          chunked.push({
             ...resource,
             id: `${resource.id}_part_${i + 1}`,
-            title: `${resource.title} (Part ${i + 1}/${numberOfParts})`,
-            durationMinutes: partDuration,
+            title: `${resource.title} (Part ${i + 1}/${parts})`,
+            durationMinutes: duration,
             isSplittable: false,
             pairedResourceIds: []
           });
         }
       } else {
-        chunkedResources.push(resource);
+        chunked.push(resource);
       }
     }
     
-    return chunkedResources;
+    return chunked;
   }
 
   private createDaySchedules(startDateStr: string, endDateStr: string, exceptionRules: ExceptionDateRule[]): DailySchedule[] {
     const startDate = parseDateString(startDateStr);
     const endDate = parseDateString(endDateStr);
     const exceptionMap = new Map(exceptionRules.map(rule => [rule.date, rule]));
-    const daySchedules: DailySchedule[] = [];
+    const days: DailySchedule[] = [];
 
-    for (let currentDate = new Date(startDate); currentDate <= endDate; currentDate.setUTCDate(currentDate.getUTCDate() + 1)) {
-      const dateString = isoDate(currentDate);
-      const exceptionRule = exceptionMap.get(dateString);
+    for (let date = new Date(startDate); date <= endDate; date.setUTCDate(date.getUTCDate() + 1)) {
+      const dateStr = isoDate(date);
+      const exception = exceptionMap.get(dateStr);
       
-      daySchedules.push({
-        date: dateString,
-        dayName: currentDate.toLocaleDateString('en-US', { weekday: 'long', timeZone: 'UTC' }),
+      days.push({
+        date: dateStr,
+        dayName: date.toLocaleDateString('en-US', { weekday: 'long', timeZone: 'UTC' }),
         tasks: [],
-        totalStudyTimeMinutes: Math.max(exceptionRule?.targetMinutes ?? DEFAULT_DAILY_STUDY_MINS, 0),
-        isRestDay: exceptionRule?.isRestDayOverride ?? false,
-        isManuallyModified: !!exceptionRule
+        totalStudyTimeMinutes: Math.max(exception?.targetMinutes ?? DEFAULT_DAILY_STUDY_MINS, 0),
+        isRestDay: exception?.isRestDayOverride ?? false,
+        isManuallyModified: !!exception
       });
     }
     
-    return daySchedules;
+    return days;
   }
 
-  private categorizeResourcesIntoPools(): ResourcePool {
-    const pools: ResourcePool = {
-      titanVideos: [],
-      crackTheCore: [],
-      caseCompanion: [],
-      qevlar: [],
-      huda: [],
-      nuclear: [],
-      nucApp: [],
-      nisRisc: [],
-      boardVitals: [],
-      physics: [],
-      discord: [],
-      coreRadiology: []
+  private categorizeIntoStrictPools(): ResourcePools {
+    const pools: ResourcePools = {
+      titanVideos: [], crackTheCore: [], caseCompanion: [], qevlar: [],
+      huda: [], nuclear: [], warMachine: [], nucApp: [],
+      nisRisc: [], boardVitals: [], physics: [], physicsApp: [],
+      discord: [], coreRadiology: []
     };
     
     for (const resource of this.allResources.values()) {
       const title = (resource.title || '').toLowerCase();
-      const videoSource = (resource.videoSource || '').toLowerCase();
-      const bookSource = (resource.bookSource || '').toLowerCase();
+      const video = (resource.videoSource || '').toLowerCase();
+      const book = (resource.bookSource || '').toLowerCase();
       
-      if (videoSource.includes('titan')) {
+      // Strict categorization
+      if (video.includes('titan')) {
         pools.titanVideos.push(resource);
-      } else if (bookSource.includes('crack the core')) {
+      } else if (book.includes('crack the core') && !book.includes('case companion')) {
         pools.crackTheCore.push(resource);
-      } else if (bookSource.includes('case companion')) {
+      } else if (book.includes('case companion')) {
         pools.caseCompanion.push(resource);
-      } else if (bookSource.includes('qevlar')) {
+      } else if (book.includes('qevlar')) {
         pools.qevlar.push(resource);
-      } else if ((videoSource.includes('huda') || bookSource.includes('huda')) && resource.domain === Domain.PHYSICS) {
+      } else if ((video.includes('huda') || book.includes('huda')) && resource.domain === Domain.PHYSICS) {
         pools.huda.push(resource);
-      } else if (resource.domain === Domain.NUCLEAR_MEDICINE) {
+      } else if (resource.domain === Domain.NUCLEAR_MEDICINE && !book.includes('nucapp')) {
         pools.nuclear.push(resource);
-        if (bookSource.includes('nucapp')) {
-          pools.nucApp.push(resource);
-        }
+      } else if (book.includes('war machine')) {
+        pools.warMachine.push(resource);
+      } else if (book.includes('nucapp')) {
+        pools.nucApp.push(resource);
       } else if (resource.domain === Domain.NIS || resource.domain === Domain.RISC) {
         pools.nisRisc.push(resource);
-      } else if (bookSource.includes('board vitals')) {
+      } else if (book.includes('board vitals')) {
         pools.boardVitals.push(resource);
         this.totalBoardVitalsQuestions += (resource.questionCount || 0);
-      } else if (resource.domain === Domain.PHYSICS) {
-        pools.physics.push(resource);
-      } else if (videoSource.includes('discord')) {
+      } else if (resource.domain === Domain.PHYSICS && !video.includes('huda') && !book.includes('huda')) {
+        if (title.includes('app') || book.includes('physics app')) {
+          pools.physicsApp.push(resource);
+        } else {
+          pools.physics.push(resource);
+        }
+      } else if (video.includes('discord')) {
         pools.discord.push(resource);
-      } else if (bookSource.includes('core radiology') || title.includes('core radiology')) {
+      } else if (book.includes('core radiology') || title.includes('core radiology')) {
         pools.coreRadiology.push(resource);
       }
     }
@@ -236,7 +249,7 @@ class TemplateBasedScheduler {
       pool.sort((a, b) => (a.sequenceOrder || 999) - (b.sequenceOrder || 999));
     });
     
-    // Sort Titan videos by canonical sequence
+    // Sort Titan videos by EXACT canonical sequence
     pools.titanVideos.sort((a, b) => {
       const aIndex = this.getTitanSequenceIndex(a.title);
       const bIndex = this.getTitanSequenceIndex(b.title);
@@ -247,86 +260,53 @@ class TemplateBasedScheduler {
     return pools;
   }
 
-  private createDailyTemplates(): void {
-    this.dailyTemplates = this.studyDays.map((day, index) => ({
+  private getTitanSequenceIndex(title: string): number {
+    const t = title.toLowerCase();
+    
+    for (let i = 0; i < TITAN_SEQUENCE.length; i++) {
+      const topic = TITAN_SEQUENCE[i];
+      if (t.includes(topic)) return i;
+    }
+    
+    // Handle aliases
+    if (t.includes('msk')) return TITAN_SEQUENCE.indexOf('musculoskeletal');
+    if (t.includes('peds')) return TITAN_SEQUENCE.indexOf('pediatric');
+    if (t.includes('ir')) return TITAN_SEQUENCE.indexOf('interventional');
+    
+    return 999; // Unknown
+  }
+
+  private createDailyExecutionPlans(): void {
+    this.dailyExecutions = this.studyDays.map((day, index) => ({
       date: day.date,
-      dayIndex: index,
-      titanTopicIndex: index % TITAN_SEQUENCE.length,
       titanTopic: TITAN_SEQUENCE[index % TITAN_SEQUENCE.length],
-      completedSteps: new Set<number>()
+      titanTopicIndex: index % TITAN_SEQUENCE.length,
+      stepsCompleted: 0,
+      coveredDomains: new Set<Domain>()
     }));
   }
 
-  private getTitanSequenceIndex(title: string): number {
-    const normalizedTitle = title.toLowerCase();
-    
-    for (let i = 0; i < TITAN_SEQUENCE.length; i++) {
-      if (normalizedTitle.includes(TITAN_SEQUENCE[i])) {
-        return i;
-      }
-    }
-    
-    // Handle special cases
-    if (normalizedTitle.includes('msk')) return TITAN_SEQUENCE.indexOf('musculoskeletal');
-    if (normalizedTitle.includes('peds')) return TITAN_SEQUENCE.indexOf('pediatric');
-    if (normalizedTitle.includes('ir')) return TITAN_SEQUENCE.indexOf('interventional');
-    
-    return TITAN_SEQUENCE.length; // Unknown goes last
-  }
-
-  private isTopicallyRelated(anchor: StudyResource, candidate: StudyResource): boolean {
-    // Same domain
-    if (anchor.domain === candidate.domain) return true;
-    
-    // Same chapter
-    if (anchor.chapterNumber && candidate.chapterNumber && 
-        anchor.chapterNumber === candidate.chapterNumber) return true;
-    
-    // Topic keyword matching
-    const anchorTitle = (anchor.title || '').toLowerCase();
-    const candidateTitle = (candidate.title || '').toLowerCase();
-    
-    const keywords = [
-      'pancreas', 'liver', 'renal', 'kidney', 'reproductive', 'gynecologic', 'prostate', 'testicular',
-      'barium', 'esophagus', 'stomach', 'bowel', 'colon', 'gi',
-      'chest', 'thorax', 'lung', 'pulmonary', 'mediastinum',
-      'thyroid', 'parathyroid', 'neck',
-      'musculoskeletal', 'msk', 'bone', 'joint', 'spine',
-      'neuro', 'brain', 'neurological', 'head',
-      'pediatric', 'peds', 'child',
-      'cardiac', 'heart', 'coronary', 'cardiovascular',
-      'breast', 'mammography', 'mammo',
-      'nuclear', 'pet', 'spect', 'scintigraphy',
-      'interventional', 'vascular', 'angiography', 'ir',
-      'physics', 'ct', 'mri', 'ultrasound', 'radiation'
-    ];
-    
-    return keywords.some(keyword => 
-      anchorTitle.includes(keyword) && candidateTitle.includes(keyword)
-    );
-  }
-
   private getRemainingTime(day: DailySchedule): number {
-    const usedTime = day.tasks.reduce((sum, task) => sum + task.durationMinutes, 0);
-    return Math.max(0, day.totalStudyTimeMinutes - usedTime);
+    const used = day.tasks.reduce((sum, task) => sum + task.durationMinutes, 0);
+    return Math.max(0, day.totalStudyTimeMinutes - used);
   }
 
-  private createTask(resource: StudyResource, orderIndex: number): ScheduledTask {
+  private createTask(resource: StudyResource, order: number): ScheduledTask {
     this.taskCounter++;
-    const originalResourceId = resource.id.includes('_part_') 
+    const originalId = resource.id.includes('_part_') 
       ? resource.id.split('_part_')[0] 
       : resource.id;
     
     return {
       id: `task_${resource.id}_${this.taskCounter}`,
       resourceId: resource.id,
-      originalResourceId,
+      originalResourceId: originalId,
       title: resource.title,
       type: resource.type,
       originalTopic: resource.domain,
       durationMinutes: resource.durationMinutes,
       status: 'pending',
-      order: orderIndex,
+      order,
       isOptional: resource.isOptional,
       isPrimaryMaterial: resource.isPrimaryMaterial,
       pages: resource.pages,
@@ -341,34 +321,114 @@ class TemplateBasedScheduler {
   }
 
   private addTaskToDay(day: DailySchedule, resource: StudyResource): boolean {
-    if (!this.remainingResources.has(resource.id)) return false;
-    
-    const remainingTime = this.getRemainingTime(day);
-    if (remainingTime < resource.durationMinutes) return false;
+    if (!this.availableResources.has(resource.id)) return false;
+    if (this.getRemainingTime(day) < resource.durationMinutes) return false;
     
     const task = this.createTask(resource, day.tasks.length);
     day.tasks.push(task);
-    this.remainingResources.delete(resource.id);
-    this.coveredTopicsPerDay.get(day.date)?.add(resource.domain);
+    this.availableResources.delete(resource.id);
+    
+    const execution = this.dailyExecutions.find(e => e.date === day.date);
+    execution?.coveredDomains.add(resource.domain);
     
     return true;
   }
 
-  private createSyntheticBoardVitalsTask(day: DailySchedule, targetQuestions: number, suggestedSubjects: string[]): ScheduledTask {
+  private isTopicallyRelated(anchor: StudyResource, candidate: StudyResource): boolean {
+    // Same domain match
+    if (anchor.domain === candidate.domain) return true;
+    
+    // Chapter number match
+    if (anchor.chapterNumber && candidate.chapterNumber && 
+        anchor.chapterNumber === candidate.chapterNumber) return true;
+    
+    // Title keyword matching
+    const anchorTitle = (anchor.title || '').toLowerCase();
+    const candidateTitle = (candidate.title || '').toLowerCase();
+    
+    const topicKeywords = [
+      // GI
+      'pancreas', 'liver', 'hepatic', 'biliary', 'gallbladder', 'spleen', 'stomach', 'gastric',
+      'esophagus', 'bowel', 'colon', 'intestine', 'abdomen', 'gi', 'gastrointestinal',
+      
+      // GU  
+      'renal', 'kidney', 'ureter', 'bladder', 'urethra', 'prostate', 'testicular', 'scrotal',
+      'uterus', 'ovary', 'cervix', 'vagina', 'reproductive', 'gynecologic', 'obstetric',
+      
+      // Chest/Cardiac
+      'lung', 'pulmonary', 'thorax', 'chest', 'mediastinum', 'pleura', 'trachea', 'bronch',
+      'heart', 'cardiac', 'coronary', 'aorta', 'valve', 'pericardium',
+      
+      // Neuro/Head&Neck  
+      'brain', 'cerebral', 'skull', 'spine', 'cord', 'neuro', 'head', 'neck',
+      'thyroid', 'parathyroid', 'salivary', 'sinus', 'temporal', 'orbit',
+      
+      // MSK
+      'bone', 'joint', 'spine', 'muscle', 'tendon', 'ligament', 'msk', 'musculoskeletal',
+      'shoulder', 'elbow', 'wrist', 'hip', 'knee', 'ankle', 'pelvis',
+      
+      // Breast
+      'breast', 'mammography', 'mammo',
+      
+      // Nuclear/Physics
+      'nuclear', 'pet', 'spect', 'scintigraphy', 'radiotracer',
+      'physics', 'ct', 'mri', 'ultrasound', 'radiation', 'dose',
+      
+      // Peds
+      'pediatric', 'peds', 'child', 'infant', 'neonatal',
+      
+      // IR/Vascular
+      'interventional', 'vascular', 'angiography', 'embolization', 'stent'
+    ];
+    
+    return topicKeywords.some(keyword => 
+      anchorTitle.includes(keyword) && candidateTitle.includes(keyword)
+    );
+  }
+
+  private createSyntheticBoardVitalsTask(
+    day: DailySchedule, 
+    execution: DailyExecution,
+    dayIndex: number
+  ): ScheduledTask | null {
+    const remainingTime = this.getRemainingTime(day);
+    if (remainingTime < 30) return null;
+    
+    // Calculate quota
+    const remainingDays = this.studyDays.length - dayIndex;
+    const remainingQuestions = Math.max(0, this.totalBoardVitalsQuestions - this.scheduledBoardVitalsQuestions);
+    
+    if (remainingQuestions === 0) return null;
+    
+    const avgPerDay = Math.ceil(remainingQuestions / Math.max(1, remainingDays));
+    const maxByTime = Math.floor(remainingTime * 0.25 * 0.5); // 25% max time, 0.5 Q/min
+    const targetQuestions = Math.min(avgPerDay, maxByTime, remainingQuestions);
+    
+    if (targetQuestions === 0) return null;
+    
+    // Suggested subjects from covered domains up to this day
+    const suggestedSubjects = new Set<string>();
+    for (let i = 0; i <= dayIndex; i++) {
+      const exec = this.dailyExecutions[i];
+      exec.coveredDomains.forEach(domain => {
+        const domainStr = domain.toString().replace(/_/g, ' ').toLowerCase();
+        if (!['nis', 'risc', 'mixed review', 'high yield', 'final review'].includes(domainStr)) {
+          suggestedSubjects.add(domainStr);
+        }
+      });
+    }
+    
+    const subjectList = Array.from(suggestedSubjects).join(', ') || 'mixed topics';
+    const minutes = Math.ceil(targetQuestions * 2); // 2 min per question
+    
     this.taskCounter++;
-    const actualMinutes = Math.ceil(targetQuestions * 2); // 2 minutes per question
-    
-    const subjectList = suggestedSubjects.length > 0 
-      ? suggestedSubjects.join(', ') 
-      : 'mixed topics';
-    
     return {
       id: `synthetic_bv_${day.date}_${this.taskCounter}`,
       resourceId: `bv_mixed_${day.date}`,
       title: `Board Vitals - Mixed ${targetQuestions} questions (suggested: ${subjectList})`,
       type: ResourceType.QUESTIONS,
       originalTopic: Domain.MIXED_REVIEW,
-      durationMinutes: actualMinutes,
+      durationMinutes: minutes,
       status: 'pending',
       order: day.tasks.length,
       isOptional: false,
@@ -377,39 +437,42 @@ class TemplateBasedScheduler {
     };
   }
 
+  private findPairedResources(anchor: StudyResource, pool: StudyResource[]): StudyResource[] {
+    return pool.filter(resource => 
+      this.availableResources.has(resource.id) && 
+      this.isTopicallyRelated(anchor, resource)
+    );
+  }
+
   /**
-   * MAIN TEMPLATE-BASED SCHEDULING ALGORITHM
+   * STRICT 6-STEP DAILY TEMPLATE EXECUTION
    */
   
-  public generateScheduleUsingTemplate(): GeneratedStudyPlanOutcome {
+  public executeStrictTemplate(): GeneratedStudyPlanOutcome {
     try {
-      if (this.studyDays.length === 0) {
-        throw new Error('No study days available');
-      }
-      
       this.notifications.push({
         type: 'info',
-        message: `Starting template-based sequential scheduling: ${this.studyDays.length} days`
+        message: 'Starting STRICT 6-step daily template execution'
       });
       
-      // Execute daily template for each day
+      // Execute template for each day in sequence
       for (let dayIndex = 0; dayIndex < this.studyDays.length; dayIndex++) {
-        this.executeDailyTemplate(dayIndex);
+        this.executeStrictDailyTemplate(dayIndex);
       }
       
-      // Final validation and optimization
-      this.finalValidationAndMopUp();
+      // Final completeness guarantee
+      this.guaranteeCompleteness();
+      
+      // Validate and optimize
+      this.validateAndOptimize();
       
       // Generate summary
-      this.generateFinalSummary();
-      
-      // Build progress tracking
-      const progressPerDomain = this.buildProgressTracking();
+      this.generateExecutionSummary();
       
       return {
         plan: {
           schedule: this.schedule,
-          progressPerDomain,
+          progressPerDomain: this.buildProgressTracking(),
           startDate: this.schedule[0]?.date || '',
           endDate: this.schedule[this.schedule.length - 1]?.date || '',
           firstPassEndDate: null,
@@ -423,490 +486,460 @@ class TemplateBasedScheduler {
       };
       
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      
       this.notifications.push({
         type: 'error',
-        message: `Template scheduling failed: ${errorMessage}`
+        message: `Strict template execution failed: ${error instanceof Error ? error.message : 'Unknown error'}`
       });
       
       return this.createEmptyPlan();
     }
   }
 
-  private executeDailyTemplate(dayIndex: number): void {
+  private executeStrictDailyTemplate(dayIndex: number): void {
     const day = this.studyDays[dayIndex];
-    const template = this.dailyTemplates[dayIndex];
+    const execution = this.dailyExecutions[dayIndex];
     
     this.notifications.push({
       type: 'info',
-      message: `Day ${dayIndex + 1} (${day.date}): Executing template for ${template.titanTopic}`
+      message: `Day ${dayIndex + 1} (${day.date}): Executing template for ${execution.titanTopic}`
     });
     
-    // Step 1: Titan video + paired content
-    this.executeStep1TitanBlock(day, template);
+    // STEP 1: Titan video + paired content
+    if (this.executeStep1_TitanBlock(day, execution)) execution.stepsCompleted++;
     
-    // Step 2: Huda physics block
-    this.executeStep2HudaBlock(day, template);
+    // STEP 2: Huda physics block
+    if (this.executeStep2_HudaBlock(day, execution)) execution.stepsCompleted++;
     
-    // Step 3: Nuclear medicine block
-    this.executeStep3NuclearBlock(day, template);
+    // STEP 3: Nuclear medicine block  
+    if (this.executeStep3_NuclearBlock(day, execution)) execution.stepsCompleted++;
     
-    // Step 4: NIS/RISC block
-    this.executeStep4NisRiscBlock(day, template);
+    // STEP 4: NIS/RISC block
+    if (this.executeStep4_NisRiscBlock(day, execution)) execution.stepsCompleted++;
     
-    // Step 5: Board Vitals mixed questions
-    this.executeStep5BoardVitals(day, template, dayIndex);
+    // STEP 5: Board Vitals mixed quota
+    if (this.executeStep5_BoardVitalsQuota(day, execution, dayIndex)) execution.stepsCompleted++;
     
-    // Step 6: Physics block
-    this.executeStep6PhysicsBlock(day, template);
+    // STEP 6: Physics block
+    if (this.executeStep6_PhysicsBlock(day, execution)) execution.stepsCompleted++;
     
-    // Step 7: Supplementary content (Discord then Core Radiology)
-    this.executeStep7SupplementaryContent(day, template);
+    // STEP 7: Supplementary content (only after steps 1-6)
+    if (execution.stepsCompleted >= 6) {
+      this.executeStep7_SupplementaryContent(day, execution);
+    }
     
-    const dayTotal = day.tasks.reduce((sum, task) => sum + task.durationMinutes, 0);
-    const utilization = ((dayTotal / day.totalStudyTimeMinutes) * 100).toFixed(1);
+    const totalTime = day.tasks.reduce((sum, task) => sum + task.durationMinutes, 0);
+    const utilization = ((totalTime / day.totalStudyTimeMinutes) * 100).toFixed(1);
     
     this.notifications.push({
       type: 'info',
-      message: `Day ${dayIndex + 1} complete: ${dayTotal}min/${day.totalStudyTimeMinutes}min (${utilization}%)`
+      message: `Day ${dayIndex + 1}: ${execution.stepsCompleted}/6 core steps, ${totalTime}min (${utilization}%)`
     });
   }
 
-  private executeStep1TitanBlock(day: DailySchedule, template: DailyTemplate): void {
-    // Find Titan video for this topic
+  private executeStep1_TitanBlock(day: DailySchedule, execution: DailyExecution): boolean {
+    // Find Titan video for this day's topic
     const titanVideo = this.pools.titanVideos.find(video => 
-      this.remainingResources.has(video.id) && 
-      video.title.toLowerCase().includes(template.titanTopic)
+      this.availableResources.has(video.id) && 
+      this.getTitanSequenceIndex(video.title) === execution.titanTopicIndex
     );
     
-    if (titanVideo) {
-      this.addTaskToDay(day, titanVideo);
-      
-      // Find paired Crack the Core content
-      const pairedCrackTheCore = this.pools.crackTheCore.filter(resource => 
-        this.remainingResources.has(resource.id) && 
-        this.isTopicallyRelated(titanVideo, resource)
+    if (!titanVideo) {
+      // Try any available Titan video if specific topic not found
+      const anyTitan = this.pools.titanVideos.find(video => 
+        this.availableResources.has(video.id)
       );
+      if (!anyTitan) return false;
       
-      pairedCrackTheCore.forEach(resource => {
-        if (this.getRemainingTime(day) >= resource.durationMinutes) {
-          this.addTaskToDay(day, resource);
-        }
-      });
+      if (!this.addTaskToDay(day, anyTitan)) return false;
       
-      // Find paired Case Companion content
-      const pairedCaseCompanion = this.pools.caseCompanion.filter(resource => 
-        this.remainingResources.has(resource.id) && 
-        this.isTopicallyRelated(titanVideo, resource)
-      );
+      // Find ALL paired content for this Titan video
+      const pairedContent = [
+        ...this.findPairedResources(anyTitan, this.pools.crackTheCore),
+        ...this.findPairedResources(anyTitan, this.pools.caseCompanion),
+        ...this.findPairedResources(anyTitan, this.pools.qevlar)
+      ];
       
-      pairedCaseCompanion.forEach(resource => {
-        if (this.getRemainingTime(day) >= resource.durationMinutes) {
-          this.addTaskToDay(day, resource);
-        }
-      });
-      
-      // Find paired QEVLAR content
-      const pairedQevlar = this.pools.qevlar.filter(resource => 
-        this.remainingResources.has(resource.id) && 
-        this.isTopicallyRelated(titanVideo, resource)
-      );
-      
-      pairedQevlar.forEach(resource => {
-        if (this.getRemainingTime(day) >= resource.durationMinutes) {
-          this.addTaskToDay(day, resource);
-        }
-      });
-      
-      template.completedSteps.add(1);
-    }
-  }
-
-  private executeStep2HudaBlock(day: DailySchedule, template: DailyTemplate): void {
-    // Find next available Huda lecture
-    const hudaLecture = this.pools.huda.find(resource => 
-      this.remainingResources.has(resource.id) && 
-      (resource.type === ResourceType.VIDEO_LECTURE || resource.type === ResourceType.HIGH_YIELD_VIDEO)
-    );
-    
-    if (hudaLecture && this.getRemainingTime(day) >= hudaLecture.durationMinutes) {
-      this.addTaskToDay(day, hudaLecture);
-      
-      // Find paired Huda QB and textbook
-      const pairedHuda = this.pools.huda.filter(resource => 
-        this.remainingResources.has(resource.id) && 
-        resource.id !== hudaLecture.id &&
-        this.isTopicallyRelated(hudaLecture, resource)
-      );
-      
-      pairedHuda.slice(0, 3).forEach(resource => {
-        if (this.getRemainingTime(day) >= resource.durationMinutes) {
-          this.addTaskToDay(day, resource);
-        }
-      });
-      
-      template.completedSteps.add(2);
-    }
-  }
-
-  private executeStep3NuclearBlock(day: DailySchedule, template: DailyTemplate): void {
-    // Find next available nuclear content
-    const nuclearAnchor = this.pools.nuclear.find(resource => 
-      this.remainingResources.has(resource.id)
-    );
-    
-    if (nuclearAnchor && this.getRemainingTime(day) >= nuclearAnchor.durationMinutes) {
-      this.addTaskToDay(day, nuclearAnchor);
-      
-      // Find paired nuclear content
-      const pairedNuclear = this.pools.nuclear.filter(resource => 
-        this.remainingResources.has(resource.id) && 
-        resource.id !== nuclearAnchor.id &&
-        this.isTopicallyRelated(nuclearAnchor, resource)
-      );
-      
-      // Add NucApp content
-      const pairedNucApp = this.pools.nucApp.filter(resource => 
-        this.remainingResources.has(resource.id) && 
-        this.isTopicallyRelated(nuclearAnchor, resource)
-      );
-      
-      // Add nuclear QEVLAR
-      const nuclearQevlar = this.pools.qevlar.filter(resource => 
-        this.remainingResources.has(resource.id) && 
-        resource.domain === Domain.NUCLEAR_MEDICINE &&
-        this.isTopicallyRelated(nuclearAnchor, resource)
-      );
-      
-      [...pairedNuclear.slice(0, 2), ...pairedNucApp.slice(0, 2), ...nuclearQevlar.slice(0, 2)].forEach(resource => {
-        if (this.getRemainingTime(day) >= resource.durationMinutes) {
-          this.addTaskToDay(day, resource);
-        }
-      });
-      
-      template.completedSteps.add(3);
-    }
-  }
-
-  private executeStep4NisRiscBlock(day: DailySchedule, template: DailyTemplate): void {
-    // Find next available NIS/RISC content
-    const nisRiscContent = this.pools.nisRisc.find(resource => 
-      this.remainingResources.has(resource.id)
-    );
-    
-    if (nisRiscContent && this.getRemainingTime(day) >= nisRiscContent.durationMinutes) {
-      this.addTaskToDay(day, nisRiscContent);
-      
-      // Find paired NIS QEVLAR
-      const nisQevlar = this.pools.qevlar.filter(resource => 
-        this.remainingResources.has(resource.id) && 
-        (resource.domain === Domain.NIS || resource.domain === Domain.RISC) &&
-        this.isTopicallyRelated(nisRiscContent, resource)
-      );
-      
-      nisQevlar.slice(0, 2).forEach(resource => {
-        if (this.getRemainingTime(day) >= resource.durationMinutes) {
-          this.addTaskToDay(day, resource);
-        }
-      });
-      
-      template.completedSteps.add(4);
-    }
-  }
-
-  private executeStep5BoardVitals(day: DailySchedule, template: DailyTemplate, dayIndex: number): void {
-    const remainingTime = this.getRemainingTime(day);
-    if (remainingTime < 30) return; // Need minimum time
-    
-    // Calculate daily quota
-    const remainingDays = this.studyDays.length - dayIndex;
-    const remainingQuestions = Math.max(0, this.totalBoardVitalsQuestions - this.scheduledBoardVitalsQuestions);
-    
-    if (remainingQuestions === 0) return;
-    
-    const avgQuestionsPerDay = Math.ceil(remainingQuestions / Math.max(1, remainingDays));
-    const maxQuestionsByTime = Math.floor(remainingTime * 0.3 * 0.5); // 30% of time, 0.5 Q/min
-    const targetQuestions = Math.min(avgQuestionsPerDay, maxQuestionsByTime, remainingQuestions);
-    
-    if (targetQuestions > 0) {
-      // Get suggested subjects from covered topics up to this day
-      const suggestedSubjects: string[] = [];
-      for (let i = 0; i <= dayIndex; i++) {
-        const dayTopics = this.coveredTopicsPerDay.get(this.studyDays[i].date) || new Set();
-        dayTopics.forEach(topic => {
-          const topicStr = topic.toString().replace(/_/g, ' ').toLowerCase();
-          if (!['nis', 'risc', 'mixed review', 'high yield'].includes(topicStr) && 
-              !suggestedSubjects.includes(topicStr)) {
-            suggestedSubjects.push(topicStr);
-          }
-        });
+      // Add all paired content that fits
+      for (const resource of pairedContent) {
+        this.addTaskToDay(day, resource);
       }
       
-      // Create synthetic Board Vitals task
-      const bvTask = this.createSyntheticBoardVitalsTask(day, targetQuestions, suggestedSubjects);
-      day.tasks.push(bvTask);
-      this.scheduledBoardVitalsQuestions += targetQuestions;
-      this.coveredTopicsPerDay.get(day.date)?.add(Domain.MIXED_REVIEW);
-      
-      template.completedSteps.add(5);
+      return true;
     }
+    
+    // Add the specific Titan video
+    if (!this.addTaskToDay(day, titanVideo)) return false;
+    
+    // Add ALL paired content
+    const pairedContent = [
+      ...this.findPairedResources(titanVideo, this.pools.crackTheCore),
+      ...this.findPairedResources(titanVideo, this.pools.caseCompanion),
+      ...this.findPairedResources(titanVideo, this.pools.qevlar)
+    ];
+    
+    for (const resource of pairedContent) {
+      this.addTaskToDay(day, resource);
+    }
+    
+    return true;
   }
 
-  private executeStep6PhysicsBlock(day: DailySchedule, template: DailyTemplate): void {
-    // Find next available Titan physics or general physics content
-    const physicsContent = this.pools.physics.find(resource => 
-      this.remainingResources.has(resource.id)
+  private executeStep2_HudaBlock(day: DailySchedule, execution: DailyExecution): boolean {
+    // Find next Huda lecture
+    const hudaLectures = this.pools.huda.filter(r => 
+      this.availableResources.has(r.id) && 
+      (r.type === ResourceType.VIDEO_LECTURE || r.type === ResourceType.HIGH_YIELD_VIDEO)
     );
     
-    if (physicsContent && this.getRemainingTime(day) >= physicsContent.durationMinutes) {
-      this.addTaskToDay(day, physicsContent);
-      
-      // Find paired physics QEVLAR
-      const physicsQevlar = this.pools.qevlar.filter(resource => 
-        this.remainingResources.has(resource.id) && 
-        resource.domain === Domain.PHYSICS &&
-        this.isTopicallyRelated(physicsContent, resource)
-      );
-      
-      physicsQevlar.slice(0, 1).forEach(resource => {
-        if (this.getRemainingTime(day) >= resource.durationMinutes) {
-          this.addTaskToDay(day, resource);
-        }
-      });
-      
-      template.completedSteps.add(6);
+    if (hudaLectures.length === 0) return false;
+    
+    const hudaLecture = hudaLectures[this.globalIterators.huda % hudaLectures.length];
+    this.globalIterators.huda++;
+    
+    if (!this.addTaskToDay(day, hudaLecture)) return false;
+    
+    // Add paired Huda content (QB + textbook)
+    const pairedHuda = this.findPairedResources(hudaLecture, this.pools.huda)
+      .filter(r => r.id !== hudaLecture.id)
+      .slice(0, 4); // Limit to prevent day overflow
+    
+    for (const resource of pairedHuda) {
+      this.addTaskToDay(day, resource);
     }
+    
+    return true;
   }
 
-  private executeStep7SupplementaryContent(day: DailySchedule, template: DailyTemplate): void {
-    const dayTopics = this.coveredTopicsPerDay.get(day.date) || new Set();
+  private executeStep3_NuclearBlock(day: DailySchedule, execution: DailyExecution): boolean {
+    // Find next nuclear content (prioritize Titan nuclear videos)
+    const titanNuclear = this.pools.nuclear.filter(r =>
+      this.availableResources.has(r.id) && 
+      (r.videoSource || '').toLowerCase().includes('titan')
+    );
     
-    // First: Discord lectures by relevancy
+    const nuclearAnchor = titanNuclear.length > 0 
+      ? titanNuclear[0]
+      : this.pools.nuclear.find(r => this.availableResources.has(r.id));
+    
+    if (!nuclearAnchor) return false;
+    
+    if (!this.addTaskToDay(day, nuclearAnchor)) return false;
+    
+    // Add paired nuclear content
+    const pairedNuclear = [
+      ...this.findPairedResources(nuclearAnchor, this.pools.nuclear).filter(r => r.id !== nuclearAnchor.id),
+      ...this.findPairedResources(nuclearAnchor, this.pools.crackTheCore),
+      ...this.findPairedResources(nuclearAnchor, this.pools.warMachine),
+      ...this.findPairedResources(nuclearAnchor, this.pools.nucApp),
+      ...this.pools.qevlar.filter(r => 
+        this.availableResources.has(r.id) && 
+        r.domain === Domain.NUCLEAR_MEDICINE &&
+        this.isTopicallyRelated(nuclearAnchor, r)
+      )
+    ].slice(0, 6); // Limit block size
+    
+    for (const resource of pairedNuclear) {
+      this.addTaskToDay(day, resource);
+    }
+    
+    return true;
+  }
+
+  private executeStep4_NisRiscBlock(day: DailySchedule, execution: DailyExecution): boolean {
+    // Find next NIS/RISC document
+    const nisRiscDocs = this.pools.nisRisc.filter(r => 
+      this.availableResources.has(r.id) && 
+      r.type === ResourceType.READING_TEXTBOOK
+    );
+    
+    if (nisRiscDocs.length === 0) return false;
+    
+    const nisRiscDoc = nisRiscDocs[this.globalIterators.nisRisc % nisRiscDocs.length];
+    this.globalIterators.nisRisc++;
+    
+    if (!this.addTaskToDay(day, nisRiscDoc)) return false;
+    
+    // Add paired NIS QB and relevant QEVLAR
+    const pairedNisContent = [
+      ...this.pools.nisRisc.filter(r => 
+        this.availableResources.has(r.id) && 
+        r.type === ResourceType.QUESTIONS &&
+        r.id !== nisRiscDoc.id
+      ),
+      ...this.pools.qevlar.filter(r => 
+        this.availableResources.has(r.id) && 
+        (r.domain === Domain.NIS || r.domain === Domain.RISC)
+      )
+    ].slice(0, 3);
+    
+    for (const resource of pairedNisContent) {
+      this.addTaskToDay(day, resource);
+    }
+    
+    return true;
+  }
+
+  private executeStep5_BoardVitalsQuota(day: DailySchedule, execution: DailyExecution, dayIndex: number): boolean {
+    const syntheticBVTask = this.createSyntheticBoardVitalsTask(day, execution, dayIndex);
+    
+    if (!syntheticBVTask) return false;
+    
+    day.tasks.push(syntheticBVTask);
+    this.scheduledBoardVitalsQuestions += syntheticBVTask.questionCount || 0;
+    execution.coveredDomains.add(Domain.MIXED_REVIEW);
+    
+    return true;
+  }
+
+  private executeStep6_PhysicsBlock(day: DailySchedule, execution: DailyExecution): boolean {
+    // Find next Titan physics or general physics content
+    const titanPhysics = this.pools.physics.filter(r =>
+      this.availableResources.has(r.id) && 
+      (r.videoSource || '').toLowerCase().includes('titan')
+    );
+    
+    const physicsAnchor = titanPhysics.length > 0
+      ? titanPhysics[0]
+      : this.pools.physics.find(r => this.availableResources.has(r.id));
+    
+    if (!physicsAnchor) return false;
+    
+    if (!this.addTaskToDay(day, physicsAnchor)) return false;
+    
+    // Add paired physics content
+    const pairedPhysics = [
+      ...this.findPairedResources(physicsAnchor, this.pools.warMachine),
+      ...this.findPairedResources(physicsAnchor, this.pools.physicsApp),
+      ...this.pools.qevlar.filter(r => 
+        this.availableResources.has(r.id) && 
+        r.domain === Domain.PHYSICS &&
+        this.isTopicallyRelated(physicsAnchor, r)
+      )
+    ].slice(0, 4);
+    
+    for (const resource of pairedPhysics) {
+      this.addTaskToDay(day, resource);
+    }
+    
+    return true;
+  }
+
+  private executeStep7_SupplementaryContent(day: DailySchedule, execution: DailyExecution): void {
+    // First: Discord lectures with relevancy matching
     const relevantDiscord = this.pools.discord
-      .filter(resource => this.remainingResources.has(resource.id))
-      .sort((a, b) => this.calculateRelevancyScore(b, dayTopics) - this.calculateRelevancyScore(a, dayTopics));
+      .filter(r => this.availableResources.has(r.id))
+      .sort((a, b) => this.calculateRelevancyScore(b, execution.coveredDomains) - this.calculateRelevancyScore(a, execution.coveredDomains));
     
     for (const resource of relevantDiscord) {
-      if (this.getRemainingTime(day) >= resource.durationMinutes) {
-        this.addTaskToDay(day, resource);
-      }
+      if (this.getRemainingTime(day) < 5) break;
+      this.addTaskToDay(day, resource);
     }
     
-    // Then: Core Radiology by relevancy
+    // Then: Core Radiology with relevancy matching
     const relevantCoreRad = this.pools.coreRadiology
-      .filter(resource => this.remainingResources.has(resource.id))
-      .sort((a, b) => this.calculateRelevancyScore(b, dayTopics) - this.calculateRelevancyScore(a, dayTopics));
+      .filter(r => this.availableResources.has(r.id))
+      .sort((a, b) => this.calculateRelevancyScore(b, execution.coveredDomains) - this.calculateRelevancyScore(a, execution.coveredDomains));
     
     for (const resource of relevantCoreRad) {
-      if (this.getRemainingTime(day) >= resource.durationMinutes) {
-        this.addTaskToDay(day, resource);
-      }
+      if (this.getRemainingTime(day) < 5) break;
+      this.addTaskToDay(day, resource);
     }
-    
-    template.completedSteps.add(7);
   }
 
-  private calculateRelevancyScore(resource: StudyResource, dayTopics: Set<Domain>): number {
+  private calculateRelevancyScore(resource: StudyResource, dayDomains: Set<Domain>): number {
     let score = 0;
     
     // Perfect domain match
-    if (dayTopics.has(resource.domain)) score += 100;
+    if (dayDomains.has(resource.domain)) score += 100;
     
-    // Related domain match
-    const relatedDomains = this.getRelatedDomains(resource.domain);
-    relatedDomains.forEach(domain => {
-      if (dayTopics.has(domain)) score += 50;
-    });
+    // Related domain bonus
+    const related = this.getRelatedDomains(resource.domain);
+    for (const relatedDomain of related) {
+      if (dayDomains.has(relatedDomain)) score += 50;
+    }
     
-    // Shorter content for better gap filling
-    if (resource.durationMinutes <= 5) score += 20;
+    // Shorter items for gap filling
+    if (resource.durationMinutes <= 5) score += 25;
     else if (resource.durationMinutes <= 15) score += 15;
     else if (resource.durationMinutes <= 30) score += 10;
     
     // Primary material bonus
-    if (resource.isPrimaryMaterial) score += 25;
+    if (resource.isPrimaryMaterial) score += 20;
     
     return score;
   }
 
   private getRelatedDomains(domain: Domain): Domain[] {
-    const relations: Record<Domain, Domain[]> = {
-      [Domain.GASTROINTESTINAL_IMAGING]: [Domain.INTERVENTIONAL_RADIOLOGY, Domain.NUCLEAR_MEDICINE],
+    const relations: Partial<Record<Domain, Domain[]>> = {
+      [Domain.GASTROINTESTINAL_IMAGING]: [Domain.INTERVENTIONAL_RADIOLOGY, Domain.NUCLEAR_MEDICINE, Domain.PEDIATRIC_RADIOLOGY],
       [Domain.GENITOURINARY_IMAGING]: [Domain.INTERVENTIONAL_RADIOLOGY, Domain.NUCLEAR_MEDICINE, Domain.ULTRASOUND_IMAGING],
-      [Domain.THORACIC_IMAGING]: [Domain.CARDIOVASCULAR_IMAGING, Domain.NUCLEAR_MEDICINE],
+      [Domain.THORACIC_IMAGING]: [Domain.CARDIOVASCULAR_IMAGING, Domain.NUCLEAR_MEDICINE, Domain.PEDIATRIC_RADIOLOGY],
       [Domain.CARDIOVASCULAR_IMAGING]: [Domain.THORACIC_IMAGING, Domain.INTERVENTIONAL_RADIOLOGY, Domain.NUCLEAR_MEDICINE],
       [Domain.NEURORADIOLOGY]: [Domain.PEDIATRIC_RADIOLOGY, Domain.NUCLEAR_MEDICINE],
-      [Domain.PEDIATRIC_RADIOLOGY]: [Domain.NEURORADIOLOGY, Domain.THORACIC_IMAGING, Domain.GASTROINTESTINAL_IMAGING],
-      [Domain.MUSCULOSKELETAL_IMAGING]: [Domain.INTERVENTIONAL_RADIOLOGY, Domain.NUCLEAR_MEDICINE],
+      [Domain.PEDIATRIC_RADIOLOGY]: [Domain.NEURORADIOLOGY, Domain.THORACIC_IMAGING, Domain.GASTROINTESTINAL_IMAGING, Domain.GENITOURINARY_IMAGING, Domain.MUSCULOSKELETAL_IMAGING],
+      [Domain.MUSCULOSKELETAL_IMAGING]: [Domain.INTERVENTIONAL_RADIOLOGY, Domain.NUCLEAR_MEDICINE, Domain.PEDIATRIC_RADIOLOGY],
       [Domain.INTERVENTIONAL_RADIOLOGY]: [Domain.CARDIOVASCULAR_IMAGING, Domain.GASTROINTESTINAL_IMAGING, Domain.GENITOURINARY_IMAGING],
       [Domain.BREAST_IMAGING]: [Domain.NUCLEAR_MEDICINE, Domain.ULTRASOUND_IMAGING, Domain.PHYSICS],
       [Domain.ULTRASOUND_IMAGING]: [Domain.CARDIOVASCULAR_IMAGING, Domain.GENITOURINARY_IMAGING, Domain.BREAST_IMAGING],
       [Domain.NUCLEAR_MEDICINE]: [Domain.PHYSICS],
-      [Domain.PHYSICS]: [Domain.NUCLEAR_MEDICINE]
+      [Domain.PHYSICS]: [Domain.NUCLEAR_MEDICINE, Domain.BREAST_IMAGING]
     };
     
     return relations[domain] || [];
   }
 
-  private finalValidationAndMopUp(): void {
+  private guaranteeCompleteness(): void {
     this.notifications.push({
       type: 'info',
-      message: 'Starting final validation and completeness mop-up'
+      message: 'Guaranteeing 100% completeness for all required resources'
     });
     
-    // Mop up any remaining required content
-    this.performCompleteMopUp();
-    
-    // Validate time constraints
-    this.validateTimeConstraints();
-    
-    // Final task ordering
-    this.finalizeTaskOrdering();
-  }
-
-  private performCompleteMopUp(): void {
-    // Get ALL remaining required resources
-    const requiredResources = Array.from(this.remainingResources)
+    // Get all remaining required resources with strict priority
+    const requiredResources = Array.from(this.availableResources)
       .map(id => this.allResources.get(id))
-      .filter((resource): resource is StudyResource => 
-        resource !== undefined && (
-          (resource.bookSource || '').toLowerCase().includes('board vitals') ||
-          (resource.bookSource || '').toLowerCase().includes('nucapp') ||
-          (resource.bookSource || '').toLowerCase().includes('qevlar') ||
-          resource.domain === Domain.NIS || 
-          resource.domain === Domain.RISC ||
-          resource.domain === Domain.PHYSICS ||
-          resource.isPrimaryMaterial
+      .filter((r): r is StudyResource => 
+        r !== undefined && (
+          // Board Vitals pools
+          (r.bookSource || '').toLowerCase().includes('board vitals') ||
+          // NucApp pools  
+          (r.bookSource || '').toLowerCase().includes('nucapp') ||
+          // QEVLAR pools
+          (r.bookSource || '').toLowerCase().includes('qevlar') ||
+          // NIS/RISC
+          r.domain === Domain.NIS || r.domain === Domain.RISC ||
+          // Physics content
+          r.domain === Domain.PHYSICS ||
+          // Titan videos
+          (r.videoSource || '').toLowerCase().includes('titan') ||
+          // Primary material
+          r.isPrimaryMaterial
         )
       )
       .sort((a, b) => {
-        // Priority order: Board Vitals > NIS/RISC > NucApp > Physics > QEVLAR
-        const getPriority = (r: StudyResource) => {
-          const book = (r.bookSource || '').toLowerCase();
-          if (book.includes('board vitals')) return 1;
-          if (r.domain === Domain.NIS || r.domain === Domain.RISC) return 2;
-          if (book.includes('nucapp')) return 3;
-          if (r.domain === Domain.PHYSICS) return 4;
-          if (book.includes('qevlar')) return 5;
-          return 6;
+        // Priority ranking
+        const getPriority = (resource: StudyResource): number => {
+          const book = (resource.bookSource || '').toLowerCase();
+          const video = (resource.videoSource || '').toLowerCase();
+          
+          if (video.includes('titan')) return 1; // Highest priority
+          if (book.includes('board vitals')) return 2;
+          if (resource.domain === Domain.NIS || resource.domain === Domain.RISC) return 3;
+          if (book.includes('nucapp')) return 4;
+          if (resource.domain === Domain.PHYSICS) return 5;
+          if (book.includes('qevlar')) return 6;
+          return 10;
         };
         
-        const priorityA = getPriority(a);
-        const priorityB = getPriority(b);
+        const prioA = getPriority(a);
+        const prioB = getPriority(b);
         
-        if (priorityA !== priorityB) return priorityA - priorityB;
+        if (prioA !== prioB) return prioA - prioB;
         return (a.sequenceOrder || 999) - (b.sequenceOrder || 999);
       });
     
     if (requiredResources.length === 0) {
       this.notifications.push({
         type: 'info',
-        message: '✅ Perfect! All required resources scheduled.'
+        message: '✅ Perfect! All required resources already scheduled.'
       });
       return;
     }
     
-    // Find days with capacity, prioritizing under-filled days
+    // Find days with most available capacity
     const daysWithCapacity = this.studyDays
       .map(day => ({
         day,
         remainingTime: this.getRemainingTime(day),
-        currentUtilization: (day.tasks.reduce((sum, t) => sum + t.durationMinutes, 0) / day.totalStudyTimeMinutes) * 100
+        utilization: (day.tasks.reduce((sum, t) => sum + t.durationMinutes, 0) / day.totalStudyTimeMinutes) * 100
       }))
       .filter(({remainingTime}) => remainingTime >= 5)
       .sort((a, b) => {
-        // Prioritize days under 90% utilization first
-        if (a.currentUtilization < 90 && b.currentUtilization >= 90) return -1;
-        if (a.currentUtilization >= 90 && b.currentUtilization < 90) return 1;
+        // Prefer under-utilized days first
+        if (a.utilization < 85 && b.utilization >= 85) return -1;
+        if (a.utilization >= 85 && b.utilization < 85) return 1;
         return b.remainingTime - a.remainingTime;
       });
     
-    let moppedUp = 0;
+    let placed = 0;
     for (const resource of requiredResources) {
+      let resourcePlaced = false;
+      
       for (const {day} of daysWithCapacity) {
         if (this.addTaskToDay(day, resource)) {
-          moppedUp++;
+          placed++;
+          resourcePlaced = true;
           break;
         }
+      }
+      
+      if (!resourcePlaced) {
+        this.notifications.push({
+          type: 'warning',
+          message: `Could not place required resource: ${resource.title} (${resource.durationMinutes}min)`
+        });
       }
     }
     
     this.notifications.push({
-      type: moppedUp === requiredResources.length ? 'info' : 'warning',
-      message: `Mop-up complete: Placed ${moppedUp}/${requiredResources.length} remaining required resources`
+      type: placed === requiredResources.length ? 'info' : 'warning',
+      message: `Completeness: ${placed}/${requiredResources.length} required resources placed`
     });
   }
 
-  private validateTimeConstraints(): void {
-    let violations = 0;
-    
+  private validateAndOptimize(): void {
+    // Handle time constraint violations
     for (const day of this.studyDays) {
       const totalTime = day.tasks.reduce((sum, task) => sum + task.durationMinutes, 0);
       
       if (totalTime > day.totalStudyTimeMinutes) {
-        violations++;
         const excess = totalTime - day.totalStudyTimeMinutes;
-        
-        this.notifications.push({
-          type: 'warning',
-          message: `${day.date} exceeds limit by ${excess} minutes - redistributing`
-        });
-        
         this.redistributeExcessTasks(day, excess);
       }
     }
     
-    if (violations > 0) {
-      this.notifications.push({
-        type: 'info',
-        message: `Corrected ${violations} time violations`
+    // Final task ordering within each day
+    for (const day of this.schedule) {
+      day.tasks.sort(sortTasksByGlobalPriority);
+      day.tasks.forEach((task, index) => {
+        task.order = index;
       });
     }
   }
 
   private redistributeExcessTasks(overloadedDay: DailySchedule, excessTime: number): void {
-    // Remove supplementary content first, then optional content
-    const tasksByRemovalPriority = [...overloadedDay.tasks].sort((a, b) => {
-      // Remove synthetic BV tasks last (they're required)
+    const sortedTasks = [...overloadedDay.tasks].sort((a, b) => {
+      // Keep synthetic BV tasks (they're calculated quotas)
       if (a.resourceId.includes('bv_mixed') && !b.resourceId.includes('bv_mixed')) return 1;
       if (!a.resourceId.includes('bv_mixed') && b.resourceId.includes('bv_mixed')) return -1;
       
       // Remove supplementary content first
-      const aIsSupplementary = (a.videoSource || '').toLowerCase().includes('discord') || 
-                               (a.bookSource || '').toLowerCase().includes('core radiology');
-      const bIsSupplementary = (b.videoSource || '').toLowerCase().includes('discord') || 
-                               (b.bookSource || '').toLowerCase().includes('core radiology');
+      const aSupp = (a.videoSource || '').includes('discord') || (a.bookSource || '').includes('core radiology');
+      const bSupp = (b.videoSource || '').includes('discord') || (b.bookSource || '').includes('core radiology');
+      if (aSupp && !bSupp) return -1;
+      if (!aSupp && bSupp) return 1;
       
-      if (aIsSupplementary && !bIsSupplementary) return -1;
-      if (!aIsSupplementary && bIsSupplementary) return 1;
-      
-      // Then by task priority
-      const priorityA = TASK_TYPE_PRIORITY[a.type] || 50;
-      const priorityB = TASK_TYPE_PRIORITY[b.type] || 50;
-      if (priorityA !== priorityB) return priorityB - priorityA;
-      
-      // Optional tasks before required
+      // Then optional tasks
       if (a.isOptional !== b.isOptional) return a.isOptional ? -1 : 1;
       
+      // Then by duration (easier to move longer tasks)
       return b.durationMinutes - a.durationMinutes;
     });
     
     let timeToMove = excessTime;
     const tasksToMove: ScheduledTask[] = [];
     
-    for (const task of tasksByRemovalPriority) {
+    for (const task of sortedTasks) {
       if (timeToMove <= 0) break;
       tasksToMove.push(task);
       timeToMove -= task.durationMinutes;
     }
     
     // Remove from current day
-    overloadedDay.tasks = overloadedDay.tasks.filter(task => 
-      !tasksToMove.some(t => t.id === task.id)
+    overloadedDay.tasks = overloadedDay.tasks.filter(t => 
+      !tasksToMove.some(tm => tm.id === t.id)
     );
     
-    // Try to place on other days
+    // Place on best available days
     for (const task of tasksToMove) {
       const bestDay = this.studyDays
         .filter(d => d.date !== overloadedDay.date)
@@ -916,93 +949,72 @@ class TemplateBasedScheduler {
       if (bestDay) {
         bestDay.tasks.push({...task, order: bestDay.tasks.length});
       } else {
-        // Put back if can't place anywhere
         overloadedDay.tasks.push(task);
       }
     }
   }
 
-  private finalizeTaskOrdering(): void {
-    for (const day of this.schedule) {
-      day.tasks.sort(sortTasksByGlobalPriority);
-      day.tasks.forEach((task, index) => {
-        task.order = index;
-      });
-    }
-  }
-
-  private generateFinalSummary(): void {
-    const totalScheduledTime = this.schedule
-      .reduce((sum, day) => sum + day.tasks.reduce((daySum, task) => daySum + task.durationMinutes, 0), 0);
-    
-    const totalAvailableTime = this.studyDays
+  private generateExecutionSummary(): void {
+    const totalScheduled = this.schedule
+      .reduce((sum, day) => sum + day.tasks.reduce((ds, t) => ds + t.durationMinutes, 0), 0);
+    const totalAvailable = this.studyDays
       .reduce((sum, day) => sum + day.totalStudyTimeMinutes, 0);
-    
-    const utilizationPercentage = totalAvailableTime > 0 
-      ? ((totalScheduledTime / totalAvailableTime) * 100).toFixed(1)
-      : '0';
+    const utilization = totalAvailable > 0 ? ((totalScheduled / totalAvailable) * 100).toFixed(1) : '0';
     
     this.notifications.push({
       type: 'info',
-      message: `Final: ${totalScheduledTime}min/${totalAvailableTime}min (${utilizationPercentage}% utilization)`
+      message: `Execution complete: ${totalScheduled}/${totalAvailable}min (${utilization}% utilization)`
     });
     
-    // Board Vitals completion
+    // Board Vitals tracking
     if (this.totalBoardVitalsQuestions > 0) {
-      const bvCompletion = ((this.scheduledBoardVitalsQuestions / this.totalBoardVitalsQuestions) * 100).toFixed(1);
+      const bvPct = ((this.scheduledBoardVitalsQuestions / this.totalBoardVitalsQuestions) * 100).toFixed(1);
       this.notifications.push({
         type: 'info',
-        message: `Board Vitals: ${this.scheduledBoardVitalsQuestions}/${this.totalBoardVitalsQuestions} questions (${bvCompletion}%)`
+        message: `Board Vitals: ${this.scheduledBoardVitalsQuestions}/${this.totalBoardVitalsQuestions} questions (${bvPct}%)`
       });
     }
     
-    // Template execution summary
-    const completedTemplates = this.dailyTemplates.filter(t => t.completedSteps.size >= 6).length;
+    // Template completion
+    const fullTemplates = this.dailyExecutions.filter(e => e.stepsCompleted === 6).length;
     this.notifications.push({
-      type: 'info',
-      message: `Daily templates: ${completedTemplates}/${this.dailyTemplates.length} completed all 6 core steps`
+      type: 'info', 
+      message: `Template execution: ${fullTemplates}/${this.dailyExecutions.length} days completed all 6 steps`
     });
     
     // Unscheduled summary
-    if (this.remainingResources.size > 0) {
-      const unscheduledExamples = Array.from(this.remainingResources)
-        .slice(0, 5)
-        .map(id => {
-          const resource = this.allResources.get(id);
-          return resource ? `"${resource.title}"` : id;
-        });
+    if (this.availableResources.size > 0) {
+      const examples = Array.from(this.availableResources).slice(0, 3)
+        .map(id => this.allResources.get(id)?.title || id);
       
       this.notifications.push({
         type: 'warning',
-        message: `${this.remainingResources.size} resources unscheduled. Examples: ${unscheduledExamples.join(', ')}`
+        message: `${this.availableResources.size} resources unscheduled. Examples: ${examples.join(', ')}`
       });
     }
   }
 
   private buildProgressTracking(): StudyPlan['progressPerDomain'] {
-    const progressPerDomain: StudyPlan['progressPerDomain'] = {};
+    const progress: StudyPlan['progressPerDomain'] = {};
     
-    // Initialize all domains
+    // Initialize from all resources
     for (const resource of this.allResources.values()) {
-      if (!progressPerDomain[resource.domain]) {
-        progressPerDomain[resource.domain] = {
-          completedMinutes: 0,
-          totalMinutes: 0
-        };
+      if (!progress[resource.domain]) {
+        progress[resource.domain] = { completedMinutes: 0, totalMinutes: 0 };
       }
-      progressPerDomain[resource.domain]!.totalMinutes += resource.durationMinutes;
+      progress[resource.domain]!.totalMinutes += resource.durationMinutes;
     }
     
-    // Add completed time from scheduled tasks
+    // Add completed time from tasks
     for (const day of this.schedule) {
       for (const task of day.tasks) {
-        if (task.status === 'completed' && progressPerDomain[task.originalTopic]) {
-          progressPerDomain[task.originalTopic]!.completedMinutes += task.durationMinutes;
+        if (task.status === 'completed' && progress[task.originalTopic]) {
+          progress[task.originalTopic]!.completedMinutes += task.durationMinutes;
         }
       }
     }
     
-    return progressPerDomain;
+    return progress;
   }
 
   private createEmptyPlan(): GeneratedStudyPlanOutcome {
@@ -1025,7 +1037,7 @@ class TemplateBasedScheduler {
 }
 
 /**
- * PUBLIC API FUNCTIONS
+ * PUBLIC API
  */
 
 export const generateInitialSchedule = (
@@ -1038,7 +1050,7 @@ export const generateInitialSchedule = (
   areSpecialTopicsInterleaved: boolean | undefined
 ): GeneratedStudyPlanOutcome => {
   try {
-    const scheduler = new TemplateBasedScheduler(
+    const scheduler = new StrictTemplateScheduler(
       startDateStr,
       endDateStr,
       exceptionRules,
@@ -1048,7 +1060,7 @@ export const generateInitialSchedule = (
       areSpecialTopicsInterleaved ?? true
     );
     
-    return scheduler.generateScheduleUsingTemplate();
+    return scheduler.executeStrictTemplate();
     
   } catch (error) {
     return {
@@ -1081,40 +1093,39 @@ export const rebalanceSchedule = (
   try {
     const today = getTodayInNewYork();
     
-    let rebalanceStartDate: string;
+    let rebalanceStart: string;
     if (options.type === 'standard') {
-      rebalanceStartDate = (options.rebalanceDate && options.rebalanceDate > today) 
-        ? options.rebalanceDate 
-        : today;
+      rebalanceStart = (options.rebalanceDate && options.rebalanceDate > today) 
+        ? options.rebalanceDate : today;
     } else {
-      rebalanceStartDate = options.date;
+      rebalanceStart = options.date;
     }
     
-    // Ensure date is within bounds
-    rebalanceStartDate = Math.max(rebalanceStartDate, currentPlan.startDate);
-    rebalanceStartDate = Math.min(rebalanceStartDate, currentPlan.endDate);
+    // Clamp to plan bounds
+    rebalanceStart = Math.max(rebalanceStart, currentPlan.startDate);
+    rebalanceStart = Math.min(rebalanceStart, currentPlan.endDate);
     
-    // Preserve past schedule
-    const pastSchedule = currentPlan.schedule.filter(day => day.date < rebalanceStartDate);
+    // Preserve past
+    const pastSchedule = currentPlan.schedule.filter(day => day.date < rebalanceStart);
     
     // Get completed resources
-    const completedResourceIds = new Set<string>();
+    const completedIds = new Set<string>();
     for (const day of currentPlan.schedule) {
       for (const task of day.tasks) {
         if (task.status === 'completed' && task.originalResourceId) {
-          completedResourceIds.add(task.originalResourceId);
+          completedIds.add(task.originalResourceId);
         }
       }
     }
     
-    // Filter available resources
-    const availableResources = resourcePool.filter(resource => 
-      !completedResourceIds.has(resource.id) && !resource.isArchived
+    // Available resources
+    const availableResources = resourcePool.filter(r => 
+      !completedIds.has(r.id) && !r.isArchived
     );
     
-    // Create scheduler for remaining period
-    const scheduler = new TemplateBasedScheduler(
-      rebalanceStartDate,
+    // Create scheduler
+    const scheduler = new StrictTemplateScheduler(
+      rebalanceStart,
       currentPlan.endDate,
       exceptionRules,
       availableResources,
@@ -1123,22 +1134,22 @@ export const rebalanceSchedule = (
       currentPlan.areSpecialTopicsInterleaved
     );
     
-    const result = scheduler.generateScheduleUsingTemplate();
+    const result = scheduler.executeStrictTemplate();
     
-    // Combine schedules
+    // Merge
     result.plan.schedule = [...pastSchedule, ...result.plan.schedule];
     result.plan.startDate = currentPlan.startDate;
     
     // Recalculate progress
-    const updatedProgress = result.plan.progressPerDomain;
+    const progress = result.plan.progressPerDomain;
     for (const day of result.plan.schedule) {
       for (const task of day.tasks) {
-        if (task.status === 'completed' && updatedProgress[task.originalTopic]) {
-          updatedProgress[task.originalTopic]!.completedMinutes += task.durationMinutes;
+        if (task.status === 'completed' && progress[task.originalTopic]) {
+          progress[task.originalTopic]!.completedMinutes += task.durationMinutes;
         }
       }
     }
-    result.plan.progressPerDomain = updatedProgress;
+    result.plan.progressPerDomain = progress;
     
     return result;
     
