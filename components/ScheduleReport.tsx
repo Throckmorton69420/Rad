@@ -1,79 +1,145 @@
 import React from 'react';
-// FIX: Corrected import path for types.
 import { StudyPlan, DailySchedule } from '../types';
 import { formatDuration, parseDateString } from '../utils/timeFormatter';
 
 interface ScheduleReportProps {
   studyPlan: StudyPlan;
-  schedule?: DailySchedule[]; // Optional override for printing subsets
+  schedule?: DailySchedule[];
 }
 
 const ScheduleReport: React.FC<ScheduleReportProps> = ({ studyPlan, schedule }) => {
   const scheduleToRender = schedule || studyPlan.schedule;
-  const totalPlannedMinutes = scheduleToRender.reduce((acc, day) => acc + (day.isRestDay ? 0 : day.tasks.reduce((taskAcc, task) => taskAcc + task.durationMinutes, 0)), 0);
+  const totalPlannedMinutes = scheduleToRender.reduce(
+    (acc, day) =>
+      acc +
+      (day.isRestDay
+        ? 0
+        : day.tasks.reduce((taskAcc, task) => taskAcc + task.durationMinutes, 0)),
+    0
+  );
 
   return (
-    <div className="p-4 md:p-8 font-sans text-black bg-white printable-report">
-      <header className="mb-8 text-center border-b border-gray-300 pb-4">
-        <div className="flex justify-between items-end">
-          <span className="text-xs text-gray-500">Radiology Core Exam Study Planner</span>
-          <span className="text-xs text-gray-500">{new Date().toLocaleString()}</span>
+    <div className="printable-report" style={{ padding: '16px', fontFamily: 'serif', color: 'black', backgroundColor: 'white' }}>
+      {/* Inline header - NO separate container */}
+      <div style={{ textAlign: 'center', marginBottom: '24px', borderBottom: '1px solid #ddd', paddingBottom: '16px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: '#666', marginBottom: '8px' }}>
+          <span>Radiology Core Exam Study Planner</span>
+          <span>{new Date().toLocaleString()}</span>
         </div>
-        <div className="mt-4">
-          <h1 className="text-2xl md:text-3xl font-bold">Radiology Core Exam - Study Schedule Report</h1>
-          {scheduleToRender.length > 0 && (
-            <>
-              <p className="text-md md:text-lg text-gray-600">
-                {parseDateString(scheduleToRender[0].date).toLocaleDateString('en-US', { timeZone: 'UTC', month: 'long', day: 'numeric', year: 'numeric' })} - {parseDateString(scheduleToRender[scheduleToRender.length - 1].date).toLocaleDateString('en-US', { timeZone: 'UTC', month: 'long', day: 'numeric', year: 'numeric' })}
-              </p>
-              <p className="text-sm md:text-md text-gray-500 mt-1">Total Planned Study Time: {formatDuration(totalPlannedMinutes)}</p>
-            </>
-          )}
-        </div>
-      </header>
-      
-      <main className="space-y-8">
-        {scheduleToRender.map((day) => (
-              <div key={day.date} className="print-no-break">
-                <h2 className="text-lg font-bold mb-3 border-b-2 border-gray-400 pb-2 text-gray-800">
-                  {parseDateString(day.date).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' })}
-                </h2>
-                {day.isRestDay ? (
-                  <p className="text-gray-500 italic px-2 py-4 bg-gray-50 rounded-md">Rest Day</p>
-                ) : day.tasks.length === 0 ? (
-                    <p className="text-gray-500 italic px-2 py-4 bg-gray-50 rounded-md">No tasks scheduled for a planned duration of {formatDuration(day.totalStudyTimeMinutes)}.</p>
-                ) : (
-                  <table className="w-full text-left text-sm border-collapse">
-                    <thead className="border-b-2 border-gray-300 bg-gray-100">
-                      <tr>
-                        <th className="py-2 px-2 w-3/5 font-semibold text-gray-700">Task</th>
-                        <th className="py-2 px-2 w-1/5 font-semibold text-gray-700 text-right">Duration</th>
-                        <th className="py-2 px-2 w-1/5 font-semibold text-gray-700">Topic</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {day.tasks.map((task, index) => (
-                        <tr key={task.id} className={`border-b border-gray-200 print-no-break ${index % 2 !== 0 ? 'bg-gray-50' : ''}`}>
-                          <td className="py-1.5 px-2">{task.title}</td>
-                          <td className="py-1.5 px-2 text-right">{formatDuration(task.durationMinutes)}</td>
-                          <td className="py-1.5 px-2 text-gray-600 text-xs">{task.originalTopic}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                    <tfoot>
-                        <tr className="border-t-2 border-gray-300">
-                            <td className="pt-2 font-bold text-right">Total Time:</td>
-                            <td className="pt-2 px-2 font-bold text-right">{formatDuration(day.tasks.reduce((acc, t) => acc + t.durationMinutes, 0))}</td>
-                            <td></td>
-                        </tr>
-                    </tfoot>
-                  </table>
-                )}
-              </div>
-            )
+        <h1 style={{ fontSize: '24px', fontWeight: 'bold', margin: '8px 0' }}>
+          Radiology Core Exam - Study Schedule Report
+        </h1>
+        {scheduleToRender.length > 0 && (
+          <>
+            <p style={{ fontSize: '16px', color: '#666', margin: '4px 0' }}>
+              {parseDateString(scheduleToRender[0].date).toLocaleDateString('en-US', {
+                timeZone: 'UTC',
+                month: 'long',
+                day: 'numeric',
+                year: 'numeric',
+              })}{' '}
+              -{' '}
+              {parseDateString(
+                scheduleToRender[scheduleToRender.length - 1].date
+              ).toLocaleDateString('en-US', {
+                timeZone: 'UTC',
+                month: 'long',
+                day: 'numeric',
+                year: 'numeric',
+              })}
+            </p>
+            <p style={{ fontSize: '14px', color: '#888', margin: '4px 0' }}>
+              Total Planned Study Time: {formatDuration(totalPlannedMinutes)}
+            </p>
+          </>
         )}
+      </div>
+
+      {/* Schedule content starts IMMEDIATELY after header */}
+      <main style={{ marginTop: 0 }}>
+        {scheduleToRender.map((day) => (
+          <div key={day.date} className="print-no-break" style={{ marginBottom: '32px' }}>
+            <h2
+              style={{
+                fontSize: '18px',
+                fontWeight: 'bold',
+                marginBottom: '12px',
+                borderBottom: '2px solid #666',
+                paddingBottom: '8px',
+                color: '#333',
+              }}
+            >
+              {parseDateString(day.date).toLocaleDateString('en-US', {
+                weekday: 'long',
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric',
+                timeZone: 'UTC',
+              })}
+            </h2>
+            {day.isRestDay ? (
+              <p style={{ fontStyle: 'italic', color: '#888', padding: '16px 8px', backgroundColor: '#f9f9f9', borderRadius: '4px' }}>
+                Rest Day
+              </p>
+            ) : day.tasks.length === 0 ? (
+              <p style={{ fontStyle: 'italic', color: '#888', padding: '16px 8px', backgroundColor: '#f9f9f9', borderRadius: '4px' }}>
+                No tasks scheduled for a planned duration of{' '}
+                {formatDuration(day.totalStudyTimeMinutes)}.
+              </p>
+            ) : (
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px' }}>
+                <thead style={{ borderBottom: '2px solid #ddd', backgroundColor: '#f3f3f3' }}>
+                  <tr>
+                    <th style={{ padding: '8px', textAlign: 'left', width: '60%', fontWeight: '600', color: '#555' }}>
+                      Task
+                    </th>
+                    <th style={{ padding: '8px', textAlign: 'right', width: '15%', fontWeight: '600', color: '#555' }}>
+                      Duration
+                    </th>
+                    <th style={{ padding: '8px', textAlign: 'left', width: '25%', fontWeight: '600', color: '#555' }}>
+                      Topic
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {day.tasks.map((task, index) => (
+                    <tr
+                      key={task.id}
+                      className="print-no-break"
+                      style={{
+                        borderBottom: '1px solid #eee',
+                        backgroundColor: index % 2 !== 0 ? '#fafafa' : 'transparent',
+                      }}
+                    >
+                      <td style={{ padding: '6px 8px' }}>{task.title}</td>
+                      <td style={{ padding: '6px 8px', textAlign: 'right' }}>
+                        {formatDuration(task.durationMinutes)}
+                      </td>
+                      <td style={{ padding: '6px 8px', fontSize: '10px', color: '#666' }}>
+                        {task.originalTopic}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr style={{ borderTop: '2px solid #ddd' }}>
+                    <td style={{ paddingTop: '8px', fontWeight: 'bold', textAlign: 'right' }}>
+                      Total Time:
+                    </td>
+                    <td style={{ paddingTop: '8px', fontWeight: 'bold', textAlign: 'right', paddingRight: '8px' }}>
+                      {formatDuration(
+                        day.tasks.reduce((acc, t) => acc + t.durationMinutes, 0)
+                      )}
+                    </td>
+                    <td></td>
+                  </tr>
+                </tfoot>
+              </table>
+            )}
+          </div>
+        ))}
       </main>
-      <footer className="mt-8 pt-4 border-t border-gray-300 text-center text-xs text-gray-500">
+      <footer style={{ marginTop: '32px', paddingTop: '16px', borderTop: '1px solid #ddd', textAlign: 'center', fontSize: '10px', color: '#888' }}>
         End of Report
       </footer>
     </div>
