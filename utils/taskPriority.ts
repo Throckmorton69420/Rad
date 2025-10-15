@@ -38,11 +38,11 @@ const SOURCE_RANK: Record<string, number> = {
   'Huda': 5,
   'Huda Physics QB': 6,
   'Review of Physics 5e': 7,
-  'Nuclear': 7, // keep nuclear cluster after Huda QB if it appears in group view
+  'Nuclear': 7, // held here in UI grouping if present
   'RISC Study Guide': 8,
   'Board Vitals': 9,
   'RadPrimer': 10,
-  'Discord': 10, // allow Discord around RadPrimer; final sort will stabilize by type/title
+  'Discord': 10, // allow close to RadPrimer; tie-breakers will stabilize
   'Core Radiology': 12,
   'Other': 998,
   'Custom Task': 999,

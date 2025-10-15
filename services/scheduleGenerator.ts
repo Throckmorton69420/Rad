@@ -1,3 +1,22 @@
+  private generateInitial(startDate: string, endDate: string): void {
+    // Phase 1: primaries
+    let cursor = 0;
+    cursor = this.phase1a_distributeTitan(cursor);
+    cursor = this.phase1b_distributeHuda(cursor);
+    cursor = this.phase1c_distributeOtherPrimaries(cursor);
+
+    // Phase 1d: domain sequencing per Titan order (excluding Nuclear/Physics)
+    cursor = this.phase1d_distributeByTitanDomainOrder(cursor);
+
+    // Phase 2: topic families and daily filler
+    this.phase2_dailyFirstFit();
+
+    // Final per-day sort and reindex
+    for (const day of this.studyDays) {
+      day.tasks = sortTasksByGlobalPriority(day.tasks);
+      day.tasks = day.tasks.map((t, i) => ({ ...t, order: i }));
+    }
+  }
 // services/scheduleGenerator.ts
 
 import { 
@@ -401,8 +420,37 @@ class Scheduler {
     const blocks = anchors.map(a => this.buildBlockFromAnchor(a));
     return this.placeBlockStrictRoundRobin(blocks, cursorStart);
   }
+// Phase 1d: Distribute remaining non-Nuclear, non-Physics resources in Titan domain order
+private phase1d_distributeByTitanDomainOrder(cursorStart: number): number {
+    // Titan-inspired domain sequence excluding Nuclear and Physics (handled elsewhere)
+    const DOMAIN_ORDER: Domain[] = [
+      Domain.GASTROINTESTINAL_IMAGING,
+      Domain.GENITOURINARY_IMAGING,
+      Domain.THORACIC_IMAGING,
+      Domain.MUSCULOSKELETAL_IMAGING,
+      Domain.NEURORADIOLOGY,
+      Domain.PEDIATRIC_RADIOLOGY,
+      Domain.CARDIOVASCULAR_IMAGING,
+      Domain.BREAST_IMAGING,
+      Domain.INTERVENTIONAL_RADIOLOGY,
+    ];
 
-  // Phase 2: daily requirements
+    // Build one block per domain in preferred order
+    const domainBlocks = DOMAIN_ORDER.map(dom => {
+      const items = [...this.remaining]
+        .map(id => this.allResources.get(id)!)
+        .filter(r => r && r.domain === dom && r.domain !== Domain.NUCLEAR_MEDICINE && r.domain !== Domain.PHYSICS)
+        .filter(r => (isPrimaryByCategory(r) || r.isPrimaryMaterial));
+      const sortedItems = sortResourcesByTaskPriority(items);
+      const totalMinutes = sortedItems.reduce((s, r) => s + r.durationMinutes, 0);
+      const anchorId = sortedItems[0]?.id || `${dom}_anchor`;
+      return { anchorId, domain: dom, items: sortedItems, totalMinutes } as Block;
+    }).filter(b => b.items.length > 0);
+
+    if (domainBlocks.length === 0) return cursorStart;
+    return this.placeBlockStrictRoundRobin(domainBlocks, cursorStart);
+  }
+
   private phase2_dailyFirstFit(): void {
     // Pre-pass: distribute block families with round-robin before daily fill
     let cursor = 0;
