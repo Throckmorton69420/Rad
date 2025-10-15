@@ -23,6 +23,7 @@ interface MasterResourcePoolViewerProps {
   // FIX: Add props to make this a controlled component for filters.
   filters: ContentUiFilters;
   onFiltersChange: (filters: ContentUiFilters) => void;
+  onOpenPrintModal?: () => void;
 }
 
 type SortKey = 'title' | 'domain' | 'type' | 'durationMinutes' | 'sequenceOrder' | 'status' | 'source';
@@ -33,7 +34,7 @@ const MasterResourcePoolViewer: React.FC<MasterResourcePoolViewerProps> = ({
   onRestoreResource, onPermanentDeleteResource, scheduledResourceIds,
   onGoToDate, onHighlightDates, onClearHighlights,
   // FIX: Destructure new filter props.
-  filters, onFiltersChange,
+  filters, onFiltersChange, onOpenPrintModal,
 }) => {
   // FIX: Removed local state for filters, as they are now managed by the parent component.
   const [isSummaryExpanded, setIsSummaryExpanded] = useState(true);
@@ -118,26 +119,108 @@ const MasterResourcePoolViewer: React.FC<MasterResourcePoolViewerProps> = ({
   const typeOptions = useMemo(() => Array.from(new Set(resources.map(r => r.type))).sort().map(t => ({ value: t, label: t })), [resources]);
   const sourceOptions = useMemo(() => Array.from(new Set(resources.map(r => r.bookSource || r.videoSource).filter(Boolean) as string[])).sort().map(s => ({ value: s, label: s })), [resources]);
 
+  const getSortIcon = (key: SortKey) => {
+    if (sortConfig.key !== key) {
+      return <i className="fas fa-sort text-[var(--text-tertiary)] ml-1"></i>;
+    }
+    return sortConfig.direction === 'ascending' 
+      ? <i className="fas fa-sort-up text-[var(--accent-purple)] ml-1"></i>
+      : <i className="fas fa-sort-down text-[var(--accent-purple)] ml-1"></i>;
+  };
+
   return (
     <div className="pb-[calc(1rem+env(safe-area-inset-bottom))]">
       <div className="flex-shrink-0">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 items-end mb-3">
           <input type="text" placeholder="Search resources..." value={filters.searchTerm} onChange={(e) => onFiltersChange({...filters, searchTerm: e.target.value})} className="input-base !py-1.5 !text-sm"/>
-          <CustomSelect value={filters.domain} onChange={v => onFiltersChange({...filters, domain: v as Domain | 'all'})} options={[{value: 'all', label: 'All Topics'}, ...ALL_DOMAINS.map(d => ({ value: d, label: d }))]}/>
-          <CustomSelect value={filters.type} onChange={v => onFiltersChange({...filters, type: v as ResourceType | 'all'})} options={[{value: 'all', label: 'All Types'}, ...typeOptions]}/>
-          <CustomSelect value={filters.source} onChange={v => onFiltersChange({...filters, source: v})} options={[{value: 'all', label: 'All Sources'}, ...sourceOptions]}/>
+          <CustomSelect value={filters.domain} onChange={v => onFiltersChange({...filters, domain: v as Domain | 'all'})} options={[{value: 'all', label: 'All Topics'}, ...ALL_DOMAINS.map(d => ({ value: d, label: d }))]} />
+          <CustomSelect value={filters.type} onChange={v => onFiltersChange({...filters, type: v as ResourceType | 'all'})} options={[{value: 'all', label: 'All Types'}, ...typeOptions]} />
+          <CustomSelect value={filters.source} onChange={v => onFiltersChange({...filters, source: v})} options={[{value: 'all', label: 'All Sources'}, ...sourceOptions]} />
         </div>
+        
         <div className="flex justify-between items-center space-x-3 mt-2 pt-2">
             <div className="flex items-center space-x-4">
-              <CustomSelect value={filters.status} onChange={v => onFiltersChange({...filters, status: v as any})} options={[ {value: 'all', label: 'All Statuses'}, {value: 'scheduled', label: 'Scheduled'}, {value: 'unscheduled', label: 'Unscheduled'} ]}/>
+              <CustomSelect value={filters.status} onChange={v => onFiltersChange({...filters, status: v as any})} options={[ {value: 'all', label: 'All Statuses'}, {value: 'scheduled', label: 'Scheduled'}, {value: 'unscheduled', label: 'Unscheduled'} ]} />
               <label className="flex items-center text-sm text-[var(--text-secondary)] cursor-pointer">
                 <input type="checkbox" checked={filters.showArchived} onChange={(e) => onFiltersChange({...filters, showArchived: e.target.checked})} className="h-4 w-4 text-[var(--accent-yellow)] border-gray-700 rounded bg-gray-800 focus:ring-[var(--accent-yellow)] mr-2"/>
                 Show Archived
               </label>
             </div>
             <div className="flex items-center space-x-2">
+              {onOpenPrintModal && (
+                <Button onClick={onOpenPrintModal} variant="secondary" size="sm" className="!text-xs !px-3 !py-1.5">
+                  <i className="fas fa-print mr-1.5"></i> Print Content
+                </Button>
+              )}
               <Button onClick={onOpenAddResourceModal} variant="primary" size="sm" className="!text-xs !px-3 !py-1.5"><i className="fas fa-plus mr-1.5"></i> Add New</Button>
             </div>
+        </div>
+        
+        {/* Enhanced Sorting Controls */}
+        <div className="flex items-center space-x-2 mt-3 pt-3 border-t border-[var(--separator-primary)]">
+          <span className="text-sm font-medium text-[var(--text-secondary)]">Sort by:</span>
+          <div className="flex items-center space-x-1 flex-wrap">
+            <button 
+              onClick={() => requestSort('sequenceOrder')}
+              className={`text-xs px-2 py-1 rounded transition-colors ${
+                sortConfig.key === 'sequenceOrder' 
+                  ? 'bg-[var(--accent-purple)] text-white' 
+                  : 'bg-[var(--background-tertiary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+              }`}
+            >
+              Sequence {getSortIcon('sequenceOrder')}
+            </button>
+            <button 
+              onClick={() => requestSort('title')}
+              className={`text-xs px-2 py-1 rounded transition-colors ${
+                sortConfig.key === 'title' 
+                  ? 'bg-[var(--accent-purple)] text-white' 
+                  : 'bg-[var(--background-tertiary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+              }`}
+            >
+              Title {getSortIcon('title')}
+            </button>
+            <button 
+              onClick={() => requestSort('domain')}
+              className={`text-xs px-2 py-1 rounded transition-colors ${
+                sortConfig.key === 'domain' 
+                  ? 'bg-[var(--accent-purple)] text-white' 
+                  : 'bg-[var(--background-tertiary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+              }`}
+            >
+              Domain {getSortIcon('domain')}
+            </button>
+            <button 
+              onClick={() => requestSort('durationMinutes')}
+              className={`text-xs px-2 py-1 rounded transition-colors ${
+                sortConfig.key === 'durationMinutes' 
+                  ? 'bg-[var(--accent-purple)] text-white' 
+                  : 'bg-[var(--background-tertiary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+              }`}
+            >
+              Duration {getSortIcon('durationMinutes')}
+            </button>
+            <button 
+              onClick={() => requestSort('status')}
+              className={`text-xs px-2 py-1 rounded transition-colors ${
+                sortConfig.key === 'status' 
+                  ? 'bg-[var(--accent-purple)] text-white' 
+                  : 'bg-[var(--background-tertiary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+              }`}
+            >
+              Status {getSortIcon('status')}
+            </button>
+            <button 
+              onClick={() => requestSort('source')}
+              className={`text-xs px-2 py-1 rounded transition-colors ${
+                sortConfig.key === 'source' 
+                  ? 'bg-[var(--accent-purple)] text-white' 
+                  : 'bg-[var(--background-tertiary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+              }`}
+            >
+              Source {getSortIcon('source')}
+            </button>
+          </div>
         </div>
       </div>
       
