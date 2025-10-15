@@ -42,6 +42,33 @@ import { getTodayInNewYork, parseDateString } from '../utils/timeFormatter';
 
 import { sortTasksByGlobalPriority } from '../utils/taskPriority';
 
+// Map StudyResource[] into the same global priority as ScheduledTask comparator
+const sortResourcesByTaskPriority = (resources: StudyResource[]): StudyResource[] => {
+  const tmpTasks = resources.map((r, idx) => ({
+    id: `tmp_${r.id}_${idx}`,
+    resourceId: r.id,
+    originalResourceId: r.id,
+    title: r.title,
+    type: r.type,
+    originalTopic: r.domain,
+    durationMinutes: r.durationMinutes,
+    status: 'pending' as const,
+    order: idx,
+    isOptional: !!r.isOptional,
+    isPrimaryMaterial: !!r.isPrimaryMaterial,
+    pages: r.pages,
+    startPage: r.startPage,
+    endPage: r.endPage,
+    caseCount: r.caseCount,
+    questionCount: r.questionCount,
+    chapterNumber: r.chapterNumber,
+    bookSource: r.bookSource,
+    videoSource: r.videoSource,
+  }));
+  const sorted = sortTasksByGlobalPriority(tmpTasks);
+  const byId = new Map(resources.map(r => [r.id, r]));
+  return sorted.map(t => byId.get(t.resourceId)!).filter(Boolean);
+};
 
 const chunkLargeResources = (resources: StudyResource[]): StudyResource[] => {
   const out: StudyResource[] = [];
@@ -254,7 +281,7 @@ class Scheduler {
   private buildBlockFromAnchor(anchor: StudyResource): Block {
     const seen = new Set<string>();
     const q: string[] = [anchor.id];
-    const items: StudyResource[] = [];
+    let items: StudyResource[] = [];
     while (q.length) {
       const id = q.shift()!;
       if (seen.has(id)) continue;
@@ -265,7 +292,7 @@ class Scheduler {
       items.push(r);
       for (const pid of r.pairedResourceIds ?? []) if (!seen.has(pid)) q.push(pid);
     }
-    items.sort((a, b) => (TASK_TYPE_PRIORITY[a.type] || 99) - (TASK_TYPE_PRIORITY[b.type] || 99));
+    items = sortResourcesByTaskPriority(items);
     const total = items.reduce((s, r) => s + r.durationMinutes, 0);
     return { anchorId: anchor.id, domain: anchor.domain, items, totalMinutes: total };
   }
@@ -335,12 +362,57 @@ class Scheduler {
     return this.placeBlockStrictRoundRobin(blocks, cursorStart);
   }
 
+  // Phase 2a: Nuclear Medicine (videos/readings/cases/questions in Nuclear, plus Nucs App/Qevlar for nucs)
+  private phase2a_distributeNuclear(cursorStart: number): number {
+    const anchors = [...this.allResources.values()].filter(r =>
+      this.remaining.has(r.id) &&
+      (
+        r.domain === Domain.NUCLEAR_MEDICINE ||
+        ci(r.bookSource).includes('nucs app') ||
+        (ci(r.bookSource) === 'qevlar' && r.domain === Domain.NUCLEAR_MEDICINE)
+      ) &&
+      (isPrimaryByCategory(r) || r.isPrimaryMaterial)
+    );
+    anchors.sort((a, b) => (a.sequenceOrder || 9999) - (b.sequenceOrder || 9999));
+    const blocks = anchors.map(a => this.buildBlockFromAnchor(a));
+    return this.placeBlockStrictRoundRobin(blocks, cursorStart);
+  }
+
+  // Phase 2b: NIS / RISC
+  private phase2b_distributeNisRisc(cursorStart: number): number {
+    const anchors = [...this.allResources.values()].filter(r =>
+      this.remaining.has(r.id) &&
+      (r.domain === Domain.NIS || r.domain === Domain.RISC) &&
+      (isPrimaryByCategory(r) || r.isPrimaryMaterial)
+    );
+    anchors.sort((a, b) => (a.sequenceOrder || 9999) - (b.sequenceOrder || 9999));
+    const blocks = anchors.map(a => this.buildBlockFromAnchor(a));
+    return this.placeBlockStrictRoundRobin(blocks, cursorStart);
+  }
+
+  // Phase 2c: Board Vitals
+  private phase2c_distributeBoardVitals(cursorStart: number): number {
+    const anchors = [...this.allResources.values()].filter(r =>
+      this.remaining.has(r.id) &&
+      ci(r.bookSource) === 'board vitals' &&
+      (isPrimaryByCategory(r) || r.isPrimaryMaterial)
+    );
+    anchors.sort((a, b) => (a.sequenceOrder || 9999) - (b.sequenceOrder || 9999));
+    const blocks = anchors.map(a => this.buildBlockFromAnchor(a));
+    return this.placeBlockStrictRoundRobin(blocks, cursorStart);
+  }
+
   // Phase 2: daily requirements
   private phase2_dailyFirstFit(): void {
+    // Pre-pass: distribute block families with round-robin before daily fill
+    let cursor = 0;
+    cursor = this.phase2a_distributeNuclear(cursor);
+    cursor = this.phase2b_distributeNisRisc(cursor);
+    cursor = this.phase2c_distributeBoardVitals(cursor);
     const remainingResources = [...this.remaining].map(id => this.allResources.get(id)!).filter(Boolean);
-    const nucMed = remainingResources.filter(r => r.domain === Domain.NUCLEAR_MEDICINE && (isPrimaryByCategory(r) || r.isPrimaryMaterial)).sort((a, b) => (TASK_TYPE_PRIORITY[a.type] || 99) - (TASK_TYPE_PRIORITY[b.type] || 99));
-    const nisRisc = remainingResources.filter(r => (r.domain === Domain.NIS || r.domain === Domain.RISC) && (isPrimaryByCategory(r) || r.isPrimaryMaterial)).sort((a, b) => (TASK_TYPE_PRIORITY[a.type] || 99) - (TASK_TYPE_PRIORITY[b.type] || 99));
-    const boardVitals = remainingResources.filter(r => ci(r.bookSource) === 'board vitals' && (isPrimaryByCategory(r) || r.isPrimaryMaterial));
+    const nucMed = sortResourcesByTaskPriority(remainingResources.filter(r => r.domain === Domain.NUCLEAR_MEDICINE && (isPrimaryByCategory(r) || r.isPrimaryMaterial)));
+    const nisRisc = sortResourcesByTaskPriority(remainingResources.filter(r => (r.domain === Domain.NIS || r.domain === Domain.RISC) && (isPrimaryByCategory(r) || r.isPrimaryMaterial)));
+    const boardVitals = sortResourcesByTaskPriority(remainingResources.filter(r => ci(r.bookSource) === 'board vitals' && (isPrimaryByCategory(r) || r.isPrimaryMaterial)));
 
     for (let d = 0; d < this.studyDays.length; d++) {
       const day = this.studyDays[d];
