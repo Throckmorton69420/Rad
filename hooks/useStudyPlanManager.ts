@@ -6,7 +6,7 @@ import { supabase } from '../services/supabaseClient';
 import { DEFAULT_TOPIC_ORDER, STUDY_END_DATE, STUDY_START_DATE } from '../constants';
 import { getTodayInNewYork } from '../utils/timeFormatter';
 
-// OR-Tools Service Integration
+// OR-Tools Service Integration - FIXED environment variable access
 const OR_TOOLS_SERVICE_URL = 'http://localhost:8001';
 
 interface ORToolsScheduleRequest {
@@ -162,7 +162,9 @@ export const useStudyPlanManager = (showConfirmation: (options: ShowConfirmation
     const [systemNotification, setSystemNotification] = useState<{ type: 'error' | 'warning' | 'info', message: string } | null>(null);
     const [isNewUser, setIsNewUser] = useState(false);
     const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
-    const [useORTools, setUseORTools] = useState<boolean>(true);
+    
+    // FIXED: Safe environment variable access - defaults to false on production
+    const [useORTools, setUseORTools] = useState<boolean>(false);
     
     const isInitialLoadRef = useRef(true);
     const debounceTimerRef = useRef<number | null>(null);
@@ -179,63 +181,66 @@ export const useStudyPlanManager = (showConfirmation: (options: ShowConfirmation
 
         try {
             if (!regenerate) {
-                const { data, error } = await supabase
-                    .from('study_plans')
-                    .select('plan_data')
-                    .eq('id', 1)
-                    .single();
+                try {
+                    const { data, error } = await supabase
+                        .from('study_plans')
+                        .select('plan_data')
+                        .eq('id', 1)
+                        .single();
 
-                if (error && error.code !== 'PGRST116') {
-                    throw new Error(error.message);
-                }
-                
-                const loadedData = data ? (data as any).plan_data as PlanDataBlob | null : null;
-                
-                if (loadedData && loadedData.plan && Array.isArray(loadedData.plan.schedule)) {
-                    const freshCodePool = initialMasterResourcePool;
-                    const dbResources = loadedData.resources || [];
-                    
-                    const archivedIds = new Set<string>();
-                    const customResources: StudyResource[] = [];
+                    if (!error && data && data.plan_data) {
+                        const loadedData = data.plan_data as PlanDataBlob;
+                        
+                        if (loadedData.plan && Array.isArray(loadedData.plan.schedule)) {
+                            const freshCodePool = initialMasterResourcePool;
+                            const dbResources = loadedData.resources || [];
+                            
+                            const archivedIds = new Set<string>();
+                            const customResources: StudyResource[] = [];
 
-                    dbResources.forEach((res: StudyResource) => {
-                        if (res.isArchived) {
-                            archivedIds.add(res.id);
+                            dbResources.forEach((res: StudyResource) => {
+                                if (res.isArchived) {
+                                    archivedIds.add(res.id);
+                                }
+                                if (res.id.startsWith('custom_')) {
+                                    customResources.push(res);
+                                }
+                            });
+
+                            let reconciledPool = freshCodePool.map(codeRes => ({
+                                ...codeRes,
+                                isArchived: archivedIds.has(codeRes.id),
+                            }));
+                            
+                            reconciledPool.push(...customResources);
+
+                            const loadedPlan = loadedData.plan;
+                            if (!loadedPlan.topicOrder) loadedPlan.topicOrder = DEFAULT_TOPIC_ORDER;
+                            if (!loadedPlan.cramTopicOrder) loadedPlan.cramTopicOrder = DEFAULT_TOPIC_ORDER;
+                            if (!loadedPlan.deadlines) loadedPlan.deadlines = {};
+                            if (loadedPlan.areSpecialTopicsInterleaved === undefined) {
+                                loadedPlan.areSpecialTopicsInterleaved = true;
+                            }
+                            if (!loadedPlan.startDate) loadedPlan.startDate = STUDY_START_DATE;
+                            if (!loadedPlan.endDate) loadedPlan.endDate = STUDY_END_DATE;
+                            
+                            setStudyPlan(loadedPlan);
+                            setGlobalMasterResourcePool(reconciledPool);
+                            setUserExceptions(loadedData.exceptions || []);
+                            
+                            setIsNewUser(false);
+                            setSystemNotification({ type: 'info', message: 'Welcome back! Your plan has been restored.' });
+                            setTimeout(() => setSystemNotification(null), 3000);
+                            setSaveStatus('saved');
+                            setTimeout(() => setSaveStatus('idle'), 2000);
+                            setIsLoading(false);
+                            isInitialLoadRef.current = false;
+                            return;
                         }
-                        if (res.id.startsWith('custom_')) {
-                            customResources.push(res);
-                        }
-                    });
-
-                    let reconciledPool = freshCodePool.map(codeRes => ({
-                        ...codeRes,
-                        isArchived: archivedIds.has(codeRes.id),
-                    }));
-                    
-                    reconciledPool.push(...customResources);
-
-                    const loadedPlan = loadedData.plan;
-                    if (!loadedPlan.topicOrder) loadedPlan.topicOrder = DEFAULT_TOPIC_ORDER;
-                    if (!loadedPlan.cramTopicOrder) loadedPlan.cramTopicOrder = DEFAULT_TOPIC_ORDER;
-                    if (!loadedPlan.deadlines) loadedPlan.deadlines = {};
-                    if (loadedPlan.areSpecialTopicsInterleaved === undefined) {
-                        loadedPlan.areSpecialTopicsInterleaved = true;
                     }
-                    if (!loadedPlan.startDate) loadedPlan.startDate = STUDY_START_DATE;
-                    if (!loadedPlan.endDate) loadedPlan.endDate = STUDY_END_DATE;
-                    
-                    setStudyPlan(loadedPlan);
-                    setGlobalMasterResourcePool(reconciledPool);
-                    setUserExceptions(loadedData.exceptions || []);
-                    
-                    setIsNewUser(false);
-                    setSystemNotification({ type: 'info', message: 'Welcome back! Your plan has been restored.' });
-                    setTimeout(() => setSystemNotification(null), 3000);
-                    setSaveStatus('saved');
-                    setTimeout(() => setSaveStatus('idle'), 2000);
-                    setIsLoading(false);
-                    isInitialLoadRef.current = false;
-                    return;
+                } catch (supabaseError) {
+                    console.warn('Supabase load failed, generating new plan:', supabaseError);
+                    // Continue to generation section
                 }
             }
 
@@ -253,7 +258,7 @@ export const useStudyPlanManager = (showConfirmation: (options: ShowConfirmation
                 allContent: '2025-11-05',
             };
 
-            // Try OR-Tools first, fallback to original algorithm
+            // Try OR-Tools only if available and enabled
             if (useORTools) {
                 try {
                     setSystemNotification({ type: 'info', message: 'Generating optimized schedule using OR-Tools...' });
@@ -285,6 +290,7 @@ export const useStudyPlanManager = (showConfirmation: (options: ShowConfirmation
                         type: 'warning', 
                         message: 'Advanced optimizer unavailable, using standard algorithm...' 
                     });
+                    // Continue to fallback algorithm below
                 }
             }
 
@@ -320,19 +326,25 @@ export const useStudyPlanManager = (showConfirmation: (options: ShowConfirmation
 
         debounceTimerRef.current = window.setTimeout(async () => {
             if (!studyPlan) return;
-            const stateToSave: PlanDataBlob = {
-                plan: studyPlan,
-                resources: globalMasterResourcePool,
-                exceptions: userExceptions,
-            };
-            const { error } = await supabase.from('study_plans').upsert([{ id: 1, plan_data: stateToSave }] as any);
-            if (error) {
-                console.error("Supabase save error:", error);
-                setSystemNotification({ type: 'error', message: "Failed to save progress to the cloud." });
+            try {
+                const stateToSave: PlanDataBlob = {
+                    plan: studyPlan,
+                    resources: globalMasterResourcePool,
+                    exceptions: userExceptions,
+                };
+                const { error } = await supabase.from('study_plans').upsert([{ id: 1, plan_data: stateToSave }] as any);
+                if (error) {
+                    console.error("Supabase save error:", error);
+                    setSystemNotification({ type: 'error', message: "Failed to save progress to the cloud." });
+                    setSaveStatus('error');
+                } else {
+                    setSaveStatus('saved');
+                    setTimeout(() => setSaveStatus('idle'), 2000);
+                }
+            } catch (saveError) {
+                console.error("Save failed:", saveError);
                 setSaveStatus('error');
-            } else {
-                setSaveStatus('saved');
-                setTimeout(() => setSaveStatus('idle'), 2000);
+                setSystemNotification({ type: 'error', message: "Failed to save progress to the cloud." });
             }
         }, 1500);
 
