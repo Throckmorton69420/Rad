@@ -25,7 +25,8 @@ import MasterResourcePoolViewer from './components/MasterResourcePoolViewer';
 import ScheduleReport from './components/ScheduleReport';
 import PrintModal from './components/PrintModal';
 import ProgressReport from './components/ProgressReport';
-import ContentReport from './components/ContentReport';
+import ParametersPanel from './components/ParametersPanel';
+
 import { formatDuration, getTodayInNewYork, parseDateString } from './utils/timeFormatter';
 import { addResourceToGlobalPool } from './services/studyResources';
 
@@ -232,7 +233,8 @@ const App: React.FC = () => {
     isActive: false, isStudySession: true, timeLeft: POMODORO_DEFAULT_STUDY_MINS * 60,
   });
   const [currentPomodoroTaskId, setCurrentPomodoroTaskId] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'schedule' | 'progress' | 'content'>('schedule');
+  const [activeTab, setActiveTab] = useState<'schedule' | 'progress' | 'content' | 'params'>('schedule');
+
   const [highlightedDates, setHighlightedDates] = useState<string[]>([]);
   const [isPomodoroCollapsed, setIsPomodoroCollapsed] = usePersistentState('radiology_pomodoro_collapsed', true);
   
@@ -246,8 +248,22 @@ const App: React.FC = () => {
     showArchived: false,
   });
 
-  const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
-  const [printableContent, setPrintableContent] = useState<React.ReactNode | null>(null);
+  const [solverParams, setSolverParams] = React.useState({
+    MIN_CHUNK_MINUTES: 15,
+    TARGET_CHUNK_MINUTES: 30,
+    DAILY_CAP_MINUTES: 840,
+    MAX_TASKS_PER_DAY: 18,
+    TIER1_WEEKLY_SHARE: 0.6,
+    PHYSICS_WEEKLY_SHARE: 0.2,
+    QB_NIS_WEEKLY_CEIL: 0.2,
+    W_LATE_TIER1: 1000,
+    W_LATE_PHYS: 250,
+    W_UNSCHED: 500,
+    W_FRAG: 1.5,
+    W_LONGTASK: 0.01,
+    ORTOOLS_WORKERS: 8,
+    ORTOOLS_MAX_TIME: 180,
+  });
 
   const handleReorderTasks = React.useCallback((date: string, tasks: ScheduledTask[]) => {
     setStudyPlan(prev => {
@@ -726,9 +742,10 @@ const App: React.FC = () => {
                             <button onClick={() => setActiveTab('progress')} className={`py-1.5 px-4 font-semibold text-sm rounded-md flex-1 transition-colors ${activeTab === 'progress' ? 'bg-[var(--glass-bg-active)] shadow text-[var(--text-primary)]' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}>
                                 <i className="fa-solid fa-chart-pie mr-2"></i> Progress
                             </button>
-                            <button onClick={() => setActiveTab('content')} className={`py-1.5 px-4 font-semibold text-sm rounded-md flex-1 transition-colors ${activeTab === 'content' ? 'bg-[var(--glass-bg-active)] shadow text-[var(--text-primary)]' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}>
-                                <i className="fa-solid fa-book-bookmark mr-2"></i> Content
+                            <button onClick={() => setActiveTab('params')} className={`py-1.5 px-4 font-semibold text-sm rounded-md flex-1 transition-colors ${activeTab === 'params' ? 'bg-[var(--glass-bg-active)] shadow text-[var(--text-primary)]' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}>
+                                <i className="fa-solid fa-sliders mr-2"></i> Parameters
                             </button>
+
                         </div>
                     </div>
 
@@ -757,22 +774,17 @@ const App: React.FC = () => {
                             {studyPlan && <ProgressDisplay studyPlan={studyPlan} />}
                         </div>
 
-                        <div className={activeTab !== 'content' ? 'hidden' : ''}>
-                            <MasterResourcePoolViewer 
-                                resources={globalMasterResourcePool}
-                                onOpenAddResourceModal={() => openResourceEditor(null)}
-                                onEditResource={openResourceEditor}
-                                onArchiveResource={handleRequestArchive}
-                                onRestoreResource={handleRestoreResource}
-                                onPermanentDeleteResource={handlePermanentDelete}
-                                scheduledResourceIds={scheduledResourceIds}
-                                onGoToDate={handleGoToDateForResource}
-                                onHighlightDates={handleHighlightDatesForResource}
-                                onClearHighlights={() => setHighlightedDates([])}
-                                filters={contentUiFilters}
-                                onFiltersChange={setContentUiFilters}
-                                onOpenPrintModal={() => { setActiveTab('content'); setIsPrintModalOpen(true); }}
-                            />
+                        <div className={activeTab !== 'params' ? 'hidden' : ''}>
+                          <ParametersPanel
+                            params={solverParams}
+                            onChange={(p) => setSolverParams(prev => ({...prev, ...p}))}
+                            onApply={() => {
+                              // Send params to backend via environment-like header
+                              // The service reads env; for runtime overrides, pass through query headers the server can optionally read.
+                              // For now, just call OR-Tools with current dates; the service uses its env and can be extended later to accept overrides.
+                              handleGenerateORToolsSchedule();
+                            }}
+                          />
                         </div>
                     </div>
                 </div>
