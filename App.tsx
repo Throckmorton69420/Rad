@@ -231,7 +231,6 @@ const App: React.FC = () => {
     studyDuration: POMODORO_DEFAULT_STUDY_MINS,
     restDuration: POMODORO_DEFAULT_REST_MINS,
     isActive: false, isStudySession: true, timeLeft: POMODORO_DEFAULT_STUDY_MINS * 60,
-  });
   const [currentPomodoroTaskId, setCurrentPomodoroTaskId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'schedule' | 'progress' | 'content' | 'params'>('schedule');
 
@@ -246,7 +245,6 @@ const App: React.FC = () => {
     source: 'all',
     status: 'all',
     showArchived: false,
-  });
 
   const [solverParams, setSolverParams] = React.useState({
     MIN_CHUNK_MINUTES: 15,
@@ -263,7 +261,6 @@ const App: React.FC = () => {
     W_LONGTASK: 0.01,
     ORTOOLS_WORKERS: 8,
     ORTOOLS_MAX_TIME: 180,
-  });
 
   const handleReorderTasks = React.useCallback((date: string, tasks: ScheduledTask[]) => {
     setStudyPlan(prev => {
@@ -272,7 +269,8 @@ const App: React.FC = () => {
         d.date === date ? { ...d, tasks } : d
       );
       return { ...prev, schedule: updatedSchedule };
-    });
+    const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
+  const [printableContent, setPrintableContent] = useState<React.ReactNode | null>(null);
   }, [setStudyPlan]);
 
   useEffect(() => {
