@@ -7,7 +7,7 @@ export const EXAM_DATE_START = "2025-11-11";
 // The study period is now fixed. The rebalance logic handles scheduling from "today" onwards,
 // while the initial generation will always create a plan for the full period.
 // This prevents errors if the app is opened after the study period has ended.
-export const STUDY_START_DATE = "2025-10-10";
+export const STUDY_START_DATE = "2025-10-15";
 export const STUDY_END_DATE = "2025-11-07";  // CHANGED: Extended to 11/07
 
 export const DEFAULT_DAILY_STUDY_MINS = 840; // 14 hours baseline
