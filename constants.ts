@@ -8,7 +8,7 @@ export const EXAM_DATE_START = "2025-11-11";
 // while the initial generation will always create a plan for the full period.
 // This prevents errors if the app is opened after the study period has ended.
 export const STUDY_START_DATE = "2025-10-10";
-export const STUDY_END_DATE = "2025-11-05"; 
+export const STUDY_END_DATE = "2025-11-07";  // CHANGED: Extended to 11/07
 
 export const DEFAULT_DAILY_STUDY_MINS = 840; // 14 hours baseline
 
@@ -85,3 +85,8 @@ export const DEFAULT_CONSTRAINTS: Constraints = {
 // For proactive splitting, split if task exceeds a normal workday's max budget.
 export const MAX_TASK_DURATION_BEFORE_SPLIT_CONSIDERATION = DEFAULT_DAILY_STUDY_MINS; 
 export const MIN_DURATION_for_SPLIT_PART = 30;
+
+// NEW: Added timing constants for Board Vitals calculation
+export const MINUTES_PER_PAGE = 0.75;
+export const MINUTES_PER_CASE = 1.0;
+export const MINUTES_PER_QUESTION = 0.75;
