@@ -657,11 +657,19 @@ const App: React.FC = () => {
          <i className="fas fa-exclamation-triangle fa-3x text-[var(--accent-red)] mb-4"></i>
          <h1 className="text-2xl font-bold mb-2">No Plan Loaded</h1>
          <p className="text-purple-200 text-center mb-6">
-           {systemNotification?.message || 'No saved plan was found. You can generate an optimized schedule with OR‑Tools or regenerate a local plan.'}
+           {optimizationProgress ? (
+             <span>
+               Optimizing with OR‑Tools… {Math.round((optimizationProgress.progress||0)*100)}% • {optimizationProgress.current_task}
+             </span>
+           ) : (
+             <span>{systemNotification?.message || 'No saved plan was found. You can generate an optimized schedule with OR‑Tools or regenerate a local plan.'}</span>
+           )}
          </p>
          <div className="flex gap-3 flex-wrap justify-center">
-           <Button onClick={handleGenerateORToolsSchedule} variant="primary">Generate Optimized Schedule</Button>
-           <Button onClick={() => loadSchedule(true)} variant="secondary">Regenerate Schedule</Button>
+           <Button onClick={handleGenerateORToolsSchedule} variant="primary" disabled={!!optimizationProgress}>
+             {optimizationProgress ? <><i className="fas fa-spinner fa-spin mr-2"></i>Working…</> : 'Generate Optimized Schedule'}
+           </Button>
+           <Button onClick={() => loadSchedule(true)} variant="secondary" disabled={!!optimizationProgress}>Regenerate Schedule</Button>
          </div>
        </div>
      );
