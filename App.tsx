@@ -633,7 +633,19 @@ const App: React.FC = () => {
   }
   
   if (!studyPlan) {
-     return <div className="flex flex-col items-center justify-center min-h-screen bg-black text-white p-4"><i className="fas fa-exclamation-triangle fa-3x text-[var(--accent-red)] mb-4"></i><h1 className="text-2xl font-bold mb-2">Error</h1><p className="text-red-400 text-center mb-6">{systemNotification?.message || 'An unknown error occurred.'}</p><Button onClick={() => loadSchedule(true)} variant="primary">Try Again</Button></div>;
+     return (
+       <div className="flex flex-col items-center justify-center min-h-screen bg-black text-white p-4">
+         <i className="fas fa-exclamation-triangle fa-3x text-[var(--accent-red)] mb-4"></i>
+         <h1 className="text-2xl font-bold mb-2">No Plan Loaded</h1>
+         <p className="text-purple-200 text-center mb-6">
+           {systemNotification?.message || 'No saved plan was found. You can generate an optimized schedule with OR‑Tools or regenerate a local plan.'}
+         </p>
+         <div className="flex gap-3 flex-wrap justify-center">
+           <Button onClick={handleGenerateORToolsSchedule} variant="primary">Generate Optimized Schedule</Button>
+           <Button onClick={() => loadSchedule(true)} variant="secondary">Regenerate Schedule</Button>
+         </div>
+       </div>
+     );
   }
 
   const MainAppContent = (
