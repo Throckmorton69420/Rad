@@ -221,6 +221,7 @@ const App: React.FC = () => {
     handleAddOrUpdateException,
     handleUpdateDeadlines,
     handleGenerateORToolsSchedule,
+    optimizationProgress
   } = useStudyPlanManager(showConfirmation);
 
   const todayInNewYork = useMemo(() => getTodayInNewYork(), []);
@@ -797,6 +798,22 @@ const App: React.FC = () => {
       <div className="print-only-container">
         {printableContent}
       </div>
+
+      {optimizationProgress && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/55">
+          <div className="w-72 max-w-[85vw] rounded-2xl p-5 bg-gradient-to-br from-purple-700/40 to-indigo-700/40 border border-white/15 shadow-2xl">
+            <div className="text-white font-semibold text-base mb-1">Optimizing with OR‑Tools</div>
+            <div className="text-purple-200 text-xs mb-3">{optimizationProgress.current_task}</div>
+            <div className="w-full h-2 rounded bg-white/15 overflow-hidden mb-2">
+              <div className="h-full bg-white/85 transition-all" style={{ width: `${Math.round(optimizationProgress.progress * 100)}%` }} />
+            </div>
+            <div className="flex items-center justify-between text-[11px] text-purple-200/85">
+              <div>Step {optimizationProgress.step} / {optimizationProgress.total_steps}</div>
+              <div>{Math.round(optimizationProgress.progress * 100)}%</div>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 };
