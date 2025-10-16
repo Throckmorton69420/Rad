@@ -308,7 +308,6 @@ export const useStudyPlanManager = (showConfirmation: (options: ShowConfirmation
                     }
                 } catch (supabaseError) {
                     console.warn('Supabase load failed, generating new plan:', supabaseError);
-                    // Continue to generation section
                 }
             }
 
@@ -323,10 +322,9 @@ export const useStudyPlanManager = (showConfirmation: (options: ShowConfirmation
             const currentTopicOrder = planStateRef.current.studyPlan?.topicOrder || DEFAULT_TOPIC_ORDER;
             const areTopicsInterleaved = planStateRef.current.studyPlan?.areSpecialTopicsInterleaved ?? true;
             const defaultDeadlines: DeadlineSettings = {
-                allContent: '2025-11-05',
+                allContent: STUDY_END_DATE,
             };
 
-            // Try OR-Tools only if available and enabled
             if (useORTools) {
                 try {
                     setSystemNotification({ type: 'info', message: '🚀 Initializing advanced optimization engine...' });
@@ -334,7 +332,7 @@ export const useStudyPlanManager = (showConfirmation: (options: ShowConfirmation
                     const orToolsRequest: ORToolsScheduleRequest = {
                         startDate: generationStartDate,
                         endDate: STUDY_END_DATE,
-                        dailyStudyMinutes: 840, // 14 hours
+                        dailyStudyMinutes: 840,
                         includeOptional: true
                     };
 
@@ -370,12 +368,18 @@ export const useStudyPlanManager = (showConfirmation: (options: ShowConfirmation
                         type: 'warning', 
                         message: 'Advanced optimizer unavailable, using standard algorithm...' 
                     });
-                    // Continue to fallback algorithm below
                 }
             }
 
-            // Fallback to original algorithm
-            const outcome: GeneratedStudyPlanOutcome = generateInitialSchedule(poolForGeneration, exceptionsForGeneration, currentTopicOrder, defaultDeadlines, generationStartDate, STUDY_END_DATE, areTopicsInterleaved);
+            const outcome: GeneratedStudyPlanOutcome = generateInitialSchedule(
+              poolForGeneration, 
+              exceptionsForGeneration, 
+              currentTopicOrder, 
+              defaultDeadlines, 
+              generationStartDate, 
+              STUDY_END_DATE, 
+              areTopicsInterleaved
+            );
 
             setStudyPlan(outcome.plan);
             setPreviousStudyPlan(null);
@@ -488,7 +492,7 @@ export const useStudyPlanManager = (showConfirmation: (options: ShowConfirmation
                     const orToolsRequest: ORToolsScheduleRequest = {
                         startDate: studyPlan.startDate,
                         endDate: studyPlan.endDate,
-                        dailyStudyMinutes: 840, // 14 hours
+                        dailyStudyMinutes: 840,
                         includeOptional: true
                     };
 
@@ -577,217 +581,3 @@ export const useStudyPlanManager = (showConfirmation: (options: ShowConfirmation
 
     const handleToggleRestDay = useCallback((date: string, isCurrentlyRestDay: boolean) => {
         if (!studyPlan) return;
-        updatePreviousStudyPlan(studyPlan);
-    
-        const newExceptions = [...userExceptions];
-        const existingExceptionIndex = newExceptions.findIndex(ex => ex.date === date);
-    
-        if (isCurrentlyRestDay) {
-            if (existingExceptionIndex > -1) {
-                newExceptions.splice(existingExceptionIndex, 1);
-            }
-        } else {
-            const newException: ExceptionDateRule = {
-                date: date,
-                dayType: 'specific-rest',
-                isRestDayOverride: true,
-                targetMinutes: 0,
-            };
-            if (existingExceptionIndex > -1) {
-                newExceptions[existingExceptionIndex] = newException;
-            } else {
-                newExceptions.push(newException);
-            }
-        }
-        
-        setUserExceptions(newExceptions);
-    
-        setIsLoading(true);
-        setSystemNotification({ type: 'info', message: 'Updating day status and rebalancing...' });
-        
-        setTimeout(() => {
-            try {
-                const poolForRebalance = globalMasterResourcePool.map(r => ({...r}));
-                const outcome = rebalanceSchedule(studyPlan, { type: 'standard' }, newExceptions, poolForRebalance);
-                setStudyPlan(outcome.plan);
-                setSystemNotification({ type: 'info', message: 'Schedule updated successfully!' });
-                setTimeout(() => setSystemNotification(null), 3000);
-            } catch (err: any) {
-                console.error("Error during day toggle rebalance:", err);
-                setSystemNotification({ type: 'error', message: err.message || "Failed to update schedule." });
-            } finally {
-                setIsLoading(false);
-            }
-        }, 50);
-    }, [studyPlan, userExceptions, globalMasterResourcePool]);
-
-    const handleUpdatePlanDates = useCallback((newStartDate: string, newEndDate: string) => {
-        showConfirmation({
-            title: "Regenerate Entire Schedule?",
-            message: "Changing the study dates will erase all current progress and regenerate the plan from scratch using the current resource pool. Are you sure you want to continue?",
-            confirmText: "Yes, Regenerate",
-            confirmVariant: 'danger',
-            onConfirm: () => {
-                setIsLoading(true);
-                setSystemNotification({ type: 'info', message: 'Regenerating schedule with new dates...' });
-                setTimeout(() => {
-                    const outcome = generateInitialSchedule(
-                        globalMasterResourcePool.map(r => ({...r})),
-                        userExceptions,
-                        studyPlan?.topicOrder,
-                        studyPlan?.deadlines,
-                        newStartDate,
-                        newEndDate,
-                        studyPlan?.areSpecialTopicsInterleaved
-                    );
-                    setStudyPlan(outcome.plan);
-                    setPreviousStudyPlan(null);
-                    if (outcome.notifications && outcome.notifications.length > 0) {
-                        setSystemNotification(outcome.notifications[0]);
-                    } else {
-                         setSystemNotification({ type: 'info', message: `Plan regenerated for ${newStartDate} to ${newEndDate}.` });
-                    }
-                    setIsLoading(false);
-                }, 50);
-            }
-        });
-    }, [showConfirmation, globalMasterResourcePool, userExceptions, studyPlan]);
-
-    const handleUpdateTopicOrderAndRebalance = (newOrder: Domain[]) => {
-        if (!studyPlan) return;
-        updatePreviousStudyPlan(studyPlan);
-        const updatedPlan = { ...studyPlan, topicOrder: newOrder };
-        setStudyPlan(updatedPlan);
-        triggerRebalance(updatedPlan, { type: 'standard' });
-    };
-    
-    const handleUpdateCramTopicOrderAndRebalance = (newOrder: Domain[]) => {
-        if (!studyPlan) return;
-        updatePreviousStudyPlan(studyPlan);
-        const updatedPlan = { ...studyPlan, cramTopicOrder: newOrder };
-        setStudyPlan(updatedPlan);
-        triggerRebalance(updatedPlan, { type: 'standard' });
-    };
-
-    const handleToggleCramMode = (isActive: boolean) => {
-        if (!studyPlan || isLoading) return;
-        updatePreviousStudyPlan(studyPlan);
-        const updatedPlan = { ...studyPlan, isCramModeActive: isActive };
-        setStudyPlan(updatedPlan); 
-        triggerRebalance(updatedPlan, { type: 'standard' });
-        setSystemNotification({ type: 'info', message: `Cram mode ${isActive ? 'activated' : 'deactivated'}. Rebalancing schedule.` });
-    };
-
-    const handleToggleSpecialTopicsInterleaving = (isActive: boolean) => {
-        if (!studyPlan || isLoading) return;
-        updatePreviousStudyPlan(studyPlan);
-        const updatedPlan = { ...studyPlan, areSpecialTopicsInterleaved: isActive };
-        setStudyPlan(updatedPlan);
-        triggerRebalance(updatedPlan, { type: 'standard' });
-        setSystemNotification({ type: 'info', message: `Interleaving is now ${isActive ? 'ON' : 'OFF'}. Rebalancing...` });
-    };
-
-    const handleUpdateDeadlines = (newDeadlines: DeadlineSettings) => {
-        if (!studyPlan) return;
-        updatePreviousStudyPlan(studyPlan);
-        const updatedPlan = { ...studyPlan, deadlines: newDeadlines };
-        setStudyPlan(updatedPlan);
-        triggerRebalance(updatedPlan, { type: 'standard' });
-        setSystemNotification({ type: 'info', message: `Deadlines updated. Rebalancing schedule.` });
-    };
-
-    const handleTaskToggle = (taskId: string, selectedDate: string) => {
-        setStudyPlan((prevPlan): StudyPlan | null => {
-            if (!prevPlan) return null;
-            updatePreviousStudyPlan(prevPlan);
-            const newSchedule = prevPlan.schedule.map(day => {
-                if (day.date === selectedDate) {
-                    const newTasks = day.tasks.map(task => {
-                        if (task.id !== taskId) {
-                            return task;
-                        }
-                        const newStatus: 'pending' | 'completed' = task.status === 'completed' ? 'pending' : 'completed';
-                        return { ...task, status: newStatus };
-                    });
-                    return { ...day, tasks: newTasks };
-                }
-                return day;
-            });
-            const updatedPlan = { ...prevPlan, schedule: newSchedule };
-            const newProgressPerDomain = { ...prevPlan.progressPerDomain };
-            Object.keys(newProgressPerDomain).forEach(domainKey => {
-                const domain = domainKey as Domain;
-                if (newProgressPerDomain[domain]) {
-                    newProgressPerDomain[domain]!.completedMinutes = newSchedule.reduce((sum, day) => sum + day.tasks.reduce((taskSum, task) => (task.originalTopic === domain && task.status === 'completed') ? taskSum + task.durationMinutes : taskSum, 0), 0);
-                }
-            });
-            return { ...updatedPlan, progressPerDomain: newProgressPerDomain };
-        });
-    };
-    
-    const handleSaveModifiedDayTasks = (updatedTasks: ScheduledTask[], selectedDate: string) => {
-        if (!studyPlan) return;
-        updatePreviousStudyPlan(studyPlan);
-        const reorderedTasks = updatedTasks.map((task, index) => ({ ...task, order: index }));
-        
-        const newTotalTime = reorderedTasks.reduce((sum, t) => sum + t.durationMinutes, 0);
-
-        const newSchedule = studyPlan.schedule.map(day => {
-            if (day.date === selectedDate) {
-                return {
-                    ...day,
-                    tasks: reorderedTasks,
-                    totalStudyTimeMinutes: newTotalTime,
-                    isRestDay: reorderedTasks.length === 0,
-                    isManuallyModified: true,
-                };
-            }
-            return day;
-        });
-        const updatedPlan = { ...studyPlan, schedule: newSchedule };
-        setStudyPlan(updatedPlan);
-        triggerRebalance(updatedPlan, { type: 'standard' });
-        setSystemNotification({ type: 'info', message: `Tasks for ${selectedDate} updated. Rebalancing future days.` });
-    };
-
-    const handleUndo = () => {
-        if (previousStudyPlan) {
-            setStudyPlan(JSON.parse(JSON.stringify(previousStudyPlan)));
-            setPreviousStudyPlan(null);
-            setSystemNotification(null);
-        }
-    };
-
-    return {
-        studyPlan,
-        setStudyPlan,
-        previousStudyPlan,
-        globalMasterResourcePool,
-        setGlobalMasterResourcePool,
-        userExceptions,
-        isLoading,
-        systemNotification,
-        setSystemNotification,
-        isNewUser,
-        setIsNewUser,
-        loadSchedule,
-        handleRebalance,
-        handleUpdatePlanDates,
-        handleUpdateTopicOrderAndRebalance,
-        handleUpdateCramTopicOrderAndRebalance,
-        handleToggleCramMode,
-        handleToggleSpecialTopicsInterleaving,
-        handleTaskToggle,
-        handleSaveModifiedDayTasks,
-        handleUndo,
-        updatePreviousStudyPlan,
-        saveStatus,
-        handleToggleRestDay,
-        handleAddOrUpdateException,
-        handleUpdateDeadlines,
-        handleGenerateORToolsSchedule,
-        useORTools,
-        setUseORTools,
-        optimizationProgress,  // Export progress info
-    };
-};
