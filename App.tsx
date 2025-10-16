@@ -149,7 +149,6 @@ const SidebarContent = React.memo(({
                                     isLoading={isLoading} 
                                     isCramModeActive={studyPlan.isCramModeActive ?? false}
                                     areSpecialTopicsInterleaved={studyPlan.areSpecialTopicsInterleaved}
-                                    onToggleSpecialTopicsInterleaving={handleToggleSpecialTopicsInterleaving}
                                 />
                             </div>
                         )}
