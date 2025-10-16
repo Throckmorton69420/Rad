@@ -275,8 +275,7 @@ const App: React.FC = () => {
         d.date === date ? { ...d, tasks } : d
       );
       return { ...prev, schedule: updatedSchedule };
-    const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
-  const [printableContent, setPrintableContent] = useState<React.ReactNode | null>(null);
+    });
   }, [setStudyPlan]);
 
   useEffect(() => {
