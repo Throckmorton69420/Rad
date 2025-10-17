@@ -261,8 +261,12 @@ const App: React.FC = () => {
     W_UNSCHED: 500,
     W_FRAG: 1.5,
     W_LONGTASK: 0.01,
+    W_TIER2_EARLY: 5,
     ORTOOLS_WORKERS: 8,
     ORTOOLS_MAX_TIME: 180,
+    W_TIER1_DEFICIT: 50,
+    W_PHYS_DEFICIT: 20,
+    W_QBN_EXCESS: 10
   });
 
   const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
