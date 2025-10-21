@@ -404,7 +404,82 @@ export const useStudyPlanManager = (showConfirmation: (options: ShowConfirmation
     }
   }, []);
 
-  /* ======= OR-Tools: rebalance variants (preserve completed) ======= */
+  /* ======= OR-Tools: generate from scratch (backend progress) ======= */
+  const handleGenerateORToolsScheduleBackend = useCallback(async () => {
+    try {
+      // Initialize HUD
+      setOptimizationProgress({
+        progress: 0,
+        step: 1,
+        total_steps: 6,
+        current_task: 'Starting solver',
+        elapsed_seconds: 0,
+        estimated_remaining_seconds: 0
+      });
+
+      const startDate = planStateRef.current.studyPlan?.startDate || getTodayInNewYork();
+      const endDate = planStateRef.current.studyPlan?.endDate || STUDY_END_DATE;
+
+      // 1) start
+      const startRes = await fetch(`${OR_TOOLS_SERVICE_URL}/schedule/start`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ startDate, endDate, dailyStudyMinutes: 840, includeOptional: true })
+      });
+      if (!startRes.ok) {
+        const msg = await startRes.text().catch(() => `HTTP ${startRes.status}`);
+        throw new Error(`Failed to start: ${msg}`);
+      }
+      const { task_id } = await startRes.json();
+
+      // 2) poll progress
+      let done = false;
+      while (!done) {
+        await new Promise(r => setTimeout(r, 333));
+        const progRes = await fetch(`${OR_TOOLS_SERVICE_URL}/schedule/progress/${task_id}`);
+        if (!progRes.ok) {
+          const msg = await progRes.text().catch(() => `HTTP ${progRes.status}`);
+          throw new Error(`Progress failed: ${msg}`);
+        }
+        const p = await progRes.json() as { status: 'running'|'complete'|'error'; percent: number; elapsed_seconds: number; eta_seconds: number|null; message?: string };
+        setOptimizationProgress({
+          progress: Math.max(0, Math.min(1, (p.percent ?? 0) / 100)),
+          step: Math.max(1, Math.min(6, Math.round(((p.percent ?? 0) / 100) * 6))),
+          total_steps: 6,
+          current_task: p.message || (p.status === 'complete' ? 'Finalizing' : 'Solving'),
+          elapsed_seconds: p.elapsed_seconds ?? 0,
+          estimated_remaining_seconds: p.eta_seconds ?? 0
+        });
+        if (p.status === 'complete') done = true;
+        if (p.status === 'error') throw new Error('Backend error during solve');
+      }
+
+      // 3) fetch result
+      const resultRes = await fetch(`${OR_TOOLS_SERVICE_URL}/schedule/result/${task_id}`);
+      if (!resultRes.ok) {
+        const msg = await resultRes.text().catch(() => `HTTP ${resultRes.status}`);
+        throw new Error(`Result fetch failed: ${msg}`);
+      }
+      const result = await resultRes.json() as OrScheduleResponse;
+
+      const next = adaptOrToolsToStudyPlan(result, planStateRef.current.globalMasterResourcePool);
+      setStudyPlan(next);
+      setOptimizationProgress({
+        progress: 1,
+        step: 6,
+        total_steps: 6,
+        current_task: 'Schedule optimization complete!',
+        elapsed_seconds: 0,
+        estimated_remaining_seconds: 0
+      });
+      setTimeout(() => setOptimizationProgress(null), 800);
+    } catch (e: any) {
+      setOptimizationProgress(null);
+      setSystemNotification({ type: 'error', message: `OR‑Tools generation failed: ${e?.message || e}` });
+    }
+  }, []);
+
+/* ======= OR-Tools: rebalance variants (preserve completed) ======= */
   const handleRebalance = useCallback(async (options: RebalanceOptions, planToUse?: StudyPlan) => {
     try {
       if (!useORTools) {
@@ -558,7 +633,7 @@ export const useStudyPlanManager = (showConfirmation: (options: ShowConfirmation
     handleToggleRestDay,
     handleAddOrUpdateException,
     handleUpdateDeadlines,
-    handleGenerateORToolsSchedule, // used by “Generate Optimized Schedule”
+    handleGenerateORToolsSchedule: handleGenerateORToolsScheduleBackend, // used by “Generate Optimized Schedule”
     optimizationProgress // drives HUD
   };
 };
