@@ -426,10 +426,40 @@ export const useStudyPlanManager = (showConfirmation: (options: ShowConfirmation
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ startDate, endDate, dailyStudyMinutes: 840, includeOptional: true })
       });
-      if (!startRes.ok) {
-        const msg = await startRes.text().catch(() => `HTTP ${startRes.status}`);
-        throw new Error(`Failed to start: ${msg}`);
+      // Legacy fallback if /schedule/start is not deployed
+      if (startRes.status === 404) {
+        setOptimizationProgress({
+          progress: 0.2,
+          step: 2,
+          total_steps: 6,
+          current_task: 'Legacy path: generating',
+          elapsed_seconds: 0,
+          estimated_remaining_seconds: 0
+        });
+        const legacyRes = await fetch(`${OR_TOOLS_SERVICE_URL}/generate-schedule`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ startDate, endDate, dailyStudyMinutes: 840, includeOptional: true })
+        });
+        if (!legacyRes.ok) {
+          const msg = await legacyRes.text().catch(() => `HTTP ${legacyRes.status}`);
+          throw new Error(`Legacy generate-schedule failed: ${msg}`);
+        }
+        const legacy = await legacyRes.json() as OrScheduleResponse;
+        const nextLegacy = adaptOrToolsToStudyPlan(legacy, planStateRef.current.globalMasterResourcePool);
+        setStudyPlan(nextLegacy);
+        setOptimizationProgress({
+          progress: 1,
+          step: 6,
+          total_steps: 6,
+          current_task: 'Schedule optimization complete!',
+          elapsed_seconds: 0,
+          estimated_remaining_seconds: 0
+        });
+        setTimeout(() => setOptimizationProgress(null), 800);
+        return;
       }
+
       const { task_id } = await startRes.json();
 
       // 2) poll progress
